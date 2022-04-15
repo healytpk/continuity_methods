@@ -1,4 +1,5 @@
 bool constexpr verbose = false;
+bool constexpr print_all_scopes = false;
 
 #include <cstddef>    // size_t
 #include <cstdlib>    // EXIT_FAILURE
@@ -137,26 +138,24 @@ protected:
     {
         verbose && cout << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
 
-        if ( true /*nullptr != cp._parent*/ )
+        extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
+        string const str = Word_For_Curly_Pair(cp);
+
+        if ( false == str.empty() || print_all_scopes )
         {
-            string str("a");
-
-            if ( false == str.empty() )
+            for ( size_t i = 0u; i != indentation; ++i )
             {
-                for ( size_t i = 0u; i != indentation; ++i )
-                {
-                    cout << "    ";
-                }
-
-                cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
-
-                extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
-                extern string GetNames(CurlyBracketManager::CurlyPair const *);
-
-                cout << "    " << Word_For_Curly_Pair(cp);
-
-                cout << endl;
+                cout << "    ";
             }
+
+            cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
+
+
+            extern string GetNames(CurlyBracketManager::CurlyPair const *);
+
+            cout << "    " << Word_For_Curly_Pair(cp);
+
+            cout << endl;
         }
 
         for ( CurlyPair const &e : cp.Nested() )

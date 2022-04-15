@@ -1,13 +1,15 @@
 bool constexpr verbose = false;
-bool constexpr print_all_scopes = false;
+bool constexpr print_all_scopes = true;
+bool constexpr only_print_numbers = true;
 
 #include <cstddef>    // size_t
+#include <cassert>    // assert
 #include <cstdlib>    // EXIT_FAILURE
 #include <iostream>   // cout, endl
 #include <fstream>    // ifstream
 #include <algorithm>  // copy, replace, count
 #include <iterator>   // next, back_inserter, istream_iterator
-#include <string>     // string
+#include <string>     // string, to_string
 #include <ios>        // ios::binary
 #include <iomanip>    // noskipws
 #include <stdexcept>  // out_of_range, runtime_error
@@ -21,6 +23,7 @@ using std::cout;
 using std::endl;
 using std::ifstream;
 using std::string;
+using std::to_string;
 using std::vector;
 using std::pair;
 
@@ -138,8 +141,13 @@ protected:
     {
         verbose && cout << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
 
-        extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
-        string const str = Word_For_Curly_Pair(cp);
+        string str;
+
+        if constexpr ( false == only_print_numbers )
+        {
+            extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &);
+            str = Word_For_Curly_Pair(cp);
+        }
 
         if ( false == str.empty() || print_all_scopes )
         {
@@ -151,9 +159,12 @@ protected:
             cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
 
-            extern string GetNames(CurlyBracketManager::CurlyPair const *);
+            if constexpr ( false == only_print_numbers )
+            {
+                extern string GetNames(CurlyBracketManager::CurlyPair const &);
 
-            cout << "    " << Word_For_Curly_Pair(cp);
+                cout << "    " << GetNames(cp);
+            }
 
             cout << endl;
         }
@@ -219,6 +230,11 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
 
 string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
+    if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
+    {
+        throw std::runtime_error( string("Curly Pair is fucked [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
+    }
+
     size_t j = cp.First();
 
     if ( 0u == j ) return {};
@@ -256,35 +272,34 @@ string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
     return {};
 }
 
-string GetNames(CurlyBracketManager::CurlyPair const *p)
+string GetNames(CurlyBracketManager::CurlyPair const &cp)
 {
-    if ( nullptr == p ) throw std::runtime_error("GetNames must never be called with a nullptr");
+    string retval = Word_For_Curly_Pair(cp);
 
-    string retval;
+    if ( retval.empty() ) return {};
+
     string tmp;
 
     size_t iteration = 0u;
 
     try
     {
-        for ( ;  ; p = p->Parent() )  // will throw exception when root pair is reached
+        for ( CurlyBracketManager::CurlyPair const *p = &cp; p = p->Parent(); /* no post-processing */ )  // will throw exception when root pair is reached
         {
+            assert( nullptr != p );
+
             verbose && cout << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
             tmp = Word_For_Curly_Pair(*p);
             verbose && cout << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
 
-            if ( tmp.empty() )
-            {
-                if ( 0u == iteration ) break;
-                else continue;
-            }
+            if ( tmp.empty() ) continue;
 
-            retval.insert(0u, tmp + "::");
+            //retval.insert(0u, tmp + "::");
         }
     }
     catch(CurlyBracketManager::ParentError const &)
     {
-        
+        //cout << "********** ParentError ************";
     }
 
     return retval;

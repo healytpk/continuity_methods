@@ -16,6 +16,9 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <stdexcept>  // out_of_range, runtime_error
 #include <utility>    // pair<>
 #include <cctype>     // isspace
+#include <list>       // list
+#include <map>        // map
+#include <ranges>     // views::filter
 
 #include <boost/algorithm/string/replace.hpp>  // replace_all
 
@@ -30,8 +33,11 @@ using std::pair;
 
 using std::istream_iterator;
 using std::back_inserter;
+using std::views::filter;
 
 string g_intact;
+
+std::map<string,string> g_scope_names;
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
@@ -82,7 +88,7 @@ public:
 
         CurlyPair *_parent;
         pair<size_t,size_t> _indices;
-        vector<CurlyPair> _nested;
+        std::list<CurlyPair> _nested;
 
     public:
 
@@ -92,7 +98,7 @@ public:
             _indices.second =         -1;
                     _parent = arg_parent;
 
-            _nested.reserve(64u);  // We get memory corruption without this - REVISIT FIX
+            //_nested.reserve(64u);  // We get memory corruption without this - this only applied to vector when it resized, and relocated objects (invalidating iterators)
         }
 
         void clear(void) { _nested.clear(); }
@@ -103,7 +109,7 @@ public:
 
         CurlyPair const *Parent(void) const;
         
-        vector<CurlyPair> const &Nested(void) const noexcept { return _nested; }
+        std::list<CurlyPair> const &Nested(void) const noexcept { return _nested; }
 
         CurlyPair *Add_New_Inner_Scope(size_t const first)
         {
@@ -141,8 +147,8 @@ protected:
 
         if ( false == only_print_numbers )
         {
-            extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &);
-            str = Word_For_Curly_Pair(cp);
+            extern pair<string,string> Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &);
+            str = Word_For_Curly_Pair(cp).second;
         }
 
         if ( false == str.empty() || print_all_scopes )
@@ -238,7 +244,7 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
-string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
+pair<string,string> Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
@@ -275,16 +281,18 @@ string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
     
     string const clace = g_intact.substr(i + 1u, j - i - 1u);
 
-    if      (     "class" == clace ) return possible_class_name;
-    else if (    "struct" == clace ) return possible_class_name;
-    else if ( "namespace" == clace ) return possible_class_name;
+    if      (     "class" == clace ) return { "class"    , possible_class_name };
+    else if (    "struct" == clace ) return { "class"    , possible_class_name };
+    else if ( "namespace" == clace ) return { "namespace", possible_class_name };
 
     return {};
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
 {
-    string retval = Word_For_Curly_Pair(cp);
+    pair<string,string> tmppair = Word_For_Curly_Pair(cp);
+
+    string &retval = tmppair.second;
 
     if ( retval.empty() ) return {};
 
@@ -299,7 +307,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
             //cout << "Iteration No. " << iteration << endl;
 
             verbose && cout << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
-            tmp = Word_For_Curly_Pair(*p);
+            tmp = Word_For_Curly_Pair(*p).second;
             verbose && cout << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
 
             if ( tmp.empty() ) continue;
@@ -311,6 +319,10 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     {
         //cout << "********** ParentError ************";
     }
+
+    retval.insert(0u, "::");
+
+    g_scope_names[retval] = tmppair.first;
 
     return retval;
 }
@@ -342,4 +354,22 @@ int main(int const argc, char **const argv)
 
     only_print_numbers = false;
     g_curly_manager.Print();
+
+    cout << "====================================== All scope names ==============================================" << endl;
+    for ( auto const &e : g_scope_names )
+    {
+        cout << e.first << " [" << e.second << "]" << endl;
+    }
+
+    cout << "====================================== Now the namespaces ==============================================" << endl;
+    for ( auto const &e : g_scope_names | filter([](pair<string,string> const &arg){ return "namespace" == arg.second; }) )
+    {
+        cout << e.first << endl;
+    }
+
+    cout << "====================================== Now the classes ==============================================" << endl;
+    for ( auto const &e : g_scope_names | filter([](pair<string,string> const &arg){ return "class" == arg.second || "struct" == arg.second; }) )
+    {
+        cout << e.first << endl;
+    }
 }

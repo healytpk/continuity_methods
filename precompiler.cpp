@@ -1,6 +1,7 @@
 bool constexpr verbose = false;
-bool constexpr print_all_scopes = true;
-bool constexpr only_print_numbers = true;
+bool constexpr print_all_scopes = false;
+
+bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 #include <cstddef>    // size_t
 #include <cassert>    // assert
@@ -78,11 +79,9 @@ public:
 
     struct CurlyPair {
     protected:
-    
+
         CurlyPair *_parent;
-
         pair<size_t,size_t> _indices;
-
         vector<CurlyPair> _nested;
 
     public:
@@ -92,6 +91,8 @@ public:
             _indices.first  =      first;
             _indices.second =         -1;
                     _parent = arg_parent;
+
+            _nested.reserve(64u);  // We get memory corruption without this - REVISIT FIX
         }
 
         void clear(void) { _nested.clear(); }
@@ -104,17 +105,10 @@ public:
         
         vector<CurlyPair> const &Nested(void) const noexcept { return _nested; }
 
-        void SetLast(size_t const arg)
-        {
-            if ( -1 == _indices.first  ) throw std::runtime_error("SetLast should not be called on the root CurlyPair");
-            if ( -1 != _indices.second ) throw std::runtime_error("This curly pair is being set for the second time!");
-            if ( arg <= _indices.first ) throw std::runtime_error("Last char index must be > than first char index");
-
-            _indices.second = arg;
-        }
-        
         CurlyPair *Add_New_Inner_Scope(size_t const first)
         {
+            if ( nullptr == this ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
+
             if ( (-1 != _indices.first) && (first <= _indices.first) ) throw std::runtime_error("Open bracket of inner scope must come after open bracket of outer scope");
 
             _nested.emplace_back(first, this);
@@ -124,6 +118,8 @@ public:
         
         CurlyPair *Close_Scope_And_Go_Back(size_t const last)
         {
+            if ( nullptr == this ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
+
             if ( nullptr ==        _parent ) throw std::runtime_error("The root pair is NEVER supposed to get closed");
             if (    last <= _indices.first ) throw std::runtime_error("Closing backet of inner scope must come after open bracket");
 
@@ -143,7 +139,7 @@ protected:
 
         string str;
 
-        if constexpr ( false == only_print_numbers )
+        if ( false == only_print_numbers )
         {
             extern string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &);
             str = Word_For_Curly_Pair(cp);
@@ -158,8 +154,7 @@ protected:
 
             cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-
-            if constexpr ( false == only_print_numbers )
+            if ( false == only_print_numbers )
             {
                 extern string GetNames(CurlyBracketManager::CurlyPair const &);
 
@@ -177,8 +172,6 @@ protected:
     }
 
 public:
-
-    bool Check_If_Root(CurlyPair const *) const;
 
     struct ParentError : std::exception { };
 
@@ -221,18 +214,35 @@ public:
 
 CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(void) const
 {
-    if ( nullptr == this->_parent ) throw std::runtime_error("Parent should never be invoked on the root pair");
+    if ( nullptr == this          ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
+    if ( nullptr == this->_parent ) throw std::runtime_error("Parent() should never be invoked on the root pair");
 
-    if ( &g_curly_manager._root_pair == _parent ) throw CurlyBracketManager::ParentError();
+    if ( &g_curly_manager._root_pair == this->_parent ) throw CurlyBracketManager::ParentError();
 
-    return _parent;
+/*
+    cout << "Inside Parent(void) : Current=[";
+    cout << this->_indices.first;
+    cout << ", ";
+    cout << this->_indices.second;
+
+    assert( nullptr != this->_parent );
+
+    cout << "], Parent=[";
+    cout << this->_parent->_indices.first;
+    cout << ", ";
+    cout << this->_parent->_indices.second;
+    cout << "]";
+    cout << endl;
+*/
+
+    return this->_parent;
 }
 
 string Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
-        throw std::runtime_error( string("Curly Pair is fucked [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
+        throw std::runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
     }
 
     size_t j = cp.First();
@@ -286,7 +296,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     {
         for ( CurlyBracketManager::CurlyPair const *p = &cp; p = p->Parent(); /* no post-processing */ )  // will throw exception when root pair is reached
         {
-            assert( nullptr != p );
+            //cout << "Iteration No. " << iteration << endl;
 
             verbose && cout << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
             tmp = Word_For_Curly_Pair(*p);
@@ -294,7 +304,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
             if ( tmp.empty() ) continue;
 
-            //retval.insert(0u, tmp + "::");
+            retval.insert(0u, tmp + "::");
         }
     }
     catch(CurlyBracketManager::ParentError const &)
@@ -327,5 +337,9 @@ int main(int const argc, char **const argv)
     //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(cout) );
     
     g_curly_manager.Process();
+
+    cout << "====================================== ALL PROCESSING DONE ===========================================" << endl;
+
+    only_print_numbers = false;
     g_curly_manager.Print();
 }

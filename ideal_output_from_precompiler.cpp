@@ -72,8 +72,7 @@ protected:
 
 public:
 
-    Invoker(IMethodInvoker &arg_mi, void *const arg_this) : _mi(arg_mi),
-_this(arg_this) {}
+    Invoker(IMethodInvoker &arg_mi, void *const arg_this) : _mi(arg_mi), _this(arg_this) {}
 
     // The extra 'this' parameter is no longer needed
     bool Trigger(void) // not virtual
@@ -92,25 +91,13 @@ template<class Base, class Derived>
 class MethodInvoker final : public IMethodInvoker {
 protected:
 
-    union {
-        void (*f)(void);
-        bool (Base::*Trigger)(void);
-        void (Base::*Elevate)(float);
-    } const m;
-
-public:
-
-    MethodInvoker(void (*const arg_method)(void)) : m({arg_method}) {}
-
-protected:
-
     // All methods have one extra
     // parameter for 'this' as 'void*'
     bool Trigger(void *const arg_this) override
     {
         Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));  
 
-        return (p->*m.Trigger)();
+        return p->Base::Trigger();
     }
  
     // All methods have one extra
@@ -119,22 +106,22 @@ protected:
     {
         Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));  
 
-        return (p->*m.Elevate)(arg0);
+        return p->Base::Elevate(arg0);
     }
 };
 
+MethodInvoker<Laser           ,Laser_NitrogenPicoSecond> g_mi_Laser;
+
+MethodInvoker<Laser_Nitrogen  ,Laser_NitrogenPicoSecond> g_mi_Laser_Nitrogen;
+
+MethodInvoker<Laser_PicoSecond,Laser_NitrogenPicoSecond> g_mi_Laser_PicoSecond;
+
 bool Laser_NitrogenPicoSecond::Trigger(void)
 {    
-    static MethodInvoker<Laser,Laser_NitrogenPicoSecond> mi_Laser( reinterpret_cast<void(*)(void)>(&Laser::Trigger) );
-    
-    static MethodInvoker<Laser_Nitrogen,Laser_NitrogenPicoSecond> mi_Laser_Nitrogen( reinterpret_cast<void(*)(void)>(&Laser_Nitrogen::Trigger) );
-    
-    static MethodInvoker<Laser_PicoSecond,Laser_NitrogenPicoSecond> mi_Laser_PicoSecond( reinterpret_cast<void(*)(void)>(&Laser_PicoSecond::Trigger) );
-    
     std::array<Invoker,3u> methods = {
-        Invoker(mi_Laser, this),
-        Invoker(mi_Laser_Nitrogen, this),
-        Invoker(mi_Laser_PicoSecond, this),
+        Invoker(g_mi_Laser           , this),
+        Invoker(g_mi_Laser_Nitrogen  , this),
+        Invoker(g_mi_Laser_PicoSecond, this),
     };
 
     for ( auto &inv : methods )
@@ -151,16 +138,10 @@ bool Laser_NitrogenPicoSecond::Trigger(void)
 
 void Laser_NitrogenPicoSecond::Elevate(float const arg)
 {    
-    static MethodInvoker<Laser,Laser_NitrogenPicoSecond> mi_Laser( reinterpret_cast<void(*)(void)>(&Laser::Elevate) );
-    
-    static MethodInvoker<Laser_Nitrogen,Laser_NitrogenPicoSecond> mi_Laser_Nitrogen( reinterpret_cast<void(*)(void)>(&Laser_Nitrogen::Elevate) );
-    
-    static MethodInvoker<Laser_PicoSecond,Laser_NitrogenPicoSecond> mi_Laser_PicoSecond( reinterpret_cast<void(*)(void)>(&Laser_PicoSecond::Elevate) );
-    
     std::array<Invoker,3u> methods = {
-        Invoker(mi_Laser, this),
-        Invoker(mi_Laser_Nitrogen, this),
-        Invoker(mi_Laser_PicoSecond, this),
+        Invoker(g_mi_Laser           , this),
+        Invoker(g_mi_Laser_Nitrogen  , this),
+        Invoker(g_mi_Laser_PicoSecond, this),
     };
 
     for ( auto &inv : methods )

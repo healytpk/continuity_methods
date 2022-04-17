@@ -432,7 +432,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
 #include <set>    // set
 
-bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual)
+bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
@@ -451,7 +451,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view cons
 
     assert( nullptr != p );
 
-    bool is_new_entry = already_recorded.insert(full_name).second;
+    bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
     if ( false == is_new_entry && true == is_virtual ) return false;  // if it's not a new entry and if it's virtual
 
@@ -467,16 +467,17 @@ bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view cons
             cout << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
-        if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e)) )
+        if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) )
         {
-            cout << base_name << ", ";
+            retval += base_name;
+            retval += ", ";
         }
     }
 
     return true;
 }
 
-void Recursive_Print_All_Bases(string_view arg)
+string Get_All_Bases(string_view arg)
 {
     size_t const i = arg.rfind("::");
 
@@ -485,7 +486,11 @@ void Recursive_Print_All_Bases(string_view arg)
 
     std::set<string> already_recorded;
 
-    Recursive_Print_All_Bases_PROPER(prefix, classname, already_recorded, false);
+    string retval;
+
+    Recursive_Print_All_Bases_PROPER(prefix, classname, already_recorded, false, retval);
+
+    return retval;
 }
 
 int main(int const argc, char **const argv)
@@ -531,10 +536,6 @@ int main(int const argc, char **const argv)
     cout << "====================================== Now the classes ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == arg.second.first || "struct" == arg.second.first; }) )
     {
-        cout << e.first << " | Bases = ";
-
-        Recursive_Print_All_Bases(e.first);
-
-        cout << endl;
+        cout << e.first << " | Bases = " << Get_All_Bases(e.first) << endl;
     }
 }

@@ -1,5 +1,5 @@
 bool constexpr verbose = false;
-bool constexpr print_all_scopes = false;
+bool constexpr print_all_scopes = true;
 
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
@@ -20,7 +20,8 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <map>        // map
 #include <ranges>     // views::filter
 
-#include <boost/algorithm/string/replace.hpp>  // replace_all
+#include <boost/algorithm/string/trim_all.hpp>  // trim_all
+#include <boost/algorithm/string/replace.hpp>   // replace_all
 
 using std::size_t;
 using std::cout;
@@ -78,6 +79,46 @@ inline size_t EndLine(size_t char_index)
     }
     
     return char_index;
+}
+
+string TextBeforeOpenCurlyBracket(size_t const char_index)
+{
+    ThrowIfBadIndex(char_index);
+
+    if ( 0u == char_index ) return {};
+
+    if ( '{' != g_intact[char_index] ) throw std::runtime_error("This isn't an open curly bracket!");
+
+    size_t i = char_index;
+
+    while ( --i )
+    {
+        bool break_out_of_loop = false;
+
+        switch ( g_intact[i] )
+        {
+        case '}':
+        case '{':
+        case ';':
+        case '(':
+        case ')':
+
+            break_out_of_loop = true;
+            break;
+
+        default:
+
+            continue;
+        }
+
+        if ( break_out_of_loop ) break;
+    }
+
+    string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
+
+    boost::algorithm::trim_all(retval);
+
+    return retval;
 }
 
 class CurlyBracketManager {
@@ -159,6 +200,8 @@ protected:
             }
 
             cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
+
+            cout << "  [" << TextBeforeOpenCurlyBracket(cp.First()) << "]";
 
             if ( false == only_print_numbers )
             {

@@ -450,9 +450,9 @@ void Recursive_Print_All_Bases(string const &arg)
     {
         string const &base_name = std::get<2u>(e);
 
-        cout << base_name << ", ";
-
         Recursive_Print_All_Bases(arg.substr(0u, arg.rfind("::") + 2u) + base_name);
+
+        cout << base_name << ", ";
     }
 }
 

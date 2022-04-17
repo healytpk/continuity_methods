@@ -1,5 +1,5 @@
 bool constexpr verbose = false;
-bool constexpr print_all_scopes = true;
+bool constexpr print_all_scopes = false;
 
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
@@ -19,6 +19,10 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <list>       // list
 #include <map>        // map
 #include <ranges>     // views::filter
+#include <tuple>      // tuple
+#include <utility>    // pair
+#include <vector>     // vector
+#include <string_view> // string_view
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -29,12 +33,16 @@ using std::endl;
 using std::ifstream;
 using std::string;
 using std::to_string;
+using std::string_view;
 using std::vector;
+using std::tuple;
 using std::pair;
 
 using std::istream_iterator;
 using std::back_inserter;
 using std::views::filter;
+
+namespace views = std::views;
 
 string g_intact;
 
@@ -102,6 +110,8 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
         case ';':
         case '(':
         case ')':
+        case '<':
+        case '>':
 
             break_out_of_loop = true;
             break;
@@ -120,6 +130,19 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     return retval;
 }
+
+class ClassInheritanceEntry {
+
+    bool is_virtual;
+
+    enum class Visibility {
+        is_public,
+        is_protected,
+        is_private
+    } visibility;
+
+    string str_classname;
+};
 
 class CurlyBracketManager {
 public:
@@ -186,10 +209,11 @@ protected:
 
         string str;
 
+        extern tuple< string,string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
+
         if ( false == only_print_numbers )
         {
-            extern pair<string,string> Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &);
-            str = Word_For_Curly_Pair(cp).second;
+            str = std::get<1u>(Intro_For_Curly_Pair(cp));
         }
 
         if ( false == str.empty() || print_all_scopes )
@@ -201,13 +225,15 @@ protected:
 
             cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-            cout << "  [" << TextBeforeOpenCurlyBracket(cp.First()) << "]";
+            verbose && cout << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
 
             if ( false == only_print_numbers )
             {
                 extern string GetNames(CurlyBracketManager::CurlyPair const &);
 
-                cout << "    " << GetNames(cp);
+                //cout << "    " << GetNames(cp);
+
+                cout << "  [" << GetNames(cp) << "]";
             }
 
             cout << endl;
@@ -287,59 +313,66 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
-pair<string,string> Word_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
+tuple< string, string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
         throw std::runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
     }
 
-    size_t j = cp.First();
+    string intro = TextBeforeOpenCurlyBracket(cp.First());
 
-    if ( 0u == j ) return {};
+    if ( intro.starts_with("namespace") )
+    {
+        std::ranges::split_view my_view{intro, ' '};
 
-    --j;  // j might become zero here
+        string str;
 
-    while ( false == std::isspace(g_intact[j]) ) if ( 0u == j ) return {}; else --j;
+        unsigned i = 0u;
+        for (auto word : my_view)
+        {
+            if ( 1u != i++ ) continue;
 
-    // control won't reach here if j is zero
-    
-    size_t i = j - 1u;  // i might become zero here
+            for (char ch : word)
+            {
+                str += ch;
+            }
 
-    while ( false == std::isspace(g_intact[i]) ) if ( 0u == i ) return {}; else --i;
-    
-    // control won't reach here if i is zero
+            break;
+        }
 
-    string const possible_class_name = g_intact.substr(i + 1u, j - i - 1u);  // REVISIT fix - check for rollover here
+        return { "namespace", str, {} };
+    }
+    else if ( intro.starts_with("class") || intro.starts_with("struct") )
+    {
+        std::ranges::split_view my_view{intro, ' '};
 
-    //cout << "[" << possible_class_name << "] - - - ";
+        string str;
 
-    j = i;
+        unsigned i = 0u;
+        for (auto word : my_view)
+        {
+            if ( 1u != i++ ) continue;
 
-    if ( j == 0u || j == 1u ) return {};
+            for (char ch : word)
+            {
+                str += ch;
+            }
 
-    i = j - 1u;
+            break;
+        }
 
-    while ( false == std::isspace(g_intact[i]) ) if ( 0u == i ) break; else --i;
-    
-    string const clace = g_intact.substr(i + 1u, j - i - 1u);
-
-    if      (     "class" == clace ) return { "class"    , possible_class_name };
-    else if (    "struct" == clace ) return { "class"    , possible_class_name };
-    else if ( "namespace" == clace ) return { "namespace", possible_class_name };
+        return { "class", str, {} };
+    }
 
     return {};
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
 {
-    pair<string,string> tmppair = Word_For_Curly_Pair(cp);
-
-    string &retval = tmppair.second;
+    string retval = std::get<1u>( Intro_For_Curly_Pair(cp) );  /* e.g. 0 = class, 1 = Laser, 2 = [ ... base classes ... ] */
 
     if ( retval.empty() ) return {};
-
-    string tmp;
 
     size_t iteration = 0u;
 
@@ -350,7 +383,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
             //cout << "Iteration No. " << iteration << endl;
 
             verbose && cout << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
-            tmp = Word_For_Curly_Pair(*p).second;
+            string const tmp = std::get<1u>( Intro_For_Curly_Pair(*p) );
             verbose && cout << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
 
             if ( tmp.empty() ) continue;
@@ -365,7 +398,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
     retval.insert(0u, "::");
 
-    g_scope_names[retval] = tmppair.first;
+    g_scope_names[retval] = std::get<0u>( Intro_For_Curly_Pair(cp) );
 
     return retval;
 }

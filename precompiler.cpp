@@ -430,30 +430,62 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     return retval;
 }
 
-void Recursive_Print_All_Bases(string const &arg)
-{
+#include <set>    // set
 
+bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual)
+{
     decltype(g_scope_names)::mapped_type const *p = nullptr;
+
+    string full_name(prefix);
+    full_name += "::";
+    full_name += classname;
 
     try
     {
-        p = &( g_scope_names.at(arg) );
+        p = &( g_scope_names.at(full_name) );
     }
     catch (std::out_of_range const &)
     {
-        return;
+        throw std::runtime_error("Encountered a class name that hasn't been defined '" + full_name + "'");
     }
 
     assert( nullptr != p );
+
+    bool is_new_entry = already_recorded.insert(full_name).second;
+
+    if ( false == is_new_entry && true == is_virtual ) return false;  // if it's not a new entry and if it's virtual
 
     for ( auto const &e : p->second )
     {
         string const &base_name = std::get<2u>(e);
 
-        Recursive_Print_All_Bases(arg.substr(0u, arg.rfind("::") + 2u) + base_name);
+        if constexpr ( verbose )
+        {
+            cout << " [ALREADY_SEEN=";
+            for ( auto const &e : already_recorded ) cout << e << ", ";
+            cout << "] ";
+            cout << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+        }
 
-        cout << base_name << ", ";
+        if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e)) )
+        {
+            cout << base_name << ", ";
+        }
     }
+
+    return true;
+}
+
+void Recursive_Print_All_Bases(string_view arg)
+{
+    size_t const i = arg.rfind("::");
+
+    string_view prefix    = arg.substr(0u, i);
+    string_view classname = arg.substr(i +  2u);
+
+    std::set<string> already_recorded;
+
+    Recursive_Print_All_Bases_PROPER(prefix, classname, already_recorded, false);
 }
 
 int main(int const argc, char **const argv)

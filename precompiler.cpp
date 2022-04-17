@@ -26,6 +26,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all
 #include <boost/algorithm/string/replace.hpp>   // replace_all
+#include <boost/algorithm/string/erase.hpp>     // erase_all
 
 using std::size_t;
 using std::cout;
@@ -41,12 +42,21 @@ using std::pair;
 using std::istream_iterator;
 using std::back_inserter;
 using std::views::filter;
-
-namespace views = std::views;
+using std::views::split;
 
 string g_intact;
 
-std::map<string,string> g_scope_names;
+std::map< string, pair< string, vector< tuple<string,string,string> > > > g_scope_names;
+
+/* For example:
+
+get<0>    class
+get<1>    Laser_NitrogenPicoSecond
+get<2>    {
+              { "" "public" "Laser_Nitrogen"   }
+              { "" "public" "Laser_PicoSecond" }
+          }
+*/
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
@@ -131,19 +141,6 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
     return retval;
 }
 
-class ClassInheritanceEntry {
-
-    bool is_virtual;
-
-    enum class Visibility {
-        is_public,
-        is_protected,
-        is_private
-    } visibility;
-
-    string str_classname;
-};
-
 class CurlyBracketManager {
 public:
 
@@ -209,7 +206,7 @@ protected:
 
         string str;
 
-        extern tuple< string,string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
+        extern tuple< string,string, vector< tuple<string,string,string> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
 
         if ( false == only_print_numbers )
         {
@@ -294,26 +291,50 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
 
     if ( &g_curly_manager._root_pair == this->_parent ) throw CurlyBracketManager::ParentError();
 
-/*
-    cout << "Inside Parent(void) : Current=[";
-    cout << this->_indices.first;
-    cout << ", ";
-    cout << this->_indices.second;
-
-    assert( nullptr != this->_parent );
-
-    cout << "], Parent=[";
-    cout << this->_parent->_indices.first;
-    cout << ", ";
-    cout << this->_parent->_indices.second;
-    cout << "]";
-    cout << endl;
-*/
-
     return this->_parent;
 }
 
-tuple< string, string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
+vector< tuple<string,string,string> > Parse_Bases_Of_Class(string_view const str)
+{
+    tuple<string,string,string> tmp;
+
+    vector< tuple<string,string,string> > retval;
+
+    for ( auto const &base : str | split(',') )
+    {
+        for ( auto const &word_view : base |  split(' ') )
+        {
+            string word;
+
+            for ( char const c : word_view )
+            {
+                word += c;
+            }
+
+            boost::trim_all(word);
+
+            if ( "virtual" == word )
+            {
+                std::get<0u>(tmp) = "virtual";
+            }
+            else if ( "public" == word || "protected" == word || "private" == word )
+            {
+                std::get<1u>(tmp) = word;
+            }
+            else
+            {
+                std::get<2u>(tmp) = word;  // This is the name of the base class
+            }
+        }
+
+        //cout << "[ADD RECORD : " << std::get<0u>(tmp) << " : " << std::get<1u>(tmp) << " : " << std::get<2u>(tmp) << "]";
+        retval.push_back(tmp);
+    }
+
+    return retval;
+}
+
+tuple< string, string, vector< tuple<string,string,string> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
@@ -324,12 +345,10 @@ tuple< string, string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(Curl
 
     if ( intro.starts_with("namespace") )
     {
-        std::ranges::split_view my_view{intro, ' '};
-
         string str;
 
         unsigned i = 0u;
-        for (auto word : my_view)
+        for ( auto word : intro | std::views::split(' ') )
         {
             if ( 1u != i++ ) continue;
 
@@ -343,34 +362,42 @@ tuple< string, string, vector<ClassInheritanceEntry> > Intro_For_Curly_Pair(Curl
 
         return { "namespace", str, {} };
     }
-    else if ( intro.starts_with("class") || intro.starts_with("struct") )
+
+    if (   !(intro.starts_with("class") || intro.starts_with("struct"))   ) return {};
+
+    boost::erase_all( intro, " final" );   // careful it might be "final{"
+
+    auto my_view = intro | std::views::split(' ');
+
+    string str;
+
+    unsigned i = 0u;
+    auto pword = my_view.begin();
+    for ( ; pword != my_view.end(); ++pword)
     {
-        std::ranges::split_view my_view{intro, ' '};
+        auto word = *pword;
 
-        string str;
+        if ( 1u != i++ ) continue;
 
-        unsigned i = 0u;
-        for (auto word : my_view)
+        for (char ch : word)
         {
-            if ( 1u != i++ ) continue;
-
-            for (char ch : word)
-            {
-                str += ch;
-            }
-
-            break;
+            str += ch;
         }
 
-        return { "class", str, {} };
+        break;
     }
 
-    return {};
+    if ( ++pword == my_view.end() ) return { "class", str, {} };
+    if ( ++pword == my_view.end() ) return { "class", str, {} };
+
+    return { "class", str, Parse_Bases_Of_Class( string_view( &(*pword).front(), &intro.back() + 1u ) ) };
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
 {
-    string retval = std::get<1u>( Intro_For_Curly_Pair(cp) );  /* e.g. 0 = class, 1 = Laser, 2 = [ ... base classes ... ] */
+    tuple< string, string, vector< tuple<string,string,string> >  > tmppair = Intro_For_Curly_Pair(cp);
+
+    string retval = std::get<1u>(tmppair);  /* e.g. 0 = class, 1 = Laser, 2 = [ ... base classes ... ] */
 
     if ( retval.empty() ) return {};
 
@@ -398,9 +425,35 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
     retval.insert(0u, "::");
 
-    g_scope_names[retval] = std::get<0u>( Intro_For_Curly_Pair(cp) );
+    g_scope_names[retval] = { std::get<0u>(tmppair), std::get<2u>(tmppair) };
 
     return retval;
+}
+
+void Recursive_Print_All_Bases(string const &arg)
+{
+
+    decltype(g_scope_names)::mapped_type const *p = nullptr;
+
+    try
+    {
+        p = &( g_scope_names.at(arg) );
+    }
+    catch (std::out_of_range const &)
+    {
+        return;
+    }
+
+    assert( nullptr != p );
+
+    for ( auto const &e : p->second )
+    {
+        string const &base_name = std::get<2u>(e);
+
+        cout << base_name << ", ";
+
+        Recursive_Print_All_Bases(arg.substr(0u, arg.rfind("::") + 2u) + base_name);
+    }
 }
 
 int main(int const argc, char **const argv)
@@ -434,18 +487,22 @@ int main(int const argc, char **const argv)
     cout << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
-        cout << e.first << " [" << e.second << "]" << endl;
+        cout << e.first << " [" << e.second.first << "]" << endl;
     }
 
     cout << "====================================== Now the namespaces ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](pair<string,string> const &arg){ return "namespace" == arg.second; }) )
+    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == arg.second.first; }) )
     {
         cout << e.first << endl;
     }
 
     cout << "====================================== Now the classes ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](pair<string,string> const &arg){ return "class" == arg.second || "struct" == arg.second; }) )
+    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == arg.second.first || "struct" == arg.second.first; }) )
     {
-        cout << e.first << endl;
+        cout << e.first << " | Bases = ";
+
+        Recursive_Print_All_Bases(e.first);
+
+        cout << endl;
     }
 }

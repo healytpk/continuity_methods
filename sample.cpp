@@ -70,20 +70,11 @@ struct FurtherDerived : virtual Base2, Derived2  {
 };
 
 namespace MyNamespace {
-class Organism {
 
-	class Mammal {
-		
-		class Canine {
-			
-			class Wolf {
-				
-			};
-			
-		};
-		
-	};
-};
+class Organism {};
+class Mammal : Organism {};
+class Canine : Mammal {};
+class Wolf : Canine {};
 
 class NonOrganism {
 	

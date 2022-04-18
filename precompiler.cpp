@@ -20,7 +20,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <map>        // map
 #include <ranges>     // views::filter
 #include <tuple>      // tuple
-#include <utility>    // pair
+#include <utility>    // pair, move
 #include <vector>     // vector
 #include <string_view> // string_view
 
@@ -146,10 +146,10 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     boost::algorithm::trim_all(retval);
 
-    //if ( retval.contains("unary_function<_Tp") ) cout << "1: ===================" << retval << "===================" << endl;
+    if ( retval.contains("Pair::first_type") ) cout << "1: ===================" << retval << "===================" << endl;
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
-    //if ( retval.contains("unary_function<_Tp") ) cout << "2: ===================" << retval << "===================" << endl;
+    if ( retval.contains("Pair::first_type") ) cout << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }
@@ -313,7 +313,8 @@ vector< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
 
     vector< tuple<string,string,string> > retval;
 
-    std::regex const my_regex("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
+    std::regex const my_regex ("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
+    std::regex const my_regex2("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
     for (std::sregex_token_iterator iter(str.begin(), str.end(), my_regex, -1);
          iter != std::sregex_token_iterator();
@@ -321,14 +322,11 @@ vector< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
     {
         string base_info_str{ *iter };
 
-        for ( auto const &word_view : base_info_str |  split(' ') )
+        for (std::sregex_token_iterator iter2(base_info_str.begin(), base_info_str.end(), my_regex2, -1);
+             iter2 != std::sregex_token_iterator();
+             ++iter2)
         {
-            string word;
-
-            for ( char const c : word_view )
-            {
-                word += c;
-            }
+            string word { *iter2 };
 
             boost::trim_all(word);
 
@@ -465,7 +463,22 @@ bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view cons
     }
     catch (std::out_of_range const &)
     {
-        throw std::runtime_error("Encountered a class name that hasn't been defined '" + full_name + "'");
+        string const duplicate_original_full_name{ full_name };
+
+        string const class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
+
+        full_name = prefix;
+        full_name += "::";
+        full_name += class_name_without_template_specialisation;
+
+        try
+        {
+             p = &( g_scope_names.at(full_name) );
+        }
+        catch (std::out_of_range const &)
+        {
+            throw std::runtime_error("Encountered a class name that hasn't been defined (original = '" + duplicate_original_full_name + "') (edited = '" + full_name + "')");
+        }
     }
 
     assert( nullptr != p );

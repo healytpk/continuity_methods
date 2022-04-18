@@ -99,6 +99,8 @@ inline size_t EndLine(size_t char_index)
     return char_index;
 }
 
+#include <regex>
+
 string TextBeforeOpenCurlyBracket(size_t const char_index)
 {
     ThrowIfBadIndex(char_index);
@@ -120,8 +122,8 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
         case ';':
         case '(':
         case ')':
-        case '<':
-        case '>':
+        //case '<':
+        //case '>':
 
             break_out_of_loop = true;
             break;
@@ -136,7 +138,18 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
 
+    boost::algorithm::replace_all(retval, "::", "mOnKeY");
+    boost::algorithm::replace_all(retval, ":", " : ");
+    boost::algorithm::replace_all(retval, "mOnKeY", "::");
+    boost::algorithm::replace_all(retval, "\t", " ");
+    boost::algorithm::replace_all(retval, "\n", " ");
+
     boost::algorithm::trim_all(retval);
+
+    if ( retval.contains("unary_function<_Tp") ) cout << "1: ===================" << retval << "===================" << endl;
+    retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
+    retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
+    if ( retval.contains("unary_function<_Tp") ) cout << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }

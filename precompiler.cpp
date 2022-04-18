@@ -146,10 +146,10 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     boost::algorithm::trim_all(retval);
 
-    if ( retval.contains("unary_function<_Tp") ) cout << "1: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("unary_function<_Tp") ) cout << "1: ===================" << retval << "===================" << endl;
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
-    if ( retval.contains("unary_function<_Tp") ) cout << "2: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("unary_function<_Tp") ) cout << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }
@@ -307,15 +307,21 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
-vector< tuple<string,string,string> > Parse_Bases_Of_Class(string_view const str)
+vector< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
 {
     tuple<string,string,string> tmp;
 
     vector< tuple<string,string,string> > retval;
 
-    for ( auto const &base : str | split(',') )
+    std::regex const my_regex("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
+
+    for (std::sregex_token_iterator iter(str.begin(), str.end(), my_regex, -1);
+         iter != std::sregex_token_iterator();
+         ++iter)
     {
-        for ( auto const &word_view : base |  split(' ') )
+        string base_info_str{ *iter };
+
+        for ( auto const &word_view : base_info_str |  split(' ') )
         {
             string word;
 
@@ -403,7 +409,7 @@ tuple< string, string, vector< tuple<string,string,string> >  > Intro_For_Curly_
     if ( ++pword == my_view.end() ) return { "class", str, {} };
     if ( ++pword == my_view.end() ) return { "class", str, {} };
 
-    return { "class", str, Parse_Bases_Of_Class( string_view( &(*pword).front(), &intro.back() + 1u ) ) };
+    return { "class", str, Parse_Bases_Of_Class( string( &(*pword).front(), &intro.back() + 1u ) ) };
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)

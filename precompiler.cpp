@@ -120,8 +120,8 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
         case '}':
         case '{':
         case ';':
-        case '(':
-        case ')':
+        //case '(':
+        //case ')':
         //case '<':
         //case '>':
 
@@ -146,10 +146,10 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     boost::algorithm::trim_all(retval);
 
-    if ( retval.contains("Pair::first_type") ) cout << "1: ===================" << retval << "===================" << endl;
+    if ( retval.contains("allocator_traits") ) cout << "1: ===================" << retval << "===================" << endl;
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
-    if ( retval.contains("Pair::first_type") ) cout << "2: ===================" << retval << "===================" << endl;
+    if ( retval.contains("allocator_traits") ) cout << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }

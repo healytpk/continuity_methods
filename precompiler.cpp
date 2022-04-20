@@ -1,10 +1,62 @@
+#include <cstddef>    // size_t
+#include <cassert>    // assert
+#include <cstdlib>    // malloc
+#include <new>        // required otherwise we get a compiler error for the 'noexcept'
+
+inline void *Implementation_Global_New(size_t size) noexcept
+{
+    size += 8u - (size % 8u);
+
+    static size_t constexpr bytes_at_a_time = 10485760;  // 10 megabytes
+
+    if ( size > bytes_at_a_time ) return nullptr;
+
+    static void *my_pointers[1000u] = {};  // 1,000 * 10 megabytes = 10 gigabytes
+
+    static void **const p_over_the_edge = my_pointers + sizeof(my_pointers)/sizeof(*my_pointers);
+
+    static void **pp = my_pointers;
+
+    static size_t bytes_allocated_so_far = 0u;
+
+    while ( p_over_the_edge != pp )  // Until we've exhausted 10 gigabytes
+    {
+        if ( nullptr == *pp )
+        {
+            *pp = malloc(bytes_at_a_time);
+
+            if ( nullptr == *pp ) return nullptr;
+        }
+
+        if ( (bytes_allocated_so_far + size) > bytes_at_a_time )
+        {
+            ++pp;  // This might push it over the edge, so don't check whether it's a nullptr
+
+            bytes_allocated_so_far = 0u;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    void *const retval = static_cast<char*>(*pp) + bytes_allocated_so_far;
+
+    bytes_allocated_so_far += size;
+
+    return retval;
+}
+
+void *operator new  (size_t const size) noexcept { return Implementation_Global_New(size); }
+void *operator new[](size_t const size) noexcept { return Implementation_Global_New(size); }
+void operator delete  (void *const p) noexcept { /* Do Nothing */ }
+void operator delete[](void *const p) noexcept { /* Do Nothing */ }
+
 bool constexpr verbose = false;
 bool constexpr print_all_scopes = false;
 
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
-#include <cstddef>    // size_t
-#include <cassert>    // assert
 #include <cstdlib>    // EXIT_FAILURE
 #include <iostream>   // cout, endl
 #include <fstream>    // ifstream
@@ -384,30 +436,27 @@ tuple< string, string, vector< tuple<string,string,string> >  > Intro_For_Curly_
 
     boost::erase_all( intro, " final" );   // careful it might be "final{"
 
-    auto my_view = intro | std::views::split(' ');
+    // The following finds spaces except those found inside angle brackets
+    std::regex const my_regex("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
-    string str;
+    std::sregex_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
 
-    unsigned i = 0u;
-    auto pword = my_view.begin();
-    for ( ; pword != my_view.end(); ++pword)
+    assert( iter != std::sregex_token_iterator() );  // This should never happen (takes "class" from "class MyClass<int,typename T::value_type> : public YourClass")
+
+    ++iter;
+
+    if ( iter == std::sregex_token_iterator() )
     {
-        auto word = *pword;
-
-        if ( 1u != i++ ) continue;
-
-        for (char ch : word)
-        {
-            str += ch;
-        }
-
-        break;
+        // Control reaches here if we have an anonymous struct (e.g. inside a function or inside a parent struct)
+        return {};
     }
 
-    if ( ++pword == my_view.end() ) return { "class", str, {} };
-    if ( ++pword == my_view.end() ) return { "class", str, {} };
+    string const str = *iter; // takes "MyClass<int,typename T::value_type>" from "class MyClass<int,typename T::value_type> : public YourClass")
 
-    return { "class", str, Parse_Bases_Of_Class( string( &(*pword).front(), &intro.back() + 1u ) ) };
+    if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
+    if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
+
+    return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
@@ -449,39 +498,70 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
 #include <set>    // set
 
-bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
+bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    string full_name(prefix);
-    full_name += "::";
-    full_name += classname;
+    string full_name, prefix(arg_prefix);
 
-    try
+    for (  ; /* ever */ ;)
     {
-        p = &( g_scope_names.at(full_name) );
-    }
-    catch (std::out_of_range const &)
-    {
-        string const duplicate_original_full_name{ full_name };
-
-        string const class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
-
-        full_name = prefix;
+        full_name  = prefix;
         full_name += "::";
-        full_name += class_name_without_template_specialisation;
+        full_name += classname;
 
         try
         {
-             p = &( g_scope_names.at(full_name) );
+            p = &( g_scope_names.at(full_name) );
         }
         catch (std::out_of_range const &)
         {
-            throw std::runtime_error("Encountered a class name that hasn't been defined (original = '" + duplicate_original_full_name + "') (edited = '" + full_name + "')");
+            cout << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
+
+            string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
+
+            string const class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
+
+            if ( class_name_without_template_specialisation != classname )
+            {
+                full_name  = prefix;
+                full_name += "::";
+                full_name += class_name_without_template_specialisation;
+
+                try
+                {
+                     p = &( g_scope_names.at(full_name) );
+                }
+                catch (std::out_of_range const &)
+                {
+                    cout << " - - - SECOND FAILED - - - " << full_name << endl;
+
+                    full_name = std::move(duplicate_original_full_name);
+                }
+            }
+        }
+
+        if ( nullptr != p )
+        {
+            cout << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
+            break;  // If we already have found the class then no need to keep searching
+        }
+
+        if ( 2u <= prefix.size() )  // if we can pear a bit more off the prefix
+        {
+            // Last resort: Change the prefix from "::std::__cxx11::locale::facet" into "", so that "::std::__cxx11::locale::facet" becomes "::std::__cxx11::locale::facet"
+
+            size_t index_of_last_colon = prefix.rfind("::");
+            prefix = prefix.substr(0u, index_of_last_colon);
+        }
+        else
+        {
+            break;
         }
     }
 
-    assert( nullptr != p );
+    if ( nullptr == p )
+        throw std::runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(arg_prefix) + "')");
 
     bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
@@ -497,6 +577,14 @@ bool Recursive_Print_All_Bases_PROPER(string_view const prefix, string_view cons
             for ( auto const &e : already_recorded ) cout << e << ", ";
             cout << "] ";
             cout << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+        }
+
+        size_t const index_of_last_colon = classname.rfind("::");
+
+        if ( -1 != index_of_last_colon && (':' != classname[0u]) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+        {
+            prefix += "::";
+            prefix += classname.substr(0u, index_of_last_colon);
         }
 
         if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) )
@@ -532,6 +620,8 @@ int main(int const argc, char **const argv)
     f >> std::noskipws;
 
     if ( false == f.is_open() ) { cout << "Cannot open file" << endl; return EXIT_FAILURE; }
+
+    //g_scope_names.reserve(5000u);
 
     std::copy( istream_iterator<char>(f), istream_iterator<char>(), back_inserter(g_intact) );
 

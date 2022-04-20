@@ -1,7 +1,8 @@
 #include <cstddef>    // size_t
-#include <cassert>    // assert
 #include <cstdlib>    // malloc
 #include <new>        // required otherwise we get a compiler error for the 'noexcept'
+
+using std::size_t;
 
 inline void *Implementation_Global_New(size_t size) noexcept
 {
@@ -23,7 +24,7 @@ inline void *Implementation_Global_New(size_t size) noexcept
     {
         if ( nullptr == *pp )
         {
-            *pp = malloc(bytes_at_a_time);
+            *pp = std::malloc(bytes_at_a_time);
 
             if ( nullptr == *pp ) return nullptr;
         }
@@ -79,8 +80,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <boost/algorithm/string/replace.hpp>   // replace_all
 #include <boost/algorithm/string/erase.hpp>     // erase_all
 
-using std::size_t;
-//using std::cout;
+using std::cout;
 using std::clog;
 using std::endl;
 using std::ifstream;
@@ -613,8 +613,59 @@ string Get_All_Bases(string_view arg)
     return retval;
 }
 
+void Print_Helper_Classes_For_Class(string_view const classname, list<string> const &func_signatures)
+{
+    cout <<
+    "class IMethodInvoker_" << classname << " {\n"
+    "protected:\n"
+    "\n"
+    "    // All methods have one extra\n"
+    "    // parameter for 'this' as 'void*'\n";
+
+    for ( auto const &method : func_signatures )
+    {
+        cout << "    virtual " << method << " = 0;\n";
+    }
+
+    cout <<
+    "\n    friend class Invoker_" << classname << ";\n"
+    "};\n\n";
+
+    cout <<
+    "template<class Base, class Derived>\n"
+    "class MethodInvoker_" << classname << " final : public IMethodInvoker_" << classname << " {\n"
+    "protected:\n"
+    "\n"
+    "    // All methods have one extra\n"
+    "    // parameter for 'this' as 'void*'\n";
+
+    for ( auto const &method : func_signatures )
+    {
+        std::regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+
+        string const tmp1 = std::regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
+        string const tmp2 = std::regex_replace(method, my_regex, "$2");
+
+        cout << "    " << tmp1 << " override\n" <<
+                "    {\n"
+                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this))\n"
+                "\n"
+                "        return p->Base::" << tmp2 << "();\n"
+                "    }\n\n";
+    }
+
+    cout << "};\n";
+}
+
 int main(int const argc, char **const argv)
 {
+    if ( false )
+    {
+        Print_Helper_Classes_For_Class("MyClass", { "void Trigger(void)", "bool Elevate(float)" });
+
+        return 0;
+    }
+
     std::ifstream f(argv[1u], std::ios::binary);
 
     f >> std::noskipws;

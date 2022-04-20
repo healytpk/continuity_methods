@@ -58,7 +58,7 @@ bool constexpr print_all_scopes = false;
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 #include <cstdlib>    // EXIT_FAILURE
-#include <iostream>   // cout, endl
+#include <iostream>   // cout, clog, endl
 #include <fstream>    // ifstream
 #include <algorithm>  // copy, replace, count
 #include <iterator>   // next, back_inserter, istream_iterator
@@ -80,7 +80,8 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <boost/algorithm/string/erase.hpp>     // erase_all
 
 using std::size_t;
-using std::cout;
+//using std::cout;
+using std::clog;
 using std::endl;
 using std::ifstream;
 using std::string;
@@ -197,10 +198,10 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     boost::algorithm::trim_all(retval);
 
-    if ( retval.contains("allocator_traits") ) cout << "1: ===================" << retval << "===================" << endl;
+    if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
-    if ( retval.contains("allocator_traits") ) cout << "2: ===================" << retval << "===================" << endl;
+    if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }
@@ -266,7 +267,7 @@ protected:
 
     void Print_CurlyPair(CurlyPair const &cp, size_t const indentation = 0u) const
     {
-        verbose && cout << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
+        verbose && clog << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
 
         string str;
 
@@ -281,28 +282,28 @@ protected:
         {
             for ( size_t i = 0u; i != indentation; ++i )
             {
-                cout << "    ";
+                clog << "    ";
             }
 
-            cout << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
+            clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-            verbose && cout << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
+            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
 
             if ( false == only_print_numbers )
             {
                 extern string GetNames(CurlyBracketManager::CurlyPair const &);
 
-                //cout << "    " << GetNames(cp);
+                //clog << "    " << GetNames(cp);
 
-                cout << "  [" << GetNames(cp) << "]";
+                clog << "  [" << GetNames(cp) << "]";
             }
 
-            cout << endl;
+            clog << endl;
         }
 
         for ( CurlyPair const &e : cp.Nested() )
         {
-            verbose && cout << "    - - - About to recurse" << endl;
+            verbose && clog << "    - - - About to recurse" << endl;
             Print_CurlyPair(e, indentation + 1u);
         }
     }
@@ -313,7 +314,7 @@ public:
 
     void Process(void)
     {
-        verbose && cout << "========= STARTING PROCESSING ===========" << endl;
+        verbose && clog << "========= STARTING PROCESSING ===========" << endl;
 
         _root_pair.clear();
 
@@ -333,7 +334,7 @@ public:
             }
         }
 
-        verbose && cout << "========= ENDING PROCESSING ===========" << endl;
+        verbose && clog << "========= ENDING PROCESSING ===========" << endl;
     }
     
     
@@ -341,7 +342,7 @@ public:
     {
         for ( CurlyPair const &e : _root_pair.Nested() )
         {
-            verbose && cout << "    - - - About to recurse" << endl;
+            verbose && clog << "    - - - About to recurse" << endl;
             Print_CurlyPair(e);
         }
     }
@@ -395,7 +396,7 @@ list< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
             }
         }
 
-        //cout << "[ADD RECORD : " << std::get<0u>(tmp) << " : " << std::get<1u>(tmp) << " : " << std::get<2u>(tmp) << "]";
+        //clog << "[ADD RECORD : " << std::get<0u>(tmp) << " : " << std::get<1u>(tmp) << " : " << std::get<2u>(tmp) << "]";
         retval.push_back(tmp);
     }
 
@@ -472,11 +473,11 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     {
         for ( CurlyBracketManager::CurlyPair const *p = &cp; p = p->Parent(); /* no post-processing */ )  // will throw exception when root pair is reached
         {
-            //cout << "Iteration No. " << iteration << endl;
+            //clog << "Iteration No. " << iteration << endl;
 
-            verbose && cout << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
+            verbose && clog << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
             string const tmp = std::get<1u>( Intro_For_Curly_Pair(*p) );
-            verbose && cout << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
+            verbose && clog << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
 
             if ( tmp.empty() ) continue;
 
@@ -485,7 +486,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     }
     catch(CurlyBracketManager::ParentError const &)
     {
-        //cout << "********** ParentError ************";
+        //clog << "********** ParentError ************";
     }
 
     retval.insert(0u, "::");
@@ -515,7 +516,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
         }
         catch (std::out_of_range const &)
         {
-            cout << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
+            clog << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
 
             string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
 
@@ -533,7 +534,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
                 }
                 catch (std::out_of_range const &)
                 {
-                    cout << " - - - SECOND FAILED - - - " << full_name << endl;
+                    clog << " - - - SECOND FAILED - - - " << full_name << endl;
 
                     full_name = std::move(duplicate_original_full_name);
                 }
@@ -542,7 +543,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
 
         if ( nullptr != p )
         {
-            cout << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
+            clog << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
             break;  // If we already have found the class then no need to keep searching
         }
 
@@ -572,10 +573,10 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
 
         if constexpr ( verbose )
         {
-            cout << " [ALREADY_SEEN=";
-            for ( auto const &e : already_recorded ) cout << e << ", ";
-            cout << "] ";
-            cout << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+            clog << " [ALREADY_SEEN=";
+            for ( auto const &e : already_recorded ) clog << e << ", ";
+            clog << "] ";
+            clog << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
         size_t const index_of_last_colon = classname.rfind("::");
@@ -618,14 +619,14 @@ int main(int const argc, char **const argv)
 
     f >> std::noskipws;
 
-    if ( false == f.is_open() ) { cout << "Cannot open file" << endl; return EXIT_FAILURE; }
+    if ( false == f.is_open() ) { clog << "Cannot open file" << endl; return EXIT_FAILURE; }
 
     g_scope_names.reserve(5000u);
 
     std::copy( istream_iterator<char>(f), istream_iterator<char>(), back_inserter(g_intact) );
 
-    cout << "Bytes: " << g_intact.size() << endl;
-    cout << "Lines: " << Lines() << endl;
+    clog << "Bytes: " << g_intact.size() << endl;
+    clog << "Lines: " << Lines() << endl;
 
     std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');
 
@@ -633,30 +634,30 @@ int main(int const argc, char **const argv)
 
     boost::replace_all(g_intact, "\r", "\n");
 
-    //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(cout) );
+    //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(clog) );
     
     g_curly_manager.Process();
 
-    cout << "====================================== ALL PROCESSING DONE ===========================================" << endl;
+    clog << "====================================== ALL PROCESSING DONE ===========================================" << endl;
 
     only_print_numbers = false;
     g_curly_manager.Print();
 
-    cout << "====================================== All scope names ==============================================" << endl;
+    clog << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
-        cout << e.first << " [" << e.second.first << "]" << endl;
+        clog << e.first << " [" << e.second.first << "]" << endl;
     }
 
-    cout << "====================================== Now the namespaces ==============================================" << endl;
+    clog << "====================================== Now the namespaces ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == arg.second.first; }) )
     {
-        cout << e.first << endl;
+        clog << e.first << endl;
     }
 
-    cout << "====================================== Now the classes ==============================================" << endl;
+    clog << "====================================== Now the classes ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == arg.second.first || "struct" == arg.second.first; }) )
     {
-        cout << e.first << " | Bases = " << Get_All_Bases(e.first) << endl;
+        clog << e.first << " | Bases = " << Get_All_Bases(e.first) << endl;
     }
 }

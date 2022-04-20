@@ -69,7 +69,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <utility>    // pair<>
 #include <cctype>     // isspace
 #include <list>       // list
-#include <map>        // map
+#include <unordered_map> // unordered_map
 #include <ranges>     // views::filter
 #include <tuple>      // tuple
 #include <utility>    // pair, move
@@ -97,7 +97,7 @@ using std::views::split;
 
 string g_intact;
 
-std::map< string, pair< string, list< tuple<string,string,string> > > > g_scope_names;
+std::unordered_map< string, pair< string, list< tuple<string,string,string> > > > g_scope_names;
 
 /* For example:
 
@@ -620,7 +620,7 @@ int main(int const argc, char **const argv)
 
     if ( false == f.is_open() ) { cout << "Cannot open file" << endl; return EXIT_FAILURE; }
 
-    //g_scope_names.reserve(5000u);
+    g_scope_names.reserve(5000u);
 
     std::copy( istream_iterator<char>(f), istream_iterator<char>(), back_inserter(g_intact) );
 

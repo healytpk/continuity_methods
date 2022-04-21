@@ -752,7 +752,16 @@ int main(int const argc, char **const argv)
     clog << "====================================== Now the namespaces ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
     {
-        clog << e.first << endl;
+        clog << e.first;
+
+        list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets( *(std::get<0u>(e.second).front()) );
+
+        for ( auto const my_pair : my_list )
+        {
+            clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
+        }
+
+        clog << endl;
     }
 
     clog << "====================================== Now the classes ==============================================" << endl;

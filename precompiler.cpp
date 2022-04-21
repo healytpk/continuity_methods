@@ -72,6 +72,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <list>       // list
 #include <unordered_map> // unordered_map
 #include <ranges>     // views::filter
+#include <array>      // array
 #include <tuple>      // tuple
 #include <utility>    // pair, move
 #include <string_view> // string_view
@@ -88,6 +89,7 @@ using std::string;
 using std::to_string;
 using std::string_view;
 using std::list;
+using std::array;
 using std::tuple;
 using std::pair;
 
@@ -98,7 +100,7 @@ using std::views::split;
 
 string g_intact;
 
-std::unordered_map< string, pair< string, list< tuple<string,string,string> > > > g_scope_names;
+std::unordered_map< string, pair< string, list< array<string,3u> > > > g_scope_names;
 
 /* For example:
 
@@ -271,7 +273,7 @@ protected:
 
         string str;
 
-        extern tuple< string,string, list< tuple<string,string,string> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
+        extern tuple< string,string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
 
         if ( false == only_print_numbers )
         {
@@ -359,11 +361,11 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
-list< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
+list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
 {
-    tuple<string,string,string> tmp;
+    array<string,3u> tmp;
 
-    list< tuple<string,string,string> > retval;
+    list< array<string,3u> > retval;
 
     std::regex const my_regex ("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
     std::regex const my_regex2("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
@@ -403,7 +405,7 @@ list< tuple<string,string,string> > Parse_Bases_Of_Class(string const &str)
     return retval;
 }
 
-tuple< string, string, list< tuple<string,string,string> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
+tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp)
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
@@ -461,7 +463,7 @@ tuple< string, string, list< tuple<string,string,string> >  > Intro_For_Curly_Pa
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
 {
-    tuple< string, string, list< tuple<string,string,string> >  > tmppair = Intro_For_Curly_Pair(cp);
+    tuple< string, string, list< array<string,3u> >  > tmppair = Intro_For_Curly_Pair(cp);
 
     string retval = std::get<1u>(tmppair);  /* e.g. 0 = class, 1 = Laser, 2 = [ ... base classes ... ] */
 
@@ -689,9 +691,10 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
 
     --iter;
 
-    if ( '}' == g_intact[ iter->Second+1u ] ) return;
-
-    retval.push_back( { iter->Second() + 1u }, cp.Second() - 1u );
+    if ( '}' != g_intact[ iter->Last() +1u ] )
+    {
+        retval.push_back( { iter->Last() + 1u , cp.Last() - 1u } );
+    }
 
     return retval;
 }

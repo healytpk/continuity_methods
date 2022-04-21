@@ -674,7 +674,9 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
     // Next line might not be needed but leave it here for now
     size_t last_open = cp.Nested().front().First() - 1u;  // class Monkey { struct Dog { char c; }; int i; };
 
-    for ( list<CurlyBracketManager::CurlyPair>::const_iterator iter = cp.Nested().cbegin(); ; )
+    list<CurlyBracketManager::CurlyPair>::const_iterator iter = cp.Nested().cbegin();
+
+    for ( ; ; )
     {
         retval.back().second = iter->First() - 1u;
 
@@ -684,6 +686,12 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
 
         retval.push_back( { iter->First() - 1u , -1 } );
     }
+
+    --iter;
+
+    if ( '}' == g_intact[ iter->Second+1u ] ) return;
+
+    retval.push_back( { iter->Second() + 1u }, cp.Second() - 1u );
 
     return retval;
 }

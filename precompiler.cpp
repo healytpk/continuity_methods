@@ -704,6 +704,18 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
     return retval;
 }
 
+void Print_All_Usings_In_Open_Space(size_t const first, size_t const last)
+{
+    std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
+
+    for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
+                             i != std::sregex_iterator();
+                             ++i )
+    {
+        clog << i->str() << endl;
+    }
+}
+
 int main(int const argc, char **const argv)
 {
     if ( false )
@@ -746,22 +758,26 @@ int main(int const argc, char **const argv)
     clog << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
-        clog << e.first << " [" << std::get<1u>(e.second) << "]" << endl;
+        clog << e.first << " [" << std::get<1u>(e.second) << "] ";
+
+        for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )
+        {
+            list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*my_curly_pair_pointer);
+
+            for ( auto const my_pair : my_list )
+            {
+                clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
+                Print_All_Usings_In_Open_Space(my_pair.first, my_pair.second);
+            }
+
+            clog << endl;
+        }
     }
 
     clog << "====================================== Now the namespaces ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
     {
-        clog << e.first;
-
-        list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets( *(std::get<0u>(e.second).front()) );
-
-        for ( auto const my_pair : my_list )
-        {
-            clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
-        }
-
-        clog << endl;
+        clog << e.first << endl;
     }
 
     clog << "====================================== Now the classes ==============================================" << endl;

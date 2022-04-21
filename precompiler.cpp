@@ -100,18 +100,6 @@ using std::views::split;
 
 string g_intact;
 
-std::unordered_map< string, pair< string, list< array<string,3u> > > > g_scope_names;
-
-/* For example:
-
-get<0>    class
-get<1>    Laser_NitrogenPicoSecond
-get<2>    {
-              { "" "public" "Laser_Nitrogen"   }
-              { "" "public" "Laser_PicoSecond" }
-          }
-*/
-
 inline void ThrowIfBadIndex(size_t const char_index)
 {
     if ( char_index >= g_intact.size() )
@@ -361,6 +349,17 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
+std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair const *>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+/* For example:
+
+get<0>    class
+get<1>    Laser_NitrogenPicoSecond
+get<2>    {
+              { "" "public" "Laser_Nitrogen"   }
+              { "" "public" "Laser_PicoSecond" }
+          }
+*/
+
 list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
 {
     array<string,3u> tmp;
@@ -493,7 +492,13 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
     retval.insert(0u, "::");
 
-    g_scope_names[retval] = { std::get<0u>(tmppair), std::get<2u>(tmppair) };
+    //std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+
+    std::get<0u>( g_scope_names[retval] ).push_back(&cp);  // Note that these are pointers
+
+    std::get<1u>( g_scope_names[retval] ) = std::get<0u>(tmppair);
+
+    std::get<2u>( g_scope_names[retval] ) = std::get<2u>(tmppair);
 
     return retval;
 }
@@ -569,7 +574,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
 
     if ( false == is_new_entry && true == is_virtual ) return false;  // if it's not a new entry and if it's virtual
 
-    for ( auto const &e : p->second )
+    for ( auto const &e : std::get<2u>(*p) )
     {
         string const &base_name = std::get<2u>(e);
 
@@ -736,21 +741,23 @@ int main(int const argc, char **const argv)
     only_print_numbers = false;
     g_curly_manager.Print();
 
+    //std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+
     clog << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
-        clog << e.first << " [" << e.second.first << "]" << endl;
+        clog << e.first << " [" << std::get<1u>(e.second) << "]" << endl;
     }
 
     clog << "====================================== Now the namespaces ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == arg.second.first; }) )
+    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
     {
         clog << e.first << endl;
     }
 
     clog << "====================================== Now the classes ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == arg.second.first || "struct" == arg.second.first; }) )
+    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
     {
-        clog << e.first << " | Bases = " << Get_All_Bases(e.first) << endl;
+        clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u << " | Bases = " << Get_All_Bases(e.first) << endl;
     }
 }

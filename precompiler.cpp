@@ -657,6 +657,37 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
     cout << "};\n";
 }
 
+list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketManager::CurlyPair const &cp)
+{
+    if ( cp.Last() == (cp.First() + 1u) ) return {};   // If we have class Monkey {};
+
+    list< pair<size_t,size_t> > retval;
+
+    retval.push_back( { cp.First() + 1u, -1 /* This will be changed later */ } );
+
+    if ( cp.Nested().empty() )  // if we have no inner curly brackets class Monkey { int i; };
+    {
+        retval.back().second = cp.Last() - 1u;
+        return retval;
+    }
+
+    // Next line might not be needed but leave it here for now
+    size_t last_open = cp.Nested().front().First() - 1u;  // class Monkey { struct Dog { char c; }; int i; };
+
+    for ( list<CurlyBracketManager::CurlyPair>::const_iterator iter = cp.Nested().cbegin(); ; )
+    {
+        retval.back().second = iter->First() - 1u;
+
+        ++iter;
+
+        if ( cp.Nested().end() == iter ) break;
+
+        retval.push_back( { iter->First() - 1u , -1 } );
+    }
+
+    return retval;
+}
+
 int main(int const argc, char **const argv)
 {
     if ( false )

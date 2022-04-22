@@ -76,6 +76,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <tuple>      // tuple
 #include <utility>    // pair, move
 #include <string_view> // string_view
+#include <set>        // set
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -503,11 +504,22 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     return retval;
 }
 
-#include <set>    // set
+std::unordered_map<string,string> g_psuedonyms;
 
-bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view const classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
+bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
+
+    auto Adjust_Class_Name = [](string &arg) -> void
+    {
+        try
+        {
+            arg = g_psuedonyms.at(arg);
+        }
+        catch(std::out_of_range const &e) {}
+    };
+
+    Adjust_Class_Name(classname);
 
     string full_name, prefix(arg_prefix);
 
@@ -541,7 +553,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string_view 
                 }
                 catch (std::out_of_range const &)
                 {
-                    clog << " - - - SECOND FAILED - - - " << full_name << endl;
+                    clog << " - - - SECOND FAILED - - - Prefix='" << prefix << "', Classname='" << class_name_without_template_specialisation << "' - Fullname='" << full_name << "'" << endl;
 
                     full_name = std::move(duplicate_original_full_name);
                 }
@@ -615,7 +627,7 @@ string Get_All_Bases(string_view arg)
 
     string retval;
 
-    Recursive_Print_All_Bases_PROPER(prefix, classname, already_recorded, false, retval);
+    Recursive_Print_All_Bases_PROPER(prefix, string(classname), already_recorded, false, retval);
 
     return retval;
 }
@@ -700,7 +712,13 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
 
         begin_from = e.Last() + 1u;
 
-        if ( begin_from >= g_intact.size() ) std::abort();
+        if ( begin_from >= g_intact.size() )
+        {
+            cout << "About to abort because begin_from >= g_intact.size()\n" << endl;
+            clog << "About to abort because begin_from >= g_intact.size()\n" << endl;
+            std::cerr << "About to abort because begin_from >= g_intact.size()\n" << endl;
+            std::abort();
+        }
     }
 
     assert( cp.Last() >= begin_from );
@@ -713,9 +731,9 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
     return retval;
 }
 
-void Print_All_Usings_In_Open_Space(size_t const first, size_t const last)
+void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string_view const scope_name)
 {
-    assert( last >= first );  // It's okay for them to be equal if we have { }
+    assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
     std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
@@ -723,10 +741,26 @@ void Print_All_Usings_In_Open_Space(size_t const first, size_t const last)
                              i != std::sregex_iterator();
                              ++i )
     {
-        string tmp(i->str());
-        boost::replace_all(tmp,"\n"," ");
+#if 1
+        string impersonator = regex_replace( i->str(), r, "$1" );
+        string original     = regex_replace( i->str(), r, "$2" );
+
+        boost::replace_all(impersonator,"\n"," ");
+        boost::replace_all(original    ,"\n"," ");
+        boost::trim_all(impersonator);
+        boost::trim_all(original    );
+
+        //cout << "Old = " << original << ", New = " << impersonator << endl;
+
+        g_psuedonyms[impersonator] = original;
+#else
+        string tmp( i->str() );
+
+        boost::replace_all(tmp, "\n", " ");
         boost::trim_all(tmp);
+
         cout << tmp << endl;
+#endif
     }
 }
 
@@ -781,11 +815,17 @@ int main(int const argc, char **const argv)
             for ( auto const my_pair : my_list )
             {
                 clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
-                Print_All_Usings_In_Open_Space(my_pair.first, my_pair.second);
+                Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first);
             }
 
             clog << endl;
         }
+    }
+
+    clog << "====================================== Now the pseudonyms (using X = Y;) ==============================================" << endl;
+    for ( auto const &e : g_psuedonyms )
+    {
+        clog << e.first << " == " << e.second << endl;
     }
 
     clog << "====================================== Now the namespaces ==============================================" << endl;

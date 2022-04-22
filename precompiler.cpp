@@ -58,7 +58,7 @@ bool constexpr print_all_scopes = false;
 
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
-#include <cstdlib>    // EXIT_FAILURE
+#include <cstdlib>    // EXIT_FAILURE, abort
 #include <iostream>   // cout, clog, endl
 #include <fstream>    // ifstream
 #include <algorithm>  // copy, replace, count
@@ -666,39 +666,48 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
 
 list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketManager::CurlyPair const &cp)
 {
-    if ( cp.Last() == (cp.First() + 1u) ) return {};   // If we have class Monkey {};
+    assert( cp.Last() > cp.First() );
+
+    // Check 1: To see if there's nothing between the curly brackets
+    if ( cp.Last() == (cp.First() + 1u) ) return {};   // e.g. if we have "class Monkey {};"
+
+    // Check 2: To see if there's no inner curly brackets
+    if ( cp.Nested().empty() )
+    {
+        return { { cp.First() + 1u, cp.Last() - 1u }  }; // e.g. if we have "class Monkey { int i; };"
+    }
+
+    // If control reaches here, we have nested curly brackets
 
     list< pair<size_t,size_t> > retval;
 
-    retval.push_back( { cp.First() + 1u, -1 /* This will be changed later */ } );
-
-    if ( cp.Nested().empty() )  // if we have no inner curly brackets class Monkey { int i; };
-    {
-        retval.back().second = cp.Last() - 1u;
-        return retval;
-    }
-
-    // Next line might not be needed but leave it here for now
-    size_t last_open = cp.Nested().front().First() - 1u;  // class Monkey { struct Dog { char c; }; int i; };
-
     list<CurlyBracketManager::CurlyPair>::const_iterator iter = cp.Nested().cbegin();
 
-    for ( ; ; )
+    size_t begin_from = cp.First() + 1u;
+
+    for ( auto const &e : cp.Nested() )
     {
-        retval.back().second = iter->First() - 1u;
+        assert( '{' == g_intact[e.First()] );
+        assert( '}' == g_intact[e.Last() ] );
 
-        ++iter;
+        assert( e.First() >= begin_from );
 
-        if ( cp.Nested().end() == iter ) break;
+        // Check 3: If we have class Monkey { void Func(void) {{}} };
+        if ( begin_from == e.First() ) continue;
 
-        retval.push_back( { iter->First() - 1u , -1 } );
+        // If control reaches here, there's an open space to record
+        retval.push_back( { begin_from, e.First() - 1u } );  // fist and second can be equal here if just one char between '}' and '{'
+
+        begin_from = e.Last() + 1u;
+
+        if ( begin_from >= g_intact.size() ) std::abort();
     }
 
-    --iter;
+    assert( cp.Last() >= begin_from );
 
-    if ( '}' != g_intact[ iter->Last() +1u ] )
+    if ( cp.Last() > begin_from ) // must rule out "namespace Dog { namespace Cat { int i; }}"
     {
-        retval.push_back( { iter->Last() + 1u , cp.Last() - 1u } );
+        retval.push_back( { begin_from, cp.Last() - 1u } );
     }
 
     return retval;
@@ -706,13 +715,18 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
 
 void Print_All_Usings_In_Open_Space(size_t const first, size_t const last)
 {
+    assert( last >= first );  // It's okay for them to be equal if we have { }
+
     std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
     for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              i != std::sregex_iterator();
                              ++i )
     {
-        clog << i->str() << endl;
+        string tmp(i->str());
+        boost::replace_all(tmp,"\n"," ");
+        boost::trim_all(tmp);
+        cout << tmp << endl;
     }
 }
 
@@ -760,7 +774,7 @@ int main(int const argc, char **const argv)
     {
         clog << e.first << " [" << std::get<1u>(e.second) << "] ";
 
-        for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )
+        for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
         {
             list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*my_curly_pair_pointer);
 

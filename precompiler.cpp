@@ -144,7 +144,7 @@ inline size_t EndLine(size_t char_index)
 
 #include <regex>
 
-string TextBeforeOpenCurlyBracket(size_t const char_index)
+string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
 {
     ThrowIfBadIndex(char_index);
 
@@ -181,18 +181,19 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)
 
     string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
 
+    retval = std::regex_replace(retval, std::regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
+
     boost::algorithm::replace_all(retval, "::", "mOnKeY");
     boost::algorithm::replace_all(retval, ":", " : ");
     boost::algorithm::replace_all(retval, "mOnKeY", "::");
-    boost::algorithm::replace_all(retval, "\t", " ");
-    boost::algorithm::replace_all(retval, "\n", " ");
+    retval = std::regex_replace(retval, std::regex("\\s"), " ");
 
     boost::algorithm::trim_all(retval);
 
-    if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
-    if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
 
     return retval;
 }
@@ -436,14 +437,14 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     if (   !(intro.starts_with("class") || intro.starts_with("struct"))   ) return {};
 
-    boost::erase_all( intro, " final" );   // careful it might be "final{"
+    boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
     std::regex const my_regex("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
     std::sregex_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
 
-    assert( iter != std::sregex_token_iterator() );  // This should never happen (takes "class" from "class MyClass<int,typename T::value_type> : public YourClass")
+    assert( iter != std::sregex_token_iterator() );  // This should never happen (takes "class" from "class __cxx11::collate : public locale::facet")
 
     ++iter;
 
@@ -453,12 +454,12 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         return {};
     }
 
-    string const str = *iter; // takes "MyClass<int,typename T::value_type>" from "class MyClass<int,typename T::value_type> : public YourClass")
+    string const str{ *iter }; // takes "__cxx11::collate" from "class __cxx11::collate : public locale::facet"
 
     if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
     if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
 
-    return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };
+    return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };  // REVISIT FIX might be 'struct' instead of 'class' (public Vs private)
 }
 
 string GetNames(CurlyBracketManager::CurlyPair const &cp)
@@ -525,6 +526,18 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
 
     for (  ; /* ever */ ;)
     {
+        if ( std::count(prefix.cbegin(),prefix.cend(),'>') != std::count(prefix.cbegin(),prefix.cend(),'<') )
+        {
+            string tmp("Aborting because prefix has uneven angle brackets - (");
+            tmp += prefix;
+            tmp += ")\n";
+
+            cout << tmp;
+            clog << tmp;
+            std::cerr << tmp;
+            std::abort();
+        }
+
         full_name  = prefix;
         full_name += "::";
         full_name += classname;
@@ -562,7 +575,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
 
         if ( nullptr != p )
         {
-            clog << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
+            //clog << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
             break;  // If we already have found the class then no need to keep searching
         }
 
@@ -570,8 +583,25 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
         {
             // Last resort: Change the prefix from "::std::__cxx11::locale::facet" into "", so that "::std::__cxx11::locale::facet" becomes "::std::__cxx11::locale::facet"
 
-            size_t index_of_last_colon = prefix.rfind("::");
-            prefix = prefix.substr(0u, index_of_last_colon);
+            std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
+            std::match_results<string::const_reverse_iterator> my_match;
+
+            if ( std::regex_search( prefix.crbegin(), prefix.crend(), my_match, r) )
+            {
+                size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &prefix.front();
+                size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
+
+                cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
+
+                if ( 0u == index_of_first_colon_in_last_double_colon )
+                {
+                    prefix.clear();
+                }
+                else
+                {
+                    prefix = prefix.substr(0u, index_of_first_colon_in_last_double_colon);
+                }
+            }
         }
         else
         {
@@ -598,7 +628,29 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
             clog << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
-        size_t const index_of_last_colon = classname.rfind("::");
+// ========================================================================
+
+        std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
+        std::match_results<string::const_reverse_iterator> my_match;
+
+        size_t index_of_last_colon = -1;
+
+        if ( std::regex_search(classname.crbegin(), classname.crend(), my_match, r) )
+        {
+            size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &prefix.front();
+            index_of_last_colon = index_of_second_colon_in_last_double_colon - 1u;
+
+            if ( 0u == index_of_last_colon)
+            {
+
+            }
+            else
+            {
+                cout << "============ POSITION = " << index_of_last_colon << " =================" << endl;
+            }
+        }
+
+// ========================================================================
 
         if ( -1 != index_of_last_colon && (':' != classname[0u]) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
@@ -618,10 +670,32 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
 
 string Get_All_Bases(string_view arg)
 {
-    size_t const i = arg.rfind("::");
+// ========================================================================
 
-    string_view prefix    = arg.substr(0u, i);
-    string_view classname = arg.substr(i +  2u);
+    std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
+    std::match_results<string_view::const_reverse_iterator> my_match;
+
+    size_t index_of_last_colon = -1;
+
+    if ( std::regex_search(arg.crbegin(), arg.crend(), my_match, r) )
+    {
+        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &arg.front();
+        index_of_last_colon = index_of_second_colon_in_last_double_colon - 1u;
+
+        if ( 0u == index_of_last_colon)
+        {
+
+        }
+        else
+        {
+            cout << "============ POSITION = " << index_of_last_colon << " =================" << endl;
+        }
+    }
+
+// ========================================================================
+
+    string_view prefix    = arg.substr(0u, index_of_last_colon);
+    string_view classname = arg.substr(index_of_last_colon +  2u);
 
     std::set<string> already_recorded;
 

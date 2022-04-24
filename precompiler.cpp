@@ -370,12 +370,14 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
 std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair const *>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 /* For example:
 
-get<0>    class
-get<1>    Laser_NitrogenPicoSecond
-get<2>    {
-              { "" "public" "Laser_Nitrogen"   }
-              { "" "public" "Laser_PicoSecond" }
-          }
+         e.first "class"
+get<0>(e.second) { pointer to first '{', pointer to second '{', pointer to third '{' }
+get<1>(e.second) "Laser_NitrogenPicoSecond"
+get<2>(e.second) {
+                     { "", "public", "Laser_Nitrogen"   }
+                     { "", "public", "Laser_PicoSecond" }
+                     { "virtual", "protected", "NoSuchClass }
+                 }
 */
 
 list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
@@ -384,7 +386,10 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
 
     list< array<string,3u> > retval;
 
+    // The next line is to find any comma that isn't enclosed within angle brackets
     std::regex const my_regex ("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
+
+    // The next line is to find any white space that isn't enclosed within angle brackets
     std::regex const my_regex2("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
     for (std::sregex_token_iterator iter(str.begin(), str.end(), my_regex, -1);
@@ -561,24 +566,21 @@ bool Strip_Last_Scope(string &s)
 
 std::unordered_map<string,string> g_psuedonyms;
 
-bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
+string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    auto Adjust_Class_Name = [](string &arg) -> void
+    if ( classname.starts_with("::") )
     {
-        try
-        {
-            arg = g_psuedonyms.at(arg);
-        }
-        catch(std::out_of_range const &e) {}
-    };
+        g_scope_names.at(classname);  // just to see if it throws
+        return classname;
+    }
 
-    Adjust_Class_Name(classname);
+    string const intact_prefix{ prefix };
 
-    string full_name, prefix(arg_prefix);
+    string full_name;
 
-    for (  ; /* ever */ ;)
+    for (; /* ever */ ;)
     {
         if ( std::count(prefix.cbegin(),prefix.cend(),'>') != std::count(prefix.cbegin(),prefix.cend(),'<') )
         {
@@ -638,13 +640,33 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
     }
 
     if ( nullptr == p )
-        throw runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(arg_prefix) + "')");
+        throw runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
+
+    return full_name;
+}
+
+bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
+{
+    decltype(g_scope_names)::mapped_type const *p = nullptr;
+
+    auto Adjust_Class_Name = [](string &arg) -> void
+    {
+        try
+        {
+            arg = g_psuedonyms.at(arg);
+        }
+        catch(std::out_of_range const &e) {}
+    };
+
+    Adjust_Class_Name(classname);
+
+    string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
 
     bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
     if ( false == is_new_entry && true == is_virtual ) return false;  // if it's not a new entry and if it's virtual
 
-    for ( auto const &e : std::get<2u>(*p) )
+    for ( auto const &e : std::get<2u>( g_scope_names.at(full_name) ) )
     {
         string const &base_name = std::get<2u>(e);
 
@@ -681,14 +703,14 @@ string Get_All_Bases(string_view arg)
 
     if ( -1 == index_of_last_colon ) throw runtime_error("There's no double-colon in the argument to Get_All_Bases");
 
-    string_view prefix    = arg.substr(0u, index_of_last_colon);
-    string_view classname = arg.substr(index_of_last_colon +  2u);
+    string_view const prefix    = arg.substr(0u, index_of_last_colon);
+    string_view const classname = arg.substr(index_of_last_colon +  2u);
 
     std::set<string> already_recorded;
 
     string retval;
 
-    Recursive_Print_All_Bases_PROPER(prefix, string(classname), already_recorded, false, retval);
+    Recursive_Print_All_Bases_PROPER(string(prefix), string(classname), already_recorded, false, retval);
 
     return retval;
 }

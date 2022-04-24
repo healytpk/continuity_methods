@@ -1,3 +1,7 @@
+// =====================================================================
+// Section 1 of 8 : Override global 'new' and 'delete' for max speed
+// =====================================================================
+
 #include <cstddef>    // size_t
 #include <cstdlib>    // malloc
 #include <new>        // required otherwise we get a compiler error for the 'noexcept'
@@ -53,6 +57,10 @@ void *operator new[](size_t const size) noexcept { return Implementation_Global_
 void operator delete  (void *const p) noexcept { /* Do Nothing */ }
 void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 
+// =========================================================================
+// Section 2 of 8 : Include standard header files, and define global objects
+// =========================================================================
+
 bool constexpr verbose = false;
 bool constexpr print_all_scopes = false;
 
@@ -77,6 +85,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <utility>    // pair, move
 #include <string_view> // string_view
 #include <set>        // set
+#include <regex>      // regex, regex_replace, smatch, match_results
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -93,6 +102,11 @@ using std::list;
 using std::array;
 using std::tuple;
 using std::pair;
+
+using std::regex;
+using std::regex_replace;
+using std::smatch;
+using std::match_results;
 
 using std::istream_iterator;
 using std::back_inserter;
@@ -142,7 +156,7 @@ inline size_t EndLine(size_t char_index)
     return char_index;
 }
 
-#include <regex>
+
 
 string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
 {
@@ -505,6 +519,44 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     return retval;
 }
 
+size_t Find_Last_Double_Colon_In_String(string_view const s)
+{
+    static regex const r("[:](?=[^\\<]*?(?:\\>|$))");  // matches a semi-colon so long as it's not enclosed in angle brackets
+
+    match_results<string_view::const_reverse_iterator> my_match;
+
+    if ( regex_search(s.crbegin(), s.crend(), my_match, r) )  // returns true if there is at least one match
+    {
+        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &s.front(); // REVISIT FIX - consider using my_match.position() here
+        assert( ':' == s[index_of_second_colon_in_last_double_colon] );
+
+        size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
+        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw std::runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
+
+        //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
+
+        return index_of_first_colon_in_last_double_colon;
+    }
+
+    return -1;
+}
+
+bool Strip_Last_Scope(string &s)
+{
+    // Change the prefix from "::std::__cxx11" into "::std", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
+
+    if ( s.empty() ) return false;
+
+    size_t const i = Find_Last_Double_Colon_In_String(s);
+
+    switch ( i )
+    {
+    case (size_t)-1: return false;
+    case 0u: s.clear(); return true;
+    default: s.resize(i); return true;
+    }
+}
+
 std::unordered_map<string,string> g_psuedonyms;
 
 bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
@@ -579,34 +631,8 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
             break;  // If we already have found the class then no need to keep searching
         }
 
-        if ( 2u <= prefix.size() )  // if we can pear a bit more off the prefix
-        {
-            // Last resort: Change the prefix from "::std::__cxx11::locale::facet" into "", so that "::std::__cxx11::locale::facet" becomes "::std::__cxx11::locale::facet"
-
-            std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
-            std::match_results<string::const_reverse_iterator> my_match;
-
-            if ( std::regex_search( prefix.crbegin(), prefix.crend(), my_match, r) )
-            {
-                size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &prefix.front();
-                size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
-
-                cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
-
-                if ( 0u == index_of_first_colon_in_last_double_colon )
-                {
-                    prefix.clear();
-                }
-                else
-                {
-                    prefix = prefix.substr(0u, index_of_first_colon_in_last_double_colon);
-                }
-            }
-        }
-        else
-        {
-            break;
-        }
+        // Last resort: Change the prefix from "::std::__cxx11" into "::std", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
+        if ( false == Strip_Last_Scope(prefix) ) break;
     }
 
     if ( nullptr == p )
@@ -628,32 +654,11 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
             clog << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
-// ========================================================================
-
-        std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
-        std::match_results<string::const_reverse_iterator> my_match;
-
-        size_t index_of_last_colon = -1;
-
-        if ( std::regex_search(classname.crbegin(), classname.crend(), my_match, r) )
-        {
-            size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &prefix.front();
-            index_of_last_colon = index_of_second_colon_in_last_double_colon - 1u;
-
-            if ( 0u == index_of_last_colon)
-            {
-
-            }
-            else
-            {
-                cout << "============ POSITION = " << index_of_last_colon << " =================" << endl;
-            }
-        }
-
-// ========================================================================
+        size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
 
         if ( -1 != index_of_last_colon && (':' != classname[0u]) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
+            // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
             prefix += "::";
             prefix += classname.substr(0u, index_of_last_colon);
         }
@@ -670,29 +675,9 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
 
 string Get_All_Bases(string_view arg)
 {
-// ========================================================================
+    size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg);
 
-    std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");
-    std::match_results<string_view::const_reverse_iterator> my_match;
-
-    size_t index_of_last_colon = -1;
-
-    if ( std::regex_search(arg.crbegin(), arg.crend(), my_match, r) )
-    {
-        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &arg.front();
-        index_of_last_colon = index_of_second_colon_in_last_double_colon - 1u;
-
-        if ( 0u == index_of_last_colon)
-        {
-
-        }
-        else
-        {
-            cout << "============ POSITION = " << index_of_last_colon << " =================" << endl;
-        }
-    }
-
-// ========================================================================
+    if ( -1 == index_of_last_colon ) throw std::runtime_error("There's no double-colon in the argument to Get_All_Bases");
 
     string_view prefix    = arg.substr(0u, index_of_last_colon);
     string_view classname = arg.substr(index_of_last_colon +  2u);

@@ -113,12 +113,14 @@ using std::back_inserter;
 using std::views::filter;
 using std::views::split;
 
+using std::runtime_error;
+
 string g_intact;
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
     if ( char_index >= g_intact.size() )
-        throw std::runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");    
+        throw runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");
 }
 
 inline size_t LastChar(void) { return g_intact.size() - 1u; }
@@ -164,7 +166,7 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     if ( 0u == char_index ) return {};
 
-    if ( '{' != g_intact[char_index] ) throw std::runtime_error("This isn't an open curly bracket!");
+    if ( '{' != g_intact[char_index] ) throw runtime_error("This isn't an open curly bracket!");
 
     size_t i = char_index;
 
@@ -245,9 +247,9 @@ public:
 
         CurlyPair *Add_New_Inner_Scope(size_t const first)
         {
-            if ( nullptr == this ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
+            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
 
-            if ( (-1 != _indices.first) && (first <= _indices.first) ) throw std::runtime_error("Open bracket of inner scope must come after open bracket of outer scope");
+            if ( (-1 != _indices.first) && (first <= _indices.first) ) throw runtime_error("Open bracket of inner scope must come after open bracket of outer scope");
 
             _nested.emplace_back(first, this);
 
@@ -256,10 +258,10 @@ public:
         
         CurlyPair *Close_Scope_And_Go_Back(size_t const last)
         {
-            if ( nullptr == this ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
+            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
 
-            if ( nullptr ==        _parent ) throw std::runtime_error("The root pair is NEVER supposed to get closed");
-            if (    last <= _indices.first ) throw std::runtime_error("Closing backet of inner scope must come after open bracket");
+            if ( nullptr ==        _parent ) throw runtime_error("The root pair is NEVER supposed to get closed");
+            if (    last <= _indices.first ) throw runtime_error("Closing backet of inner scope must come after open bracket");
 
             _indices.second = last;
 
@@ -357,8 +359,8 @@ public:
 
 CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(void) const
 {
-    if ( nullptr == this          ) throw std::runtime_error("The 'this' pointer in this method is a nullptr!");
-    if ( nullptr == this->_parent ) throw std::runtime_error("Parent() should never be invoked on the root pair");
+    if ( nullptr == this          ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
+    if ( nullptr == this->_parent ) throw runtime_error("Parent() should never be invoked on the root pair");
 
     if ( &g_curly_manager._root_pair == this->_parent ) throw CurlyBracketManager::ParentError();
 
@@ -424,7 +426,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 {
     if ( cp.First() >= g_intact.size() || cp.Last() >= g_intact.size() )
     {
-        throw std::runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
+        throw runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
     }
 
     string intro = TextBeforeOpenCurlyBracket(cp.First());
@@ -531,7 +533,7 @@ size_t Find_Last_Double_Colon_In_String(string_view const s)
         assert( ':' == s[index_of_second_colon_in_last_double_colon] );
 
         size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
-        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw std::runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
+        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
 
         //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
 
@@ -636,7 +638,7 @@ bool Recursive_Print_All_Bases_PROPER(string_view const arg_prefix, string class
     }
 
     if ( nullptr == p )
-        throw std::runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(arg_prefix) + "')");
+        throw runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(arg_prefix) + "')");
 
     bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
@@ -677,7 +679,7 @@ string Get_All_Bases(string_view arg)
 {
     size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg);
 
-    if ( -1 == index_of_last_colon ) throw std::runtime_error("There's no double-colon in the argument to Get_All_Bases");
+    if ( -1 == index_of_last_colon ) throw runtime_error("There's no double-colon in the argument to Get_All_Bases");
 
     string_view prefix    = arg.substr(0u, index_of_last_colon);
     string_view classname = arg.substr(index_of_last_colon +  2u);

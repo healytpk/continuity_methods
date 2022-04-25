@@ -1,6 +1,8 @@
-// =====================================================================
+// =================================================================
 // Section 1 of 8 : Override global 'new' and 'delete' for max speed
-// =====================================================================
+// =================================================================
+
+#if 1  // Change this line to "#if 0" in order to disable this feature
 
 #include <cstddef>    // size_t
 #include <cstdlib>    // malloc
@@ -57,6 +59,8 @@ void *operator new[](size_t const size) noexcept { return Implementation_Global_
 void operator delete  (void *const p) noexcept { /* Do Nothing */ }
 void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 
+#endif // if override global 'new' and 'delete' for max speed is enabled
+
 // =========================================================================
 // Section 2 of 8 : Include standard header files, and define global objects
 // =========================================================================
@@ -66,35 +70,35 @@ bool constexpr print_all_scopes = false;
 
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
-#include <cstdlib>    // EXIT_FAILURE, abort
-#include <iostream>   // cout, clog, endl
-#include <fstream>    // ifstream
-#include <algorithm>  // copy, replace, count
-#include <iterator>   // next, back_inserter, istream_iterator
-#include <string>     // string, to_string
-#include <ios>        // ios::binary
-#include <iomanip>    // noskipws
-#include <stdexcept>  // out_of_range, runtime_error
-#include <utility>    // pair<>
-#include <cctype>     // isspace
-#include <list>       // list
-#include <unordered_map> // unordered_map
-#include <ranges>     // views::filter
-#include <array>      // array
-#include <tuple>      // tuple
-#include <utility>    // pair, move
-#include <string_view> // string_view
-#include <set>        // set
-#include <regex>      // regex, regex_replace, smatch, match_results
+#include <cstdlib>        // EXIT_FAILURE, abort
+#include <cstdio>         // freopen, stdin
+#include <iostream>       // cout, clog, endl
+#include <algorithm>      // copy, replace, count
+#include <iterator>       // next, back_inserter, istream_iterator
+#include <string>         // string, to_string
+#include <ios>            // ios::binary
+#include <iomanip>        // noskipws
+#include <stdexcept>      // out_of_range, runtime_error
+#include <utility>        // pair<>
+#include <cctype>         // isspace
+#include <list>           // list
+#include <unordered_map>  // unordered_map
+#include <ranges>         // views::filter
+#include <array>          // array
+#include <tuple>          // tuple
+#include <utility>        // pair, move
+#include <string_view>    // string_view
+#include <set>            // set
+#include <regex>          // regex, regex_replace, smatch, match_results
 
-#include <boost/algorithm/string/trim_all.hpp>  // trim_all
+#include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
 #include <boost/algorithm/string/replace.hpp>   // replace_all
 #include <boost/algorithm/string/erase.hpp>     // erase_all
 
+using std::cin;
 using std::cout;
 using std::clog;
 using std::endl;
-using std::ifstream;
 using std::string;
 using std::to_string;
 using std::string_view;
@@ -116,6 +120,58 @@ using std::views::split;
 using std::runtime_error;
 
 string g_intact;
+
+// ==========================================================================
+// Section 3 of 8 : Generate the auxillary code needed for Continuity Methods
+// ==========================================================================
+
+void Print_Helper_Classes_For_Class(string_view const classname, list<string> const &func_signatures)
+{
+    cout <<
+    "class IMethodInvoker_" << classname << " {\n"
+    "protected:\n"
+    "\n"
+    "    // All methods have one extra\n"
+    "    // parameter for 'this' as 'void*'\n";
+
+    for ( auto const &method : func_signatures )
+    {
+        cout << "    virtual " << method << " = 0;\n";
+    }
+
+    cout <<
+    "\n    friend class Invoker_" << classname << ";\n"
+    "};\n\n";
+
+    cout <<
+    "template<class Base, class Derived>\n"
+    "class MethodInvoker_" << classname << " final : public IMethodInvoker_" << classname << " {\n"
+    "protected:\n"
+    "\n"
+    "    // All methods have one extra\n"
+    "    // parameter for 'this' as 'void*'\n";
+
+    for ( auto const &method : func_signatures )
+    {
+        std::regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+
+        string const tmp1 = std::regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
+        string const tmp2 = std::regex_replace(method, my_regex, "$2");
+
+        cout << "    " << tmp1 << " override\n" <<
+                "    {\n"
+                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this))\n"
+                "\n"
+                "        return p->Base::" << tmp2 << "();\n"
+                "    }\n\n";
+    }
+
+    cout << "};\n";
+}
+
+// =============================================================
+// Section 4 of 8 : Parse all the class definitions in the input
+// =============================================================
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
@@ -157,8 +213,6 @@ inline size_t EndLine(size_t char_index)
     
     return char_index;
 }
-
-
 
 string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
 {
@@ -640,7 +694,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
     }
 
     if ( nullptr == p )
-        throw runtime_error("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
+        throw std::out_of_range("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
 
     return full_name;
 }
@@ -713,50 +767,6 @@ string Get_All_Bases(string_view arg)
     Recursive_Print_All_Bases_PROPER(string(prefix), string(classname), already_recorded, false, retval);
 
     return retval;
-}
-
-void Print_Helper_Classes_For_Class(string_view const classname, list<string> const &func_signatures)
-{
-    cout <<
-    "class IMethodInvoker_" << classname << " {\n"
-    "protected:\n"
-    "\n"
-    "    // All methods have one extra\n"
-    "    // parameter for 'this' as 'void*'\n";
-
-    for ( auto const &method : func_signatures )
-    {
-        cout << "    virtual " << method << " = 0;\n";
-    }
-
-    cout <<
-    "\n    friend class Invoker_" << classname << ";\n"
-    "};\n\n";
-
-    cout <<
-    "template<class Base, class Derived>\n"
-    "class MethodInvoker_" << classname << " final : public IMethodInvoker_" << classname << " {\n"
-    "protected:\n"
-    "\n"
-    "    // All methods have one extra\n"
-    "    // parameter for 'this' as 'void*'\n";
-
-    for ( auto const &method : func_signatures )
-    {
-        std::regex const my_regex("(.+?) (.+?)\\((.*)\\)");
-
-        string const tmp1 = std::regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
-        string const tmp2 = std::regex_replace(method, my_regex, "$2");
-
-        cout << "    " << tmp1 << " override\n" <<
-                "    {\n"
-                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this))\n"
-                "\n"
-                "        return p->Base::" << tmp2 << "();\n"
-                "    }\n\n";
-    }
-
-    cout << "};\n";
 }
 
 list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketManager::CurlyPair const &cp)
@@ -849,6 +859,20 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 
 int main(int const argc, char **const argv)
 {
+    // The standard input stream, cin, is set to text mode
+    // and so we need to set it to binary mode:
+    bool cin_is_now_in_binary_mode = false;
+
+#   if defined(_WIN32) || defined(_WIN64)
+        extern "C" int ::_setmode(int fd,int mode);
+        extern "C" int ::_fileno(std::FILE *stream);
+        cin_is_now_in_binary_mode = ( /* _O_TEXT */ 0x4000 == ::_setmode( ::_fileno(stdin), /* O_BINARY */ 0x8000) );
+#   else
+        cin_is_now_in_binary_mode = (nullptr != std::freopen(NULL, "rb", stdin));
+#   endif
+
+    if ( false == cin_is_now_in_binary_mode ) throw std::runtime_error("Could not set standard input to binary mode (it defaults to text mode)");
+
     if ( false )
     {
         Print_Helper_Classes_For_Class("MyClass", { "void Trigger(void)", "bool Elevate(float)" });
@@ -856,20 +880,16 @@ int main(int const argc, char **const argv)
         return 0;
     }
 
-    std::ifstream f(argv[1u], std::ios::binary);
-
-    f >> std::noskipws;
-
-    if ( false == f.is_open() ) { clog << "Cannot open file" << endl; return EXIT_FAILURE; }
+    cin >> std::noskipws;
 
     g_scope_names.reserve(5000u);
 
-    std::copy( istream_iterator<char>(f), istream_iterator<char>(), back_inserter(g_intact) );
+    std::copy( istream_iterator<char>(cin), istream_iterator<char>(), back_inserter(g_intact) );
 
     clog << "Bytes: " << g_intact.size() << endl;
     clog << "Lines: " << Lines() << endl;
 
-    std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');
+    std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');  // null chars will screw up functions that parse null as end of string
 
     boost::replace_all(g_intact, "\r\n", " \n");
 

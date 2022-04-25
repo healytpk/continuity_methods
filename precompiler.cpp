@@ -1,6 +1,16 @@
+/*
+ * This program is one file of C++ code, and has no dependencies other
+ * than the C++ 2020 standard library, and Boost 1.76.
+ *
+ * The purpose of this program is to implement the C++ proposal entitled
+ * 'Continuity Methods'.
+*/
+
 // =================================================================
 // Section 1 of 8 : Override global 'new' and 'delete' for max speed
 // =================================================================
+
+decltype(sizeof(1)) g_total_allocation = 0u;
 
 #if 1  // Change this line to "#if 0" in order to disable this feature
 
@@ -14,30 +24,28 @@ inline void *Implementation_Global_New(size_t size) noexcept
 {
     size += 8u - (size % 8u);
 
-    static size_t constexpr bytes_at_a_time = 10485760;  // 10 megabytes
+    static size_t constexpr bytes_at_a_time = 10485760u;  // 10 megabytes
 
     if ( size > bytes_at_a_time ) return nullptr;
 
-    static void *my_pointers[1000u] = {};  // 1,000 * 10 megabytes = 10 gigabytes
-
-    static void **const p_over_the_edge = my_pointers + sizeof(my_pointers)/sizeof(*my_pointers);
-
-    static void **pp = my_pointers;
+    static void *p = nullptr;
 
     static size_t bytes_allocated_so_far = 0u;
 
-    while ( p_over_the_edge != pp )  // Until we've exhausted 10 gigabytes
+    for (; /* ever */ ;)
     {
-        if ( nullptr == *pp )
+        if ( nullptr == p )
         {
-            *pp = std::malloc(bytes_at_a_time);
+            p = std::malloc(bytes_at_a_time);
 
-            if ( nullptr == *pp ) return nullptr;
+            if ( nullptr == p ) return nullptr;
+
+            g_total_allocation += bytes_at_a_time;
         }
 
         if ( (bytes_allocated_so_far + size) > bytes_at_a_time )
         {
-            ++pp;  // This might push it over the edge, so don't check whether it's a nullptr
+            p = nullptr;
 
             bytes_allocated_so_far = 0u;
         }
@@ -47,7 +55,7 @@ inline void *Implementation_Global_New(size_t size) noexcept
         }
     }
 
-    void *const retval = static_cast<char*>(*pp) + bytes_allocated_so_far;
+    void *const retval = static_cast<char*>(p) + bytes_allocated_so_far;
 
     bytes_allocated_so_far += size;
 
@@ -857,8 +865,31 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
     }
 }
 
+#include <exception>
+
+void my_terminate_handler(void)
+{
+    std::exception_ptr eptr = std::current_exception();
+
+    try
+    {
+        if ( nullptr != eptr ) std::rethrow_exception(eptr);
+    }
+    catch(const std::exception& e)
+    {
+        clog << "=====================================================================================================" << endl;
+        clog << "Exception: " << e.what() << endl;
+        clog << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
+        clog << "=====================================================================================================" << endl;
+    }
+
+    std::abort();
+}
+
 int main(int const argc, char **const argv)
 {
+    std::set_terminate(my_terminate_handler);
+
     // The standard input stream, cin, is set to text mode
     // and so we need to set it to binary mode:
     bool cin_is_now_in_binary_mode = false;

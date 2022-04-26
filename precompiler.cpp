@@ -79,6 +79,7 @@ bool constexpr print_all_scopes = false;
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 #include <cstdlib>        // EXIT_FAILURE, abort
+#include <cstring>        // memset, memcpy
 #include <cstdio>         // freopen, stdin
 #include <iostream>       // cout, clog, endl
 #include <algorithm>      // copy, replace, count
@@ -180,6 +181,59 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
 // =============================================================
 
 string g_intact;
+
+void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
+{
+    static std::unordered_map<size_t, string> directives;
+
+    if ( undo )
+    {
+        for ( auto const &e : directives )
+        {
+            std::memcpy(&g_intact[e.first], &e.second.front(), e.second.size());
+        }
+
+        return;
+    }
+
+    for ( size_t i = 0u; i != g_intact.size(); ++i )
+    {
+        assert( '\r' != g_intact[i] );
+        assert( '\t' != g_intact[i] );
+
+        if ( '#' == g_intact[i] )
+        {
+            if ( (0u == i) || ('\n' == g_intact[i-1u]) )
+            {
+                if ( g_intact.size() == (i + 1u) )
+                {
+                    // The hash symbol is the last char in the file
+                    directives[i] = "#";
+                    return;
+                }
+
+                // We have a preprocessor directive starting at index i
+                size_t j = g_intact.find_first_of('\n', i + 1u);
+
+                if ( -1 == j ) j = g_intact.size() - 1u;
+
+                directives[i] = g_intact.substr(i, j - i);
+
+                std::memset(&g_intact[i], ' ', j - i);
+
+                i = j;
+            }
+        }
+    }
+
+    clog << "Preprocessor Replacements:\n"
+            "==========================\n";
+
+    for ( auto const &e : directives )
+    {
+        clog << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
+    }
+}
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
@@ -1014,6 +1068,8 @@ int main(int const argc, char **const argv)
     boost::replace_all(g_intact, "\r\n", " \n");
 
     boost::replace_all(g_intact, "\r", "\n");
+
+    Replace_All_Preprocessor_Directives_With_Spaces();
 
     //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(clog) );
     

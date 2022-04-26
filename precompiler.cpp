@@ -613,18 +613,19 @@ size_t Find_Last_Double_Colon_In_String(string_view const s)
 
 bool Strip_Last_Scope(string &s)
 {
-    // Change the prefix from "::std::__cxx11" into "::std", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
+    // Change the prefix from "::std::__cxx11::" into "::std::", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
 
-    if ( s.empty() ) return false;
+    assert( false == s.empty() );
+
+    if ( "::" == s ) return false;
 
     size_t const i = Find_Last_Double_Colon_In_String(s);
 
-    switch ( i )
-    {
-    case (size_t)-1: return false;
-    case 0u: s.clear(); return true;
-    default: s.resize(i); return true;
-    }
+    if ( -1 == i ) return false;
+
+    s.resize(i + 2u);  // i can be zero here
+
+    return true;
 }
 
 std::unordered_map<string,string> g_psuedonyms;
@@ -633,7 +634,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    if ( classname.starts_with("::") )
+    if ( classname.starts_with("::") )  // If it's an absolute class name rather than relative
     {
         g_scope_names.at(classname);  // just to see if it throws
         return classname;
@@ -658,7 +659,6 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
         }
 
         full_name  = prefix;
-        full_name += "::";
         full_name += classname;
 
         try
@@ -676,7 +676,6 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
             if ( class_name_without_template_specialisation != classname )
             {
                 full_name  = prefix;
-                full_name += "::";
                 full_name += class_name_without_template_specialisation;
 
                 try
@@ -747,7 +746,6 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
         if ( -1 != index_of_last_colon && (':' != classname[0u]) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
             // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
-            prefix += "::";
             prefix += classname.substr(0u, index_of_last_colon);
         }
 
@@ -767,7 +765,7 @@ string Get_All_Bases(string_view arg)
 
     if ( -1 == index_of_last_colon ) throw runtime_error("There's no double-colon in the argument to Get_All_Bases");
 
-    string_view const prefix    = arg.substr(0u, index_of_last_colon);
+    string_view const prefix    = arg.substr(0u, index_of_last_colon + 2u);
     string_view const classname = arg.substr(index_of_last_colon +  2u);
 
     std::set<string> already_recorded;
@@ -838,7 +836,9 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
-    std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
+    assert( scope_name.ends_with("::") );
+
+    std::regex const r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
     for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              i != std::sregex_iterator();
@@ -862,6 +862,42 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         catch (std::out_of_range const &e)
         {
             clog << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            return;
+        }
+#else
+        string tmp( i->str() );
+
+        boost::replace_all(tmp, "\n", " ");
+        boost::trim_all(tmp);
+
+        cout << tmp << endl;
+#endif
+    }
+
+    std::regex const r2("typedef\\s+(.+?)\\s+(.?+)\\s*;");
+
+    for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r2);  // Note the +1 on this line
+                             i != std::sregex_iterator();
+                             ++i )
+    {
+#if 1
+        string impersonator = regex_replace( i->str(), r2, "$2" );
+        string original     = regex_replace( i->str(), r2, "$1" );
+
+        boost::replace_all(impersonator,"\n"," ");
+        boost::replace_all(original    ,"\n"," ");
+        boost::trim_all(impersonator);
+        boost::trim_all(original    );
+
+        try
+        {
+            string full_name_of_original = Find_Class_Relative_To_Scope(scope_name, original);  // might throw out_of_range
+            //cout << "Old = " << original << ", New = " << impersonator << endl;
+            g_psuedonyms[scope_name + impersonator] = full_name_of_original;
+        }
+        catch (std::out_of_range const &e)
+        {
+            clog << "====== WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
             return;
         }
 #else
@@ -959,7 +995,7 @@ int main(int const argc, char **const argv)
             for ( auto const my_pair : my_list )
             {
                 clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
-                Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first);
+                Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first + "::");
             }
 
             clog << endl;

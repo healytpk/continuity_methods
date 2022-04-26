@@ -663,7 +663,7 @@ bool Strip_Last_Scope(string &s)
 
 std::unordered_map<string,string> g_psuedonyms;
 
-string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
+string Find_Class_Relative_To_Scope(string &prefix, string classname)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
@@ -672,6 +672,16 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
         g_scope_names.at(classname);  // just to see if it throws
         return classname;
     }
+
+    auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
+    {
+        try
+        {
+            arg_classname = g_psuedonyms.at(arg_prefix + arg_classname);
+            arg_prefix.clear();
+        }
+        catch(std::out_of_range const &e) {}
+    };
 
     string const intact_prefix{ prefix };
 
@@ -691,6 +701,8 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
             std::abort();
         }
 
+        Adjust_Class_Name(prefix, classname);
+
         full_name  = prefix;
         full_name += classname;
 
@@ -704,10 +716,13 @@ string Find_Class_Relative_To_Scope(string &prefix, string const &classname)
 
             string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
 
-            string const class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
+            string class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
 
             if ( class_name_without_template_specialisation != classname )
             {
+
+                Adjust_Class_Name(prefix, class_name_without_template_specialisation);
+
                 full_name  = prefix;
                 full_name += class_name_without_template_specialisation;
 
@@ -910,7 +925,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
                              i != std::sregex_iterator();
                              ++i )
     {
-        clog << "Iterating in typedef loop" << endl;
+        //clog << "Iterating in typedef loop" << endl;
 
         string impersonator = regex_replace( i->str(), r, "$2" );
         string original     = regex_replace( i->str(), r, "$1" );

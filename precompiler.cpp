@@ -127,8 +127,6 @@ using std::views::split;
 
 using std::runtime_error;
 
-string g_intact;
-
 // ==========================================================================
 // Section 3 of 8 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
@@ -180,6 +178,8 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
 // =============================================================
 // Section 4 of 8 : Parse all the class definitions in the input
 // =============================================================
+
+string g_intact;
 
 inline void ThrowIfBadIndex(size_t const char_index)
 {
@@ -240,7 +240,7 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
         {
         case '}':
         case '{':
-        case ';':
+        case ';':     // REVISIT FIX - What if we have "for (int i = 0; i != -1; ++i) { . . . }"
         //case '(':
         //case ')':
         //case '<':
@@ -523,7 +523,8 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
-    std::regex const my_regex("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
+    std::regex const my_regex("(\\<.*\\>)|\\s");
+    //std::regex const my_regex("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
     std::sregex_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
 
@@ -711,16 +712,17 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    auto Adjust_Class_Name = [](string &arg) -> void
+    auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
         try
         {
-            arg = g_psuedonyms.at(arg);
+            arg_classname = g_psuedonyms.at(arg_prefix + arg_classname);
+            arg_prefix.clear();
         }
         catch(std::out_of_range const &e) {}
     };
 
-    Adjust_Class_Name(classname);
+    Adjust_Class_Name(prefix, classname);
 
     string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
 
@@ -832,7 +834,7 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
     return retval;
 }
 
-void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string_view const scope_name)
+void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string scope_name)
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
@@ -851,9 +853,17 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         boost::trim_all(impersonator);
         boost::trim_all(original    );
 
-        //cout << "Old = " << original << ", New = " << impersonator << endl;
-
-        g_psuedonyms[impersonator] = original;
+        try
+        {
+            string full_name_of_original = Find_Class_Relative_To_Scope(scope_name, original);  // might throw out_of_range
+            //cout << "Old = " << original << ", New = " << impersonator << endl;
+            g_psuedonyms[scope_name + impersonator] = full_name_of_original;
+        }
+        catch (std::out_of_range const &e)
+        {
+            clog << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            return;
+        }
 #else
         string tmp( i->str() );
 

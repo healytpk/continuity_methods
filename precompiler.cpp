@@ -611,6 +611,30 @@ size_t Find_Last_Double_Colon_In_String(string_view const s)
     return -1;
 }
 
+size_t Find_Second_Last_Double_Colon_In_String(string_view const s)
+{
+    static regex const r("[:](?=[^\\<]*?(?:\\>|$))");  // matches a semi-colon so long as it's not enclosed in angle brackets
+
+    match_results<string_view::const_reverse_iterator> my_match;
+
+    if ( regex_search(s.crbegin(), s.crend(), my_match, r) )  // returns true if there is at least one match
+    {
+        if ( my_match.size() < 2u ) return -1;
+
+        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[1u].first) - &s.front(); // REVISIT FIX - consider using my_match.position() here
+        assert( ':' == s[index_of_second_colon_in_last_double_colon] );
+
+        size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
+        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
+
+        //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
+
+        return index_of_first_colon_in_last_double_colon;
+    }
+
+    return -1;
+}
+
 bool Strip_Last_Scope(string &s)
 {
     // Change the prefix from "::std::__cxx11::" into "::std::", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
@@ -619,7 +643,7 @@ bool Strip_Last_Scope(string &s)
 
     if ( "::" == s ) return false;
 
-    size_t const i = Find_Last_Double_Colon_In_String(s);
+    size_t const i = Find_Second_Last_Double_Colon_In_String(s);
 
     if ( -1 == i ) return false;
 

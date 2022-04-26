@@ -613,19 +613,28 @@ size_t Find_Last_Double_Colon_In_String(string_view const s)
 
 size_t Find_Second_Last_Double_Colon_In_String(string_view const s)
 {
-    static regex const r("[:](?=[^\\<]*?(?:\\>|$))");  // matches a semi-colon so long as it's not enclosed in angle brackets
+    static regex const r("(\\<.*\\>)|::");  // matches a double semi-colon so long as it's not enclosed in angle brackets
 
-    match_results<string_view::const_reverse_iterator> my_match;
+    bool first = true;
 
-    if ( regex_search(s.crbegin(), s.crend(), my_match, r) )  // returns true if there is at least one match
+    using r_svregex_iterator = std::regex_iterator<string_view::const_reverse_iterator>;
+
+    for(r_svregex_iterator iter  = r_svregex_iterator(s.crbegin(), s.crend(), r);
+                           iter != r_svregex_iterator();
+                           ++iter )
     {
-        if ( my_match.size() < 2u ) return -1;
+        if ( first )
+        {
+            first = false;
+            continue;
+        }
 
-        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[1u].first) - &s.front(); // REVISIT FIX - consider using my_match.position() here
-        assert( ':' == s[index_of_second_colon_in_last_double_colon] );
+        match_results<string_view::const_reverse_iterator> my_match = *iter;
 
-        size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
-        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
+        size_t const index_of_first_colon_in_last_double_colon = &*(my_match[0u].first) - &s.front() - 1u; // REVISIT FIX - consider using my_match.position() here
+
+        assert( ':' == s[index_of_first_colon_in_last_double_colon     ] );
+        assert( ':' == s[index_of_first_colon_in_last_double_colon + 1u] );
 
         //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
 
@@ -771,6 +780,7 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
         {
             // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
             prefix += classname.substr(0u, index_of_last_colon);
+            prefix += "::";
         }
 
         if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) )
@@ -862,15 +872,19 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 
     assert( scope_name.ends_with("::") );
 
-    std::regex const r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
+    std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
     for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              i != std::sregex_iterator();
                              ++i )
     {
-#if 1
         string impersonator = regex_replace( i->str(), r, "$1" );
         string original     = regex_replace( i->str(), r, "$2" );
+
+        impersonator = regex_replace(impersonator, regex("typename\\s*"), "");
+        impersonator = regex_replace(impersonator, regex("template\\s*"), "");
+        original = regex_replace(original, regex("typename\\s*"), "");
+        original = regex_replace(original, regex("template\\s*"), "");
 
         boost::replace_all(impersonator,"\n"," ");
         boost::replace_all(original    ,"\n"," ");
@@ -888,25 +902,23 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
             clog << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
             return;
         }
-#else
-        string tmp( i->str() );
-
-        boost::replace_all(tmp, "\n", " ");
-        boost::trim_all(tmp);
-
-        cout << tmp << endl;
-#endif
     }
 
-    std::regex const r2("typedef\\s+(.+?)\\s+(.?+)\\s*;");
+    r = "typedef\\s+(.+?)\\s+(.*)\\s*;";
 
-    for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r2);  // Note the +1 on this line
+    for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              i != std::sregex_iterator();
                              ++i )
     {
-#if 1
-        string impersonator = regex_replace( i->str(), r2, "$2" );
-        string original     = regex_replace( i->str(), r2, "$1" );
+        clog << "Iterating in typedef loop" << endl;
+
+        string impersonator = regex_replace( i->str(), r, "$2" );
+        string original     = regex_replace( i->str(), r, "$1" );
+
+        impersonator = regex_replace(impersonator, regex("typename\\s*"), "");
+        impersonator = regex_replace(impersonator, regex("template\\s*"), "");
+        original = regex_replace(original, regex("typename\\s*"), "");
+        original = regex_replace(original, regex("template\\s*"), "");
 
         boost::replace_all(impersonator,"\n"," ");
         boost::replace_all(original    ,"\n"," ");
@@ -924,14 +936,6 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
             clog << "====== WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
             return;
         }
-#else
-        string tmp( i->str() );
-
-        boost::replace_all(tmp, "\n", " ");
-        boost::trim_all(tmp);
-
-        cout << tmp << endl;
-#endif
     }
 }
 

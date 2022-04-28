@@ -64,29 +64,6 @@ protected:
     friend class Invoker;
 };
 
-class Invoker final {
-protected:
-
-    IMethodInvoker &_mi;
-    void *const _this;
-
-public:
-
-    Invoker(IMethodInvoker &arg_mi, void *const arg_this) : _mi(arg_mi), _this(arg_this) {}
-
-    // The extra 'this' parameter is no longer needed
-    bool Trigger(void) // not virtual
-    {
-        return _mi.Trigger(_this);
-    }
-    
-    // The extra 'this' parameter is no longer needed
-    void Elevate(float const arg) // not virtual
-    {
-        return _mi.Elevate(_this,arg);
-    }
-};
-
 template<class Base, class Derived>
 class MethodInvoker final : public IMethodInvoker {
 protected:
@@ -107,6 +84,29 @@ protected:
         Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));  
 
         return p->Base::Elevate(arg0);
+    }
+};
+
+class Invoker final {
+protected:
+
+    IMethodInvoker &_mi;
+    void *const _this;
+
+public:
+
+    Invoker(IMethodInvoker &arg_mi, void *const arg_this) : _mi(arg_mi), _this(arg_this) {}
+
+    // The extra 'this' parameter is no longer needed
+    bool Trigger(void) // not virtual
+    {
+        return _mi.Trigger(_this);
+    }
+    
+    // The extra 'this' parameter is no longer needed
+    void Elevate(float const arg) // not virtual
+    {
+        return _mi.Elevate(_this,arg);
     }
 };
 

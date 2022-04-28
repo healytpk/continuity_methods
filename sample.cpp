@@ -10,6 +10,8 @@ using std::endl;
 
 int j;
 
+namespace Caga { }
+
 namespace My_Program {
 
 int b;
@@ -56,7 +58,7 @@ struct Base2 {
 	}
 };
 
-struct Derived2 : virtual Derived1A, virtual Derived1B, virtual Base2 {
+struct Derived2 : virtual Derived1A,virtual Derived1B,virtual Base2 {
     Derived2(void) { cout << "Derived2::Constructor" << endl; }
 	void Set_Int(int const arg) override continue
 	{
@@ -76,7 +78,13 @@ struct FurtherDerived : virtual Base2, Derived2  {
 	}
 };
 
+namespace Caga { }
+
 namespace MyNamespace {
+
+namespace Caga { }
+using Frog = ::My_Program::FurtherDerived;
+typedef ::My_Program::FurtherDerived Toad;
 
 class Organism {};
 class Mammal : Organism {};

@@ -33,7 +33,7 @@ using namespace std;
 void PrintUsings(string const &unspecialised, string const &specialised)
 {
     // The following finds commas except those found inside angle brackets
-    std::regex const my_regex("(\\<.*\\>)|,");
+    std::regex const my_regex("[,](?=[^\\>]*?(?:\\<|$))");
 
     std::sregex_token_iterator iter_unsp(unspecialised.begin(), unspecialised.end(), my_regex, -1),
                                iter_sp  (  specialised.begin(),   specialised.end(), my_regex, -1);
@@ -64,6 +64,7 @@ int main(void)
     pair<string, string> classes[] = {
         { "class T, class R", "int, double" },
         { "int, typename R, B<Monkey> *k", "5, Monkey<int,float,typename Frog::Parent>, nullptr" },
+        { "typename Allocator, class Deleter, B<Monkey> *k, bool is_pod", "std::vector<double>, Monkey<int,float,typename Frog::Parent>, nullptr, false" },
     };
     
     for ( auto const &e : classes )

@@ -199,7 +199,7 @@ void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
     for ( size_t i = 0u; i != g_intact.size(); ++i )
     {
         assert( '\r' != g_intact[i] );
-        //assert( '\t' != g_intact[i] );
+        assert( '\t' != g_intact[i] );
 
         if ( '#' == g_intact[i] )
         {
@@ -276,9 +276,7 @@ inline size_t EndLine(size_t char_index)
     return char_index;
 }
 
-std::unordered_map<string,string> g_params_for_template_classes;
-
-string TextBeforeOpenCurlyBracket(size_t const char_index, string *const p_unspecialised_template_params)  // strips off the template part at the start, e.g. "template<class T>"
+string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
 {
     ThrowIfBadIndex(char_index);
 
@@ -325,22 +323,6 @@ string TextBeforeOpenCurlyBracket(size_t const char_index, string *const p_unspe
     boost::algorithm::trim_all(retval);
 
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
-
-    regex const regex_temp_params("template<(.+)> (class|struct) (.*)");
-
-    if ( nullptr != p_unspecialised_template_params )
-    {
-        std::smatch m_dummy;
-        if ( regex_search( retval, m_dummy, regex_temp_params ) )
-        {
-            *p_unspecialised_template_params = std::regex_replace(retval, regex_temp_params, "$1");
-        }
-        else
-        {
-            p_unspecialised_template_params->clear();
-        }
-    }
-
     retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
     //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
@@ -429,7 +411,7 @@ protected:
 
             clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First(),nullptr) << "]";
+            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
 
             if ( false == only_print_numbers )
             {
@@ -568,8 +550,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         throw runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
     }
 
-    string unspecialised_template_params;
-    string intro = TextBeforeOpenCurlyBracket(cp.First(), &unspecialised_template_params);
+    string intro = TextBeforeOpenCurlyBracket(cp.First());
 
     if ( intro.starts_with("namespace") )
     {
@@ -615,33 +596,6 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
     if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
-
-    if ( (false == unspecialised_template_params.empty()) && (false == str.contains("<")) )
-    {
-        clog << "FOUND TEMPLATE PARAMS: class = '" << str << "', params = '" << unspecialised_template_params << "'" << endl;
-
-        bool set_params = true;
-
-        try
-        {
-            g_params_for_template_classes.at(str);
-
-            if ( g_params_for_template_classes[str] != unspecialised_template_params )
-            {
-                set_params = false;
-
-                clog << "Warning: Too Complex : Attempt made to set unspecialised template parameters twice for the same class '" + str
-                                    + "', previous = '" + g_params_for_template_classes[str]
-                                    + "', current = '"  + unspecialised_template_params + "'" << endl;
-            }
-        }
-        catch(std::out_of_range const &)
-        {
-            set_params = true;
-        }
-
-        g_params_for_template_classes[str] = unspecialised_template_params;
-    }
 
     return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };  // REVISIT FIX might be 'struct' instead of 'class' (public Vs private)
 }
@@ -1157,12 +1111,6 @@ int main(int const argc, char **const argv)
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
     {
         clog << e.first << endl;
-    }
-
-    clog << "====================================== Now the parameter lists for template classes ==============================================" << endl;
-    for ( auto const &e : g_params_for_template_classes )
-    {
-        clog << "template <" << e.second << "> class" << e.first << " {   };" << endl;
     }
 
     clog << "====================================== Now the classes ==============================================" << endl;

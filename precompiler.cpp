@@ -120,6 +120,7 @@ using std::pair;
 
 using std::regex;
 using std::regex_replace;
+using std::regex_iterator;
 using std::smatch;
 using std::match_results;
 
@@ -303,10 +304,10 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
 
     for ( auto const &method : func_signatures )
     {
-        std::regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
 
-        string const tmp1 = std::regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
-        string const tmp2 = std::regex_replace(method, my_regex, "$2");
+        string const tmp1 = regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
+        string const tmp2 = regex_replace(method, my_regex, "$2");
 
         cout << "    " << tmp1 << " override\n" <<
                 "    {\n"
@@ -456,18 +457,18 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
 
-    retval = std::regex_replace(retval, std::regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
+    retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
 
     boost::algorithm::replace_all(retval, "::", "mOnKeY");
     boost::algorithm::replace_all(retval, ":", " : ");
     boost::algorithm::replace_all(retval, "mOnKeY", "::");
-    retval = std::regex_replace(retval, std::regex("\\s"), " ");
+    retval = regex_replace(retval, regex("\\s"), " ");
 
     boost::algorithm::trim_all(retval);
 
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
-    retval = std::regex_replace(retval, std::regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
-    retval = std::regex_replace(retval, std::regex("\\s*,\\s*"), ",");
+    retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
+    retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
     //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
 
     return retval;
@@ -645,9 +646,9 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
 
     list< array<string,3u> > retval;
 
-    std::regex const my_regex (",");
+    regex const my_regex (",");
 
-    std::regex const my_regex2("\\s");
+    regex const my_regex2("\\s");
 
     for (sregex_top_level_token_iterator iter(str.begin(), str.end(), my_regex, -1);
          iter != sregex_top_level_token_iterator();
@@ -718,7 +719,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
-    std::regex const my_regex("\\s");
+    regex const my_regex("\\s");
 
     sregex_top_level_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
 
@@ -811,7 +812,7 @@ size_t Find_Second_Last_Double_Colon_In_String(string_view const s)
 
     bool first = true;
 
-    using r_svregex_iterator = std::regex_iterator<string_view::const_reverse_iterator>;
+    using r_svregex_iterator = regex_iterator<string_view::const_reverse_iterator>;
 
     for(r_svregex_iterator iter  = r_svregex_iterator(s.crbegin(), s.crend(), r);
                            iter != r_svregex_iterator();
@@ -908,7 +909,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         {
             clog << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
 
-            string class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
+            string class_name_without_template_specialisation = regex_replace( string(classname), regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
 
             if ( class_name_without_template_specialisation != classname )
             {
@@ -1080,7 +1081,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 
     assert( scope_name.ends_with("::") );
 
-    std::regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
+    regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
     for(std::sregex_iterator i  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              i != std::sregex_iterator();

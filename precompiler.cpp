@@ -83,7 +83,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cstdio>         // freopen, stdin
 #include <iostream>       // cout, clog, endl
 #include <algorithm>      // copy, replace, count
-#include <iterator>       // next, back_inserter, istream_iterator, iterator_traits
+#include <iterator>       // next, back_inserter, istream_iterator
 #include <string>         // string, to_string
 #include <ios>            // ios::binary
 #include <iomanip>        // noskipws
@@ -139,140 +139,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 3 of 8: regex_top_level_token_iterator
-// ==========================================================================
-
-template<
-    class BidirIt,
-    class CharT = typename std::iterator_traits<BidirIt>::value_type,
-    class Traits = std::regex_traits<CharT>
->
-class regex_top_level_token_iterator : std::regex_token_iterator<BidirIt,CharT,Traits> {
-private:
-
-    using Base = std::regex_token_iterator<BidirIt,CharT,Traits>;
-    Base &base = *static_cast<Base*>(this);
-
-protected:
-
-    BidirIt const _a, _b;  // set in constructor's initialiser list
-
-    typename Base::value_type _strided_match;  /* starts off with matched = false */
-
-    bool Is_Top_Level(void) const
-    {
-        assert( base != Base() );  // Is_Top_Level should never be called on a "no more matches" token iterator
-
-        size_t counts[4u] = {};  /* (), [], {}, <> */
-
-        for ( BidirIt iter = _a; iter != (*base).second; ++iter )
-        {
-            switch ( *iter )
-            {
-            case '(': ++(counts[0u]); break;
-            case ')': --(counts[0u]); break;
-
-            case '[': ++(counts[1u]); break;
-            case ']': --(counts[1u]); break;
-
-            case '{': ++(counts[2u]); break;
-            case '}': --(counts[2u]); break;
-
-            case '<': ++(counts[3u]); break;
-            case '>': --(counts[3u]); break;
-            }
-        }
-
-        for ( auto const &count : counts )
-        {
-            if ( 0u != count ) return false;
-        }
-
-        return true;
-    }
-
-public:
-
-    regex_top_level_token_iterator(void) : Base(), _a(), _b() {}
-
-    void Keep_Searching_If_Necessary(void)
-    {
-        for ( _strided_match.matched = false; base != Base(); ++base )
-        {
-            if ( this->Is_Top_Level() )
-            {
-                _strided_match.second = (*base).second;  // redundant when _strided_match.matched == false
-                return;
-            }
-            else
-            {
-                if ( false == _strided_match.matched )
-                {
-                    _strided_match.matched = true;
-
-                    _strided_match.first = (*base).first;
-                }
-            }
-        }
-
-        _strided_match.matched = false;
-    }
-
-    regex_top_level_token_iterator(BidirIt const a, BidirIt const b,
-                                   typename Base::regex_type const &re,
-                                   int const submatch = 0,
-                                   std::regex_constants::match_flag_type const m = std::regex_constants::match_default )
-      : Base(a,b,re,submatch,m), _a(a), _b(b)
-    {
-        Keep_Searching_If_Necessary();
-    }
-
-    regex_top_level_token_iterator &operator++(void)
-    {
-        assert( base != Base() );  // operator++ should never be called on a "no more matches" token iterator
-
-        ++base;
-
-        Keep_Searching_If_Necessary();
-
-        return *this;
-    }
-
-    bool operator==(regex_top_level_token_iterator const &rhs) const  // Since C++20 we don't need operator!=
-    {
-        return base == rhs;
-    }
-
-    typename Base::value_type const &operator*(void) const
-    {
-        assert( base != Base() );  // operator* should never be called on a "no more matches" token iterator
-
-        if ( false == _strided_match.matched )
-        {
-            return *base;
-        }
-
-        return _strided_match;
-    }
-
-    typename Base::value_type const *operator->(void) const
-    {
-        assert( base != Base() );  // operator* should never be called on a "no more matches" token iterator
-
-        if ( false == _strided_match.matched )
-        {
-            return base.operator->();
-        }
-
-        return &_strided_match;
-    }
-};
-
-using sregex_top_level_token_iterator  = regex_top_level_token_iterator<     string::const_iterator>;
-using svregex_top_level_token_iterator = regex_top_level_token_iterator<string_view::const_iterator>;
-
-// ==========================================================================
-// Section 4 of 8 : Generate the auxillary code needed for Continuity Methods
+// Section 3 of 8 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string_view const classname, list<string> const &func_signatures)
@@ -320,7 +187,7 @@ void Print_Helper_Classes_For_Class(string_view const classname, list<string> co
 }
 
 // =============================================================
-// Section 5 of 8 : Parse all the class definitions in the input
+// Section 4 of 8 : Parse all the class definitions in the input
 // =============================================================
 
 string g_intact;
@@ -342,7 +209,7 @@ void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
     for ( size_t i = 0u; i != g_intact.size(); ++i )
     {
         assert( '\r' != g_intact[i] );
-        //assert( '\t' != g_intact[i] );
+        assert( '\t' != g_intact[i] );
 
         if ( '#' == g_intact[i] )
         {
@@ -645,18 +512,20 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
 
     list< array<string,3u> > retval;
 
-    std::regex const my_regex (",");
+    // The next line is to find any comma that isn't enclosed within angle brackets
+    std::regex const my_regex ("[,](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
-    std::regex const my_regex2("\\s");
+    // The next line is to find any white space that isn't enclosed within angle brackets
+    std::regex const my_regex2("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
-    for (sregex_top_level_token_iterator iter(str.begin(), str.end(), my_regex, -1);
-         iter != sregex_top_level_token_iterator();
+    for (std::sregex_token_iterator iter(str.begin(), str.end(), my_regex, -1);
+         iter != std::sregex_token_iterator();
          ++iter)
     {
         string base_info_str{ *iter };
 
-        for (sregex_top_level_token_iterator iter2(base_info_str.begin(), base_info_str.end(), my_regex2, -1);
-             iter2 != sregex_top_level_token_iterator();
+        for (std::sregex_token_iterator iter2(base_info_str.begin(), base_info_str.end(), my_regex2, -1);
+             iter2 != std::sregex_token_iterator();
              ++iter2)
         {
             string word { *iter2 };
@@ -718,15 +587,16 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
-    std::regex const my_regex("\\s");
+    std::regex const my_regex("(\\<.*\\>)|\\s");
+    //std::regex const my_regex("[\\s](?=[^\\>]*?(?:\\<|$))");  // Need an L-value for some reason (even if it's const)
 
-    sregex_top_level_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
+    std::sregex_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
 
-    assert( iter != sregex_top_level_token_iterator() );  // This should never happen (takes "class" from "class __cxx11::collate : public locale::facet")
+    assert( iter != std::sregex_token_iterator() );  // This should never happen (takes "class" from "class __cxx11::collate : public locale::facet")
 
     ++iter;
 
-    if ( sregex_top_level_token_iterator() == iter )
+    if ( iter == std::sregex_token_iterator() )
     {
         // Control reaches here if we have an anonymous struct (e.g. inside a function or inside a parent struct)
         return {};
@@ -734,8 +604,8 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     string const str{ *iter }; // takes "__cxx11::collate" from "class __cxx11::collate : public locale::facet"
 
-    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
-    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
+    if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
+    if ( ++iter == std::sregex_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
 
     return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };  // REVISIT FIX might be 'struct' instead of 'class' (public Vs private)
 }
@@ -908,11 +778,12 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         {
             clog << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
 
+            string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
+
             string class_name_without_template_specialisation = std::regex_replace( string(classname), std::regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
 
             if ( class_name_without_template_specialisation != classname )
             {
-                string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
 
                 Adjust_Class_Name(prefix, class_name_without_template_specialisation);
 

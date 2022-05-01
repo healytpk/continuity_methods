@@ -99,6 +99,8 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <string_view>    // string_view
 #include <set>            // set
 #include <regex>          // regex, regex_replace, smatch, match_results
+#include <exception>      // exception
+#include <chrono>         // duration_cast, milliseconds, steady_clock
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -127,6 +129,14 @@ using std::views::filter;
 using std::views::split;
 
 using std::runtime_error;
+
+std::uintmax_t GetTickCount(void)
+{
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
 // Section 3 of 8 : Generate the auxillary code needed for Continuity Methods
@@ -1008,8 +1018,6 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
     }
 }
 
-#include <exception>
-
 void my_terminate_handler(void)
 {
     std::exception_ptr eptr = std::current_exception();
@@ -1023,6 +1031,7 @@ void my_terminate_handler(void)
         clog << "=====================================================================================================" << endl;
         clog << "Exception: " << e.what() << endl;
         clog << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
+        clog << "Milliseconds taken: " << GetTickCount() - g_timestamp_program_start << endl;
         clog << "=====================================================================================================" << endl;
     }
 
@@ -1031,6 +1040,8 @@ void my_terminate_handler(void)
 
 int main(int const argc, char **const argv)
 {
+    g_timestamp_program_start = GetTickCount();
+
     std::set_terminate(my_terminate_handler);
 
     // The standard input stream, cin, is set to text mode

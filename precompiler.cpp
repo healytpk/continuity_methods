@@ -550,7 +550,9 @@ inline size_t EndLine(size_t char_index)
     return char_index;
 }
 
-string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
+std::unordered_map<string,string> g_params_for_template_classes;
+
+string TextBeforeOpenCurlyBracket(size_t const char_index, string *const p_unspecialised_template_params)  // strips off the template part at the start, e.g. "template<class T>"
 {
     ThrowIfBadIndex(char_index);
 
@@ -597,6 +599,22 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
     boost::algorithm::trim_all(retval);
 
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
+
+    regex const regex_temp_params("template<(.+)> (class|struct) (.*)");
+
+    if ( nullptr != p_unspecialised_template_params )
+    {
+        std::smatch m_dummy;
+        if ( regex_search( retval, m_dummy, regex_temp_params ) )
+        {
+            *p_unspecialised_template_params = regex_replace(retval, regex_temp_params, "$1");
+        }
+        else
+        {
+            p_unspecialised_template_params->clear();
+        }
+    }
+
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
     //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
@@ -685,7 +703,7 @@ protected:
 
             clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
+            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First(),nullptr) << "]";
 
             if ( false == only_print_numbers )
             {
@@ -822,7 +840,8 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         throw runtime_error( string("Curly Pair is corrupt [") + to_string(cp.First()) + "," + to_string(cp.Last()) + "]" );
     }
 
-    string intro = TextBeforeOpenCurlyBracket(cp.First());
+    string unspecialised_template_params;
+    string intro = TextBeforeOpenCurlyBracket(cp.First(), &unspecialised_template_params);
 
     if ( intro.starts_with("namespace") )
     {
@@ -867,6 +886,42 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
     if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
+
+    if ( (false == unspecialised_template_params.empty()) && (false == str.contains("<")) )
+    {
+        clog << "FOUND TEMPLATE PARAMS: class = '" << str << "', params = '" << unspecialised_template_params << "'" << endl;
+
+        bool set_params = true;
+
+        try
+        {
+            g_params_for_template_classes.at(str);
+
+            if ( g_params_for_template_classes[str] != unspecialised_template_params )
+            {
+                if ( unspecialised_template_params.size() > g_params_for_template_classes[str].size() )
+                {
+                    clog << "Warning: Unspecialised template parameters overwritten for class '" + str
+                                        + "', previous = '" + g_params_for_template_classes[str]
+                                        + "', new = '"  + unspecialised_template_params + "'" << endl;
+                }
+                else
+                {
+                    clog << "Warning: Failed attempt made to set unspecialised template parameters twice for the same class '" + str
+                                        + "', previous = '" + g_params_for_template_classes[str]
+                                        + "', new = '"  + unspecialised_template_params + "'" << endl;
+
+                    set_params = false;
+                }
+            }
+        }
+        catch(std::out_of_range const &)
+        {
+            set_params = true;
+        }
+
+        if ( set_params ) g_params_for_template_classes[str] = unspecialised_template_params;
+    }
 
     return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };  // REVISIT FIX might be 'struct' instead of 'class' (public Vs private)
 }
@@ -1008,6 +1063,45 @@ bool Strip_Last_Scope(string &str)
 
 std::unordered_map<string,string> g_psuedonyms;
 
+string Find_Class_Relative_To_Scope(string &prefix, string classname);  // Forward declared because circular dependency
+
+void Generate_Usings_From_Template_Specialisation(string_view const full_classname, string_view const unspecialised, string_view const specialised)
+{
+    regex const my_separator(",");
+    svregex_top_level_token_iterator it_unsp(unspecialised.cbegin(), unspecialised.cend(), my_separator, -1);
+    svregex_top_level_token_iterator   it_sp(  specialised.cbegin(),   specialised.cend(), my_separator, -1);
+
+    for ( ; (it_unsp != svregex_top_level_token_iterator()) && (it_sp != svregex_top_level_token_iterator()); ++it_unsp, ++it_sp )
+    {
+        string impersonator( *it_unsp );
+
+        boost::trim_all(impersonator);
+
+        if ( impersonator.starts_with("class") )
+        {
+            impersonator = impersonator.substr(5u);
+            boost::trim_all(impersonator);
+        }
+        else if ( impersonator.starts_with("typename") )
+        {
+            impersonator = impersonator.substr(8u);
+            boost::trim_all(impersonator);
+        }
+        else
+        {
+            //cout << ".......................Skipping template parameter that isn't a type..................." << endl;
+            continue;
+        }
+
+        string original( *it_sp );
+        boost::trim_all(original);
+
+        cout << "using " << impersonator << " = " << original << ";" << endl;
+
+        cout << "g_psuedonyms[\"" << full_classname << "::" << impersonator << "\"] = Find_Class_Relative_To_Scope(\"" << full_classname << "::\", " << original << ");\n";
+    }
+}
+
 string Find_Class_Relative_To_Scope(string &prefix, string classname)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
@@ -1063,6 +1157,11 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
             if ( class_name_without_template_specialisation != classname )
             {
+                string specialised_params = regex_replace( string(classname), regex("(.*)<(.+)>(.*)"), "$2");  // REVISIT FIX -- gratuitous memory allocations
+                //g_scope_names[full_name];
+
+                Generate_Usings_From_Template_Specialisation(prefix + classname + "::", g_params_for_template_classes[class_name_without_template_specialisation], specialised_params);
+
                 string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
 
                 Adjust_Class_Name(prefix, class_name_without_template_specialisation);
@@ -1442,6 +1541,12 @@ int main(int const argc, char **const argv)
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
     {
         clog << e.first << endl;
+    }
+
+    clog << "====================================== Now the parameter lists for template classes ==============================================" << endl;
+    for ( auto const &e : g_params_for_template_classes )
+    {
+        clog << "template <" << e.second << "> class" << e.first << " {   };" << endl;
     }
 
     clog << "====================================== Now the classes ==============================================" << endl;

@@ -170,17 +170,28 @@ protected:
         {
             switch ( *iter )
             {
-            case '(': ++(counts[0u]); break;
-            case ')': --(counts[0u]); break;
+            case '(': ++(counts[0u]); continue;
+            case ')': --(counts[0u]); continue;
 
-            case '[': ++(counts[1u]); break;
-            case ']': --(counts[1u]); break;
+            case '[': ++(counts[1u]); continue;
+            case ']': --(counts[1u]); continue;
 
-            case '{': ++(counts[2u]); break;
-            case '}': --(counts[2u]); break;
+            case '{': ++(counts[2u]); continue;
+            case '}': --(counts[2u]); continue;
+            }
 
-            case '<': ++(counts[3u]); break;
-            case '>': --(counts[3u]); break;
+            bool const process_next_angle_bracket =
+                   0u == counts[0u]
+                && 0u == counts[1u]
+                && 0u == counts[2u];
+
+            if ( process_next_angle_bracket )
+            {
+                switch ( *iter )
+                {
+                case '<': ++(counts[3u]); continue;
+                case '>': --(counts[3u]); continue;
+                }
             }
         }
 
@@ -294,17 +305,28 @@ protected:
         {
             switch ( *iter )
             {
-            case '(': ++(counts[0u]); break;
-            case ')': --(counts[0u]); break;
+            case '(': ++(counts[0u]); continue;
+            case ')': --(counts[0u]); continue;
 
-            case '[': ++(counts[1u]); break;
-            case ']': --(counts[1u]); break;
+            case '[': ++(counts[1u]); continue;
+            case ']': --(counts[1u]); continue;
 
-            case '{': ++(counts[2u]); break;
-            case '}': --(counts[2u]); break;
+            case '{': ++(counts[2u]); continue;
+            case '}': --(counts[2u]); continue;
+            }
 
-            case '<': ++(counts[3u]); break;
-            case '>': --(counts[3u]); break;
+            bool const process_next_angle_bracket =
+                   0u == counts[0u]
+                && 0u == counts[1u]
+                && 0u == counts[2u];
+
+            if ( process_next_angle_bracket )
+            {
+                switch ( *iter )
+                {
+                case '<': ++(counts[3u]); continue;
+                case '>': --(counts[3u]); continue;
+                }
             }
         }
 
@@ -956,7 +978,7 @@ bool Strip_Last_Scope(string &str)
         ::std::__allocator_traits_base::
     */
 
-    assert( false == s.empty() );
+    assert( false == str.empty() );
 
     char const separator[] = "::";
 

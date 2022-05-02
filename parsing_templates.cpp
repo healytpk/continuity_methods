@@ -59,17 +59,28 @@ protected:
         {
             switch ( *iter )
             {
-            case '(': ++(counts[0u]); break;
-            case ')': --(counts[0u]); break;
+            case '(': ++(counts[0u]); continue;
+            case ')': --(counts[0u]); continue;
 
-            case '[': ++(counts[1u]); break;
-            case ']': --(counts[1u]); break;
+            case '[': ++(counts[1u]); continue;
+            case ']': --(counts[1u]); continue;
 
-            case '{': ++(counts[2u]); break;
-            case '}': --(counts[2u]); break;
+            case '{': ++(counts[2u]); continue;
+            case '}': --(counts[2u]); continue;
+            }
 
-            case '<': ++(counts[3u]); break;
-            case '>': --(counts[3u]); break;
+            bool const process_next_angle_bracket =
+                   0u == counts[0u]
+                && 0u == counts[1u]
+                && 0u == counts[2u];
+
+            if ( process_next_angle_bracket )
+            {
+                switch ( *iter )
+                {
+                case '<': ++(counts[3u]); continue;
+                case '>': --(counts[3u]); continue;
+                }
             }
         }
 
@@ -183,17 +194,28 @@ protected:
         {
             switch ( *iter )
             {
-            case '(': ++(counts[0u]); break;
-            case ')': --(counts[0u]); break;
+            case '(': ++(counts[0u]); continue;
+            case ')': --(counts[0u]); continue;
 
-            case '[': ++(counts[1u]); break;
-            case ']': --(counts[1u]); break;
+            case '[': ++(counts[1u]); continue;
+            case ']': --(counts[1u]); continue;
 
-            case '{': ++(counts[2u]); break;
-            case '}': --(counts[2u]); break;
+            case '{': ++(counts[2u]); continue;
+            case '}': --(counts[2u]); continue;
+            }
 
-            case '<': ++(counts[3u]); break;
-            case '>': --(counts[3u]); break;
+            bool const process_next_angle_bracket =
+                   0u == counts[0u]
+                && 0u == counts[1u]
+                && 0u == counts[2u];
+
+            if ( process_next_angle_bracket )
+            {
+                switch ( *iter )
+                {
+                case '<': ++(counts[3u]); continue;
+                case '>': --(counts[3u]); continue;
+                }
             }
         }
 
@@ -269,6 +291,8 @@ using r_svregex_top_level_token_iterator = regex_top_level_token_iterator<string
 using r_sregex_top_level_iterator        = regex_top_level_iterator      <     string::const_reverse_iterator>;
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
+#if 0
+
 void PrintUsings(string_view const full_classname, string_view const unspecialised, string_view const specialised)
 {
     regex const my_separator(",");
@@ -330,12 +354,14 @@ bool Remove_Last_Scope(string_view &str)  // returns false when 'str' is or beco
     return separator != str;
 }
 
+#endif
+
 int main(void)
 {
 
-#if 0
+#if 1
 
-    string str("dog, cat, fish, (frogs,toads), monkeys, elephants, (lizards, amphibians<true,1>), sharks");
+    string str("dog, cat, fish, (frogs,toads), monkeys, elephants, (lizards, amphibians<true,1,(g_max_elements > 5u)>), sharks");
 
     cout << str << endl;
 
@@ -371,10 +397,12 @@ int main(void)
 
     return 0;
 
+#if 0
+
     pair<string, string> classes[] = {
         { "class T, class R", "int, double" },
         { "int, typename R, B<Monkey> *k", "5, Monkey<int,float,typename Frog::Parent>, nullptr" },
-        { "typename Allocator, class Deleter, B<Monkey> *k, bool is_pod", "std::vector<double>, Monkey<int,float,typename Frog::Parent<int,float>>, nullptr, false" },
+        { "typename Allocator, class Deleter, B<Monkey> *k, bool is_pod", "std::vector<double>, Monkey<int,float,typename Frog::Parent<int,float,(g_max_elements > 7u)>>, nullptr, false" },
     };
     
     for ( auto const &e : classes )
@@ -382,4 +410,6 @@ int main(void)
         PrintUsings("::std::exception", e.first, e.second);
         cout << "====================================" << endl;
     }
+
+#endif
 }

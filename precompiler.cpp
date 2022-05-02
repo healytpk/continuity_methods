@@ -269,8 +269,116 @@ public:
     }
 };
 
-using sregex_top_level_token_iterator  = regex_top_level_token_iterator<     string::const_iterator>;
-using svregex_top_level_token_iterator = regex_top_level_token_iterator<string_view::const_iterator>;
+template<
+    class BidirIt,
+    class CharT = typename std::iterator_traits<BidirIt>::value_type,
+    class Traits = std::regex_traits<CharT>
+>
+class regex_top_level_iterator : std::regex_iterator<BidirIt,CharT,Traits> {
+private:
+
+    using Base = std::regex_iterator<BidirIt,CharT,Traits>;
+    Base &base = *static_cast<Base*>(this);
+
+protected:
+
+    BidirIt const _a, _b;  // set in constructor's initialiser list
+
+    bool Is_Top_Level(void) const
+    {
+        assert( base != Base() );  // Is_Top_Level should never be called on a "no more matches" token iterator
+
+        size_t counts[4u] = {};  /* (), [], {}, <> */
+
+        for ( BidirIt iter = _a; iter != (*base)[0u].first; ++iter )
+        {
+            switch ( *iter )
+            {
+            case '(': ++(counts[0u]); break;
+            case ')': --(counts[0u]); break;
+
+            case '[': ++(counts[1u]); break;
+            case ']': --(counts[1u]); break;
+
+            case '{': ++(counts[2u]); break;
+            case '}': --(counts[2u]); break;
+
+            case '<': ++(counts[3u]); break;
+            case '>': --(counts[3u]); break;
+            }
+        }
+
+        for ( auto const &count : counts )
+        {
+            if ( 0u != count ) return false;
+        }
+
+        return true;
+    }
+
+public:
+
+    regex_top_level_iterator(void) : Base(), _a(), _b() {}
+
+    void Keep_Searching_If_Necessary(void)
+    {
+        for ( ; base != Base(); ++base )
+        {
+            if ( this->Is_Top_Level() )
+            {
+                return;
+            }
+        }
+    }
+
+    regex_top_level_iterator(BidirIt const a, BidirIt const b,
+                             typename Base::regex_type const &re,
+                             std::regex_constants::match_flag_type const m = std::regex_constants::match_default )
+      : Base(a,b,re,m), _a(a), _b(b)
+    {
+        Keep_Searching_If_Necessary();
+    }
+
+    regex_top_level_iterator &operator++(void)
+    {
+        assert( base != Base() );  // operator++ should never be called on a "no more matches" token iterator
+
+        ++base;
+
+        Keep_Searching_If_Necessary();
+
+        return *this;
+    }
+
+    bool operator==(regex_top_level_iterator const &rhs) const  // Since C++20 we don't need operator!=
+    {
+        return base == rhs;
+    }
+
+    typename Base::value_type const &operator*(void) const
+    {
+        assert( base != Base() );  // operator* should never be called on a "no more matches" token iterator
+
+        return *base;
+    }
+
+    typename Base::value_type const *operator->(void) const
+    {
+        assert( base != Base() );  // operator* should never be called on a "no more matches" token iterator
+
+        return base.operator->();
+    }
+};
+
+using sregex_top_level_token_iterator    = regex_top_level_token_iterator<     string::const_iterator>;
+using svregex_top_level_token_iterator   = regex_top_level_token_iterator<string_view::const_iterator>;
+using sregex_top_level_iterator          = regex_top_level_iterator      <     string::const_iterator>;
+using svregex_top_level_iterator         = regex_top_level_iterator      <string_view::const_iterator>;
+
+using r_sregex_top_level_token_iterator  = regex_top_level_token_iterator<     string::const_reverse_iterator>;
+using r_svregex_top_level_token_iterator = regex_top_level_token_iterator<string_view::const_reverse_iterator>;
+using r_sregex_top_level_iterator        = regex_top_level_iterator      <     string::const_reverse_iterator>;
+using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
 // Section 4 of 8 : Generate the auxillary code needed for Continuity Methods

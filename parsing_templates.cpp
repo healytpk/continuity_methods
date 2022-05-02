@@ -306,6 +306,30 @@ void PrintUsings(string_view const full_classname, string_view const unspecialis
     }
 }
 
+bool Remove_Last_Scope(string_view &str)  // returns false when 'str' is or becomes "::", otherwise returns true
+{
+    char const separator[] = "::";
+
+    if ( separator == str ) return false;
+
+    if( (str.size() < (2*sizeof(separator)+1u)) || (false == str.starts_with(separator)) || (false == str.ends_with(separator)) )  // minimum = "::A::"
+    {
+        throw runtime_error("Remove_Last_Scope: Invalid string");
+    }
+
+    regex const double_colon(separator);
+
+    r_svregex_top_level_iterator iter( str.crbegin(), str.crend(), double_colon );  // reverse
+
+    assert( r_svregex_top_level_iterator() != iter );
+
+    ++iter;  // skip the first match because it's the trailing "::"
+
+    str.remove_suffix( std::distance( str.crbegin(), (*iter)[0u].first ) );
+
+    return separator != str;
+}
+
 int main(void)
 {
 
@@ -330,18 +354,17 @@ int main(void)
 
     string str("::std::__allocator_traits_base::__rebind<_Tp,_Up,__void_t<typename _Tp::template rebind<_Up>::other>>::");
 
-    cout << str << endl;
+    cout << "Original: " << str << endl;
 
-    regex const double_colon("::");
+    string_view sv(s_str);
 
-    r_svregex_top_level_iterator iter( string_view(str).crbegin(), string_view(str).crend(), double_colon );
-
-    for ( ; iter != r_svregex_top_level_iterator(); ++iter )
+    for (; /* ever */; )
     {
-        // Since we have a reverse iterator, 'first' and 'second' are reversed, so use 'second' in the next line:
-        string tmp( &*(   ((*iter)[0u]).first   ) - 1u, &*(str.cend()) );  // REVISIT FIX dereference invalid pointer -- -1u is a bug improvisation
-        boost::trim_all(tmp);
-        cout << tmp << endl;
+        bool retval = Remove_Last_Scope(sv);
+
+        cout << sv << endl;
+
+        if ( false == retval ) break;
     }
 
 #endif

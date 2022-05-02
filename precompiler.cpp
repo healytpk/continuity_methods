@@ -83,7 +83,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cstdio>         // freopen, stdin
 #include <iostream>       // cout, clog, endl
 #include <algorithm>      // copy, replace, count
-#include <iterator>       // next, back_inserter, istream_iterator, iterator_traits
+#include <iterator>       // next, distance, back_inserter, istream_iterator, iterator_traits
 #include <string>         // string, to_string
 #include <ios>            // ios::binary
 #include <iomanip>        // noskipws
@@ -947,19 +947,35 @@ size_t Find_Second_Last_Double_Colon_In_String(string_view const s)
     return -1;
 }
 
-bool Strip_Last_Scope(string &s)
+bool Strip_Last_Scope(string &str)
 {
-    // Change the prefix from "::std::__cxx11::" into "::std::", so that "::std::__cxx11::locale::facet" becomes "::std::locale::facet"
+    /*
+    Change the prefix from:
+        ::std::__allocator_traits_base::__rebind<_Tp,_Up,__void_t<typename _Tp::template rebind<_Up>::other>>::
+    to:
+        ::std::__allocator_traits_base::
+    */
 
     assert( false == s.empty() );
 
-    if ( "::" == s ) return false;
+    char const separator[] = "::";
 
-    size_t const i = Find_Second_Last_Double_Colon_In_String(s);
+    if ( separator == str ) return false;
 
-    if ( -1 == i ) return false;
+    if ( (str.size() < (2*sizeof(separator)+1u)) || (false == str.starts_with(separator)) || (false == str.ends_with(separator)) )  // minimum = "::A::"
+    {
+        throw runtime_error("Remove_Last_Scope: Invalid string");
+    }
 
-    s.resize(i + 2u);  // i can be zero here
+    regex const double_colon(separator);
+
+    r_sregex_top_level_iterator iter( str.crbegin(), str.crend(), double_colon );  // reverse
+
+    assert( r_sregex_top_level_iterator() != iter );
+
+    ++iter;  // skip the first match because it's the trailing "::"
+
+    str.resize(  str.size() - std::distance(str.crbegin(), (*iter)[0u].first)  );
 
     return true;
 }

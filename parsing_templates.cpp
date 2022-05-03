@@ -356,8 +356,54 @@ bool Remove_Last_Scope(string_view &str)  // returns false when 'str' is or beco
 
 #endif
 
+
+void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
+{
+    assert( false == str.empty() );
+
+    char const separator[] = "::";
+
+    size_t constexpr seplen = sizeof(separator) - 1u;
+
+    if ( separator == str ) return; // If the input is "::"
+
+    if ( str.ends_with(separator) ) str.remove_suffix(seplen);  // Turn "::A::B::" into "::A::B"
+
+    if ( (str.size() < (seplen + 1u)) || (false == str.starts_with(separator)) || str.ends_with(separator) )  // minimum = "::A"
+    {
+        throw runtime_error("Remove_Last_Scope: Invalid string");
+    }
+
+    regex const double_colon(separator);  // REVISIT FIX watch out for control characters interpretted as a regex formula
+
+    size_t i = -2;
+
+    for ( svregex_top_level_token_iterator iter( str.cbegin(), str.cend(), double_colon, -1 );
+          svregex_top_level_token_iterator() != iter;
+          ++iter )
+    {
+        ++i;
+
+        if ( -1 == i ) continue;
+
+        clog << "Level " << i << ": " << string_view(str.cbegin(), iter->second);
+
+        if ( string_view(iter->first,iter->second).contains('<') )  // check if right-most is a template class
+        {
+            clog << "    <---- template class";
+        }
+
+        clog << endl;
+    }
+}
+
+
 int main(void)
 {
+
+    Instantiate_Scope_By_Scope_Where_Necessary("::std::vector<B,(5 > 3)>::value_type::Base::special_vector<double>::");
+
+    return 0;
 
 #if 1
 

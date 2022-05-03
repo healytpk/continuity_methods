@@ -406,8 +406,10 @@ using r_svregex_top_level_iterator       = regex_top_level_iterator      <string
 // Section 4 of 8 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
-void Print_Helper_Classes_For_Class(string_view const classname, list<string> const &func_signatures)
+void Print_Helper_Classes_For_Class(string classname, list<string> const &func_signatures)
 {
+    boost::replace_all(classname, "::", "_scope_");
+
     cout <<
     "class IMethodInvoker_" << classname << " {\n"
     "protected:\n"
@@ -595,6 +597,8 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
     retval = regex_replace(retval, regex("\\s"), " ");
 
     boost::algorithm::trim_all(retval);
+
+    if ( retval.starts_with("template") ) return {};
 
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
@@ -1018,6 +1022,8 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         return classname;
     }
 
+    if ( prefix.contains("<") || classname.contains("<") ) return {};  // Don't tolerate any templates
+
     auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
         try
@@ -1094,7 +1100,13 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     }
 
     if ( nullptr == p )
-        throw std::out_of_range("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
+    {
+        //throw std::out_of_range("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
+
+        clog << "WARNING: Cannot find base class '" + string(classname) + "' referenced inside '" + string(intact_prefix) + "'" << endl;
+
+        return {};
+    }
 
     return full_name;
 }
@@ -1116,6 +1128,8 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
     Adjust_Class_Name(prefix, classname);
 
     string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
+
+    if ( full_name.empty() ) return false;  // not a fatal error if we can't find a base class that's a template class
 
     bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
@@ -1298,6 +1312,26 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
     }
 }
 
+bool Find_All_Methods_Marked_Continue_In_Open_Space(size_t const first, size_t const last, list<string> &arg_list)
+{
+    assert( last >= first );  // It's okay for them to be equal if we have "{ }"
+
+    bool retval = false;
+
+    regex r("([A-z_][A-z_0-9]*)\\s*\\((.*)\\)\\s*continue\\s*(;|)");
+
+    for(std::sregex_iterator iter  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
+                             iter != std::sregex_iterator();
+                             ++iter )
+    {
+        retval = true;
+
+        arg_list.push_back( string((*iter)[1u]) + "(" + string((*iter)[2u]) + ")" );
+    }
+
+    return retval;
+}
+
 void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 {
     assert( false == str.empty() );
@@ -1444,9 +1478,35 @@ int main(int const argc, char **const argv)
         clog << e.first << endl;
     }
 
-    clog << "====================================== Now the classes ==============================================" << endl;
+    clog << "====================================== Now the classes that have base classes ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
     {
-        clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u << " | Bases = " << Get_All_Bases(e.first) << endl;
+        string const str_bases{ Get_All_Bases(e.first) };
+
+        if ( str_bases.empty() ) continue;
+
+        clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
+             << " | Bases = " << Get_All_Bases(e.first) << endl;
+    }
+
+    clog << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
+    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
+    {
+        for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
+        {
+            list<string> list_of_methods;
+
+            list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*my_curly_pair_pointer);
+
+            for ( auto const my_pair : my_list )
+            {
+                if ( Find_All_Methods_Marked_Continue_In_Open_Space(my_pair.first, my_pair.second, list_of_methods) )
+                {
+                    clog << e.first << endl << endl;
+
+                    Print_Helper_Classes_For_Class(e.first, list_of_methods);
+                }
+            }
+        }
     }
 }

@@ -91,6 +91,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <utility>        // pair<>
 #include <cctype>         // isspace
 #include <list>           // list
+#include <map>            // map
 #include <unordered_map>  // unordered_map
 #include <ranges>         // views::filter
 #include <array>          // array
@@ -443,7 +444,7 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 
         cout << "    " << tmp1 << " override\n" <<
                 "    {\n"
-                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this))\n"
+                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
                 "        return p->Base::" << tmp2 << "();\n"
                 "    }\n\n";
@@ -1394,21 +1395,35 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
     }
 }
 
-bool Find_All_Methods_Marked_Continue_In_Open_Space(size_t const first, size_t const last, list<string> &arg_list)
+std::map<size_t, string> g_func_preambles;
+
+bool Find_All_Methods_Marked_Continue_In_Class(CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &arg_list)
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
     bool retval = false;
 
-    regex r("([A-z_][A-z_0-9]*)\\s*\\((.*)\\)\\s*continue\\s*(;|)");
+    regex r("([A-z_][A-z_0-9]*)\\s+([A-z_][A-z_0-9]*)\\s*\\((.*)\\)\\s*.*(continue)\\s*(;|)");
 
     for(std::sregex_iterator iter  = std::sregex_iterator(g_intact.begin() + first, g_intact.begin() + last + 1u, r);  // Note the +1 on this line
                              iter != std::sregex_iterator();
                              ++iter )
     {
+        clog << "At least one continue method found" << endl;
+
         retval = true;
 
-        arg_list.push_back( string((*iter)[1u]) + "(" + string((*iter)[2u]) + ")" );
+        arg_list.push_back( string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );
+
+        // The loop on the next line replaces "continue" with "        "
+        for ( char *p = const_cast<char*>(&*(((*iter)[4u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
+        {
+            *p = ' ';
+        }
+
+        if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
+
+        g_func_preambles[last + 1u] = "cout << \"Calling base methods. . .\" << endl;";
     }
 
     return retval;
@@ -1452,6 +1467,25 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
         clog << endl;
     }
+}
+
+void Print_Final_Output(void)
+{
+    Replace_All_String_Literals_With_Spaces(true);
+    Replace_All_Preprocessor_Directives_With_Spaces(true);
+
+    size_t i = 0u, j = -1;
+
+    for ( auto const &e : g_func_preambles )
+    {
+        cout << string_view( g_intact.cbegin() + i, g_intact.cbegin() + e.first + 1u);
+
+        cout << endl << e.second;
+
+        i = e.first + 1u;
+    }
+
+    cout << string_view( g_intact.cbegin() + i, g_intact.cend() );
 }
 
 void my_terminate_handler(void)
@@ -1568,15 +1602,15 @@ int main(int const argc, char **const argv)
     clog << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
     {
-        for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
+        for ( CurlyBracketManager::CurlyPair const *const  &p_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
         {
             list<string> list_of_methods;
 
-            list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*my_curly_pair_pointer);
+            list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*p_curly_pair_pointer);
 
             for ( auto const my_pair : my_list )
             {
-                if ( Find_All_Methods_Marked_Continue_In_Open_Space(my_pair.first, my_pair.second, list_of_methods) )
+                if ( Find_All_Methods_Marked_Continue_In_Class(*p_curly_pair_pointer, my_pair.first, my_pair.second, list_of_methods) )
                 {
                     clog << e.first << endl << endl;
 
@@ -1587,8 +1621,5 @@ int main(int const argc, char **const argv)
     }
 
     // In reverse order
-    Replace_All_String_Literals_With_Spaces(true);
-    Replace_All_Preprocessor_Directives_With_Spaces(true);
-
-    cout << g_intact;
+    Print_Final_Output();
 }

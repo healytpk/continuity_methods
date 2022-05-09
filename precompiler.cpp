@@ -1397,7 +1397,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 
 std::map<size_t, string> g_func_preambles;
 
-bool Find_All_Methods_Marked_Continue_In_Class(CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &arg_list)
+bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &arg_list)
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
@@ -1423,7 +1423,10 @@ bool Find_All_Methods_Marked_Continue_In_Class(CurlyBracketManager::CurlyPair co
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
 
-        g_func_preambles[last + 1u] = "cout << \"Calling base methods. . .\" << endl;";
+        string const str_bases{ Get_All_Bases(svclass) };
+        g_func_preambles[last + 1u]  = "cout << \"Base classes: \" << \"";
+        g_func_preambles[last + 1u] += str_bases;
+        g_func_preambles[last + 1u] += "\" << endl;\n";
     }
 
     return retval;
@@ -1610,7 +1613,7 @@ int main(int const argc, char **const argv)
 
             for ( auto const my_pair : my_list )
             {
-                if ( Find_All_Methods_Marked_Continue_In_Class(*p_curly_pair_pointer, my_pair.first, my_pair.second, list_of_methods) )
+                if ( Find_All_Methods_Marked_Continue_In_Class(e.first, *p_curly_pair_pointer, my_pair.first, my_pair.second, list_of_methods) )
                 {
                     clog << e.first << endl << endl;
 

@@ -409,6 +409,10 @@ using r_svregex_top_level_iterator       = regex_top_level_iterator      <string
 
 void Print_Helper_Classes_For_Class(string classname, list<string> const &func_signatures)
 {
+    cout << "// ==========================================================================\n"
+            "// Helper classes for continuity methods within class " << classname << "\n"
+            "// ==========================================================================\n\n";
+
     boost::replace_all(classname, "::", "_scope_");
 
     cout <<
@@ -420,7 +424,11 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 
     for ( auto const &method : func_signatures )
     {
-        cout << "    virtual " << method << " = 0;\n";
+        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+
+        string const tmp1 = regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
+
+        cout << "    virtual " << tmp1 << " = 0;\n";
     }
 
     cout <<
@@ -451,6 +459,33 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     }
 
     cout << "};\n";
+
+    cout <<
+    "class Invoker_" << classname << " final {\n"
+    "protected:\n"
+    "\n"
+    "    IMethodInvoker_" << classname << " &_mi;\n"
+    "    void *const _this;\n"
+    "\n"
+    "public:\n"
+    "\n"
+    "    Invoker_" << classname << "(IMethodInvoker_" << classname << " &arg_mi, void *const arg_this)\n"
+    "      : _mi(arg_mi), _this(arg_this) {}\n\n";
+
+    for ( auto const &method : func_signatures )
+    {
+        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+
+        string const just_the_name = regex_replace(method, my_regex, "$2");
+
+        cout << "    // The extra 'this' parameter is no longer needed\n"
+             << "    " << method << " // not virtual\n"
+             << "    {\n"
+             << "        return _mi." << just_the_name << "(_this, arg);\n"
+             << "    }\n\n";
+    }
+
+    cout << "};\n\n";
 }
 
 // =============================================================
@@ -1422,14 +1457,49 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
 
-        list<string> const bases{ Get_All_Bases(svclass) };
-        g_func_preambles[last + 1u]  = "cout << \"Base classes: \" << \"";
-        for ( auto const &e : bases )
+        string derived_replaced(svclass);
+        boost::replace_all(derived_replaced, "::", "_scope_");
+
+        list<string> bases{ Get_All_Bases(svclass) };
+
+        if ( bases.empty() ) throw runtime_error("Method marked continue inside a class that has no base classes");
+
+        string &preamble = g_func_preambles[last + 1u];
+
+        for ( auto &e : bases )
         {
-            g_func_preambles[last + 1u] += e;
-            g_func_preambles[last + 1u] += ", ";
+            preamble += "static MethodInvoker_";
+            preamble += derived_replaced;
+            preamble += "<";
+            preamble += e;
+            preamble += ", ";
+            preamble += svclass;
+            preamble += "> mi_";
+
+            boost::replace_all(e, "::", "_scope_");
+
+            preamble += e;
+            preamble += ";\n";
         }
-        g_func_preambles[last + 1u] += "\" << endl;\n";
+
+        preamble += "\nusing Invoker = Invoker_";
+        preamble += derived_replaced;
+        preamble += ";\n\n";
+
+        preamble += "Invoker method[";
+        preamble += to_string(bases.size());
+        preamble += "] = {\n";
+        for ( auto &e : bases )
+        {
+            boost::replace_all(e, "::", "_scope_");
+
+            preamble += "    Invoker(";
+            preamble += "mi_";
+            preamble += e;
+            preamble += ", ";
+            preamble += "this),\n";
+        }
+        preamble += "};\n\n";
     }
 
     return retval;
@@ -1514,6 +1584,36 @@ void my_terminate_handler(void)
     std::abort();
 }
 
+void Print_Header(void)
+{
+    cout << "namespace Continuity_Methods {\n"
+            "\n"
+            "    template<class T, T v>\n"
+            "    struct integral_constant {\n"
+            "        static constexpr T value = v;\n"
+            "        using value_type = T;\n"
+            "        using type = integral_constant; // using injected-class-name\n"
+            "        constexpr operator value_type() const noexcept { return value; }\n"
+            "        constexpr value_type operator()() const noexcept { return value; } // since c++14\n"
+            "    };\n"
+            "\n"
+            "    using  true_type = integral_constant<bool,  true>;\n"
+            "    using false_type = integral_constant<bool, false>;\n"
+            "\n"
+            "    template <class T, template <class...> class Test>\n"
+            "    struct exists {\n"
+            "        template<class U>\n"
+            "        static true_type check(Test<U>*);\n"
+            "\n"
+            "        template<class U>\n"
+            "        static false_type check(...);\n"
+            "\n"
+            "        static constexpr bool value = decltype(check<T>(0))::value;\n"
+            "    };\n"
+            "\n"
+            "}\n\n";
+}
+
 int main(int const argc, char **const argv)
 {
     g_timestamp_program_start = GetTickCount();
@@ -1535,6 +1635,8 @@ int main(int const argc, char **const argv)
     if ( false == cin_is_now_in_binary_mode ) throw std::runtime_error("Could not set standard input to binary mode (it defaults to text mode)");
 
     cin >> std::noskipws;
+
+    Print_Header();
 
     g_scope_names.reserve(5000u);
 

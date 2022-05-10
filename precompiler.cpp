@@ -1194,7 +1194,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<string> &already_recorded, bool is_virtual, string &retval)
+bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<string> &already_recorded, bool is_virtual, list<string> &retval)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
@@ -1241,15 +1241,14 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
 
         if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) )
         {
-            retval += base_name;
-            retval += ", ";
+            retval.push_back(prefix + base_name);
         }
     }
 
     return true;
 }
 
-string Get_All_Bases(string_view arg)
+list<string> Get_All_Bases(string_view arg)
 {
     size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg);
 
@@ -1260,7 +1259,7 @@ string Get_All_Bases(string_view arg)
 
     std::set<string> already_recorded;
 
-    string retval;
+    list<string> retval;
 
     Recursive_Print_All_Bases_PROPER(string(prefix), string(classname), already_recorded, false, retval);
 
@@ -1423,9 +1422,13 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
 
-        string const str_bases{ Get_All_Bases(svclass) };
+        list<string> const bases{ Get_All_Bases(svclass) };
         g_func_preambles[last + 1u]  = "cout << \"Base classes: \" << \"";
-        g_func_preambles[last + 1u] += str_bases;
+        for ( auto const &e : bases )
+        {
+            g_func_preambles[last + 1u] += e;
+            g_func_preambles[last + 1u] += ", ";
+        }
         g_func_preambles[last + 1u] += "\" << endl;\n";
     }
 
@@ -1594,12 +1597,19 @@ int main(int const argc, char **const argv)
     clog << "====================================== Now the classes that have base classes ==============================================" << endl;
     for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
     {
-        string const str_bases{ Get_All_Bases(e.first) };
+        list<string> const bases{ Get_All_Bases(e.first) };
 
-        if ( str_bases.empty() ) continue;
+        if ( bases.empty() ) continue;
 
         clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
-             << " | Bases = " << Get_All_Bases(e.first) << endl;
+             << " | Bases = ";
+
+        for ( auto const &e : bases )
+        {
+            clog << e << ", ";
+        }
+
+        clog << endl;
     }
 
     clog << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;

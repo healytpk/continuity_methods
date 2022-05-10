@@ -415,8 +415,22 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 
     boost::replace_all(classname, "::", "_scope_");
 
+    cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
+
+    cout << "namespace Testers {\n";
+    for ( auto const &method : func_signatures )
+    {
+        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+
+        string const tmp1 = regex_replace(method, my_regex, "$2");
+
+        cout << "    template<class U, class = decltype(static_cast<U*>(nullptr)->" << tmp1 << "(int()))>\n"
+             << "    struct " << tmp1 << " {};\n\n";
+    }
+    cout << "}\n\n";
+
     cout <<
-    "class IMethodInvoker_" << classname << " {\n"
+    "class IMethodInvoker {\n"
     "protected:\n"
     "\n"
     "    // All methods have one extra\n"
@@ -432,12 +446,12 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     }
 
     cout <<
-    "\n    friend class Invoker_" << classname << ";\n"
+    "\n    friend class Invoker;\n"
     "};\n\n";
 
     cout <<
     "template<class Base, class Derived>\n"
-    "class MethodInvoker_" << classname << " final : public IMethodInvoker_" << classname << " {\n"
+    "class MethodInvoker final : public IMethodInvoker {\n"
     "protected:\n"
     "\n"
     "    // All methods have one extra\n"
@@ -454,22 +468,29 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
                 "    {\n"
                 "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
-                "        return p->Base::" << tmp2 << "();\n"
+                "        if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << ">::value )\n"
+                "        {\n"
+                "            return p->Base::Set_Int(arg);\n"
+                "        }\n"
+                "        else\n"
+                "        {\n"
+                "            return;\n"
+                "        }\n"
                 "    }\n\n";
     }
 
-    cout << "};\n";
+    cout << "};\n\n";
 
     cout <<
-    "class Invoker_" << classname << " final {\n"
+    "class Invoker final {\n"
     "protected:\n"
     "\n"
-    "    IMethodInvoker_" << classname << " &_mi;\n"
+    "    IMethodInvoker &_mi;\n"
     "    void *const _this;\n"
     "\n"
     "public:\n"
     "\n"
-    "    Invoker_" << classname << "(IMethodInvoker_" << classname << " &arg_mi, void *const arg_this)\n"
+    "    Invoker(IMethodInvoker &arg_mi, void *const arg_this)\n"
     "      : _mi(arg_mi), _this(arg_this) {}\n\n";
 
     for ( auto const &method : func_signatures )
@@ -486,6 +507,8 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     }
 
     cout << "};\n\n";
+
+    cout << "}}}  // close three namespaces\n\n";
 }
 
 // =============================================================
@@ -1466,11 +1489,13 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         string &preamble = g_func_preambles[last + 1u];
 
+        preamble  = "using namespace Continuity_Methods::Helpers::";
+        preamble += derived_replaced;
+        preamble += ";\n\n";
+
         for ( auto &e : bases )
         {
-            preamble += "static MethodInvoker_";
-            preamble += derived_replaced;
-            preamble += "<";
+            preamble += "static MethodInvoker<";
             preamble += e;
             preamble += ", ";
             preamble += svclass;
@@ -1482,13 +1507,9 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             preamble += ";\n";
         }
 
-        preamble += "\nusing Invoker = Invoker_";
-        preamble += derived_replaced;
-        preamble += ";\n\n";
-
-        preamble += "Invoker method[";
+        preamble += "\nInvoker methods[";
         preamble += to_string(bases.size());
-        preamble += "] = {\n";
+        preamble += "u] = {\n";
         for ( auto &e : bases )
         {
             boost::replace_all(e, "::", "_scope_");
@@ -1500,6 +1521,11 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             preamble += "this),\n";
         }
         preamble += "};\n\n";
+
+        preamble += "for ( auto &e : methods )\n";
+        preamble += "{\n";
+        preamble += "    e.Set_Int(arg);\n";
+        preamble += "}\n\n";
     }
 
     return retval;

@@ -102,6 +102,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <regex>          // regex, regex_replace, smatch, match_results
 #include <exception>      // exception
 #include <chrono>         // duration_cast, milliseconds, steady_clock
+#include <sstream>        // ostringstream;
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -131,6 +132,8 @@ using std::views::filter;
 using std::views::split;
 
 using std::runtime_error;
+
+using std::ostringstream;
 
 std::uintmax_t GetTickCount(void)
 {
@@ -1455,7 +1458,22 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
     }
 }
 
-std::map<size_t, string> g_func_preambles;
+// The following map is as follows:
+//        first  == index of where to insert "____WITHOUT_CONTINUITY"
+// second.first  == CurlyPair const *
+// second.second == entire text of new function
+
+std::map<size_t, pair<CurlyBracketManager::CurlyPair const *,ostringstream> > g_func_alterations;
+
+CurlyBracketManager::CurlyPair const &Find_Curly_Pair_For_Function_Body_In_Class(CurlyBracketManager::CurlyPair const &parent, size_t const index)
+{
+    for ( auto const &e : parent.Nested() )
+    {
+        if ( e.First() == index ) return e;
+    }
+
+    throw runtime_error("Cannot find function body for method marked continue");
+}
 
 bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &arg_list)
 {
@@ -1481,63 +1499,53 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             *p = ' ';
         }
 
-#if 0
-        // The loop on the next line replaces the first letter of the function name with 'X'
-        for ( char *p = const_cast<char*>(&*(((*iter)[2u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
-        {
-            *p = 'X';
-            break;
-        }
-#endif
+        size_t const index = ((*iter)[2u]).second - g_intact.cbegin() - 1u;  // REVISIT FIX - corner cases such as '{}'
+
+        g_func_alterations[index];  // create new element
+
+        CurlyBracketManager::CurlyPair const &cp_body = Find_Curly_Pair_For_Function_Body_In_Class(cp, ((*iter)[5u]).second - g_intact.cbegin());
+        g_func_alterations[index].first = &cp_body;  // REVISIT FIX - corner cases such as '{}'
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
-
-        string derived_replaced(svclass);
-        boost::replace_all(derived_replaced, "::", "_scope_");
 
         list<string> bases{ Get_All_Bases(svclass) };
 
         if ( bases.empty() ) throw runtime_error("Method marked continue inside a class that has no base classes");
 
-        string &preamble = g_func_preambles[last + 1u];
+        string derived_replaced(svclass);
+        boost::replace_all(derived_replaced, "::", "_scope_");
 
-        preamble  = "using namespace Continuity_Methods::Helpers::";
-        preamble += derived_replaced;
-        preamble += ";\n\n";
+        ostringstream &s = std::get<1u>(g_func_alterations[index]);
+
+        s << "\n" << arg_list.back() << "\n"
+          << "{\n"
+             "    using namespace Continuity_Methods::Helpers::" << derived_replaced << ";\n\n";
 
         for ( auto &e : bases )
         {
-            preamble += "static MethodInvoker<";
-            preamble += e;
-            preamble += ", ";
-            preamble += svclass;
-            preamble += "> mi_";
+            s << "    static MethodInvoker<" << e << ", " << svclass << "> mi_";
 
             boost::replace_all(e, "::", "_scope_");
 
-            preamble += e;
-            preamble += ";\n";
+            s << e << ";\n";
         }
 
-        preamble += "\nInvoker methods[";
-        preamble += to_string(bases.size());
-        preamble += "u] = {\n";
+        s << "\n    Invoker methods[" << bases.size() << "u] = {\n";
         for ( auto &e : bases )
         {
             boost::replace_all(e, "::", "_scope_");
 
-            preamble += "    Invoker(";
-            preamble += "mi_";
-            preamble += e;
-            preamble += ", ";
-            preamble += "this),\n";
+            s << "        Invoker(mi_" << e << ", " << "this),\n";
         }
-        preamble += "};\n\n";
+        s << "    };\n\n";
 
-        preamble += "for ( auto &e : methods )\n";
-        preamble += "{\n";
-        preamble += "    e.Set_Int(arg);\n";
-        preamble += "}\n\n";
+        s << "    for ( auto &e : methods )\n"
+             "    {\n"
+             "        e.Set_Int(arg);\n"
+             "    }\n"
+             "\n"
+             "    this->Set_Int____WITHOUT_CONTINUITY(arg);\n"
+             "}\n\n";
     }
 
     return retval;
@@ -1590,13 +1598,24 @@ void Print_Final_Output(void)
 
     size_t i = 0u, j = -1;
 
-    for ( auto const &e : g_func_preambles )
+    for ( auto const &e : g_func_alterations )
     {
-        cout << string_view( g_intact.cbegin() + i, g_intact.cbegin() + e.first + 1u);
+        cout << string_view( g_intact.cbegin() + i, g_intact.cbegin() + e.first + 1u)
+             << "____WITHOUT_CONTINUITY";
 
-        cout << endl << e.second;
+        string str( g_intact.cbegin() + e.first + 1u, g_intact.cbegin() + e.second.first->First() );
 
-        i = e.first + 1u;
+        boost::erase_all(str, " override");  // REVISIT FIX - could be "overrideBLAH
+
+        cout << str;
+
+        cout << string_view( g_intact.cbegin() + e.second.first->First(), g_intact.cbegin() + e.second.first->Last() + 1u )
+             << endl
+             << endl
+             << e.second.second.str()
+             << endl;
+
+        i = e.second.first->Last() + 1u;
     }
 
     cout << string_view( g_intact.cbegin() + i, g_intact.cend() );

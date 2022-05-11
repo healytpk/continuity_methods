@@ -424,7 +424,10 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 
         string const tmp1 = regex_replace(method, my_regex, "$2");
 
-        cout << "    template<class U, class = decltype(static_cast<U*>(nullptr)->" << tmp1 << "(int()))>\n"
+        cout << "    template<class U, class = decltype(&U::" << tmp1 << "____WITHOUT_CONTINUITY)>\n"
+             << "    struct " << tmp1 << "____WITHOUT_CONTINUITY {};\n\n";
+
+        cout << "    template<class U, class = decltype(&U::" << tmp1 << ")>\n"
              << "    struct " << tmp1 << " {};\n\n";
     }
     cout << "}\n\n";
@@ -1477,6 +1480,15 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         {
             *p = ' ';
         }
+
+#if 0
+        // The loop on the next line replaces the first letter of the function name with 'X'
+        for ( char *p = const_cast<char*>(&*(((*iter)[2u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
+        {
+            *p = 'X';
+            break;
+        }
+#endif
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
 

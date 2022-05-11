@@ -42,10 +42,8 @@ struct Derived1B : virtual Base1A, Base1B {
 
 struct Base2 {
     Base2(void) { cout << "Base2::Constructor" << endl; }
-	void Set_Int(int const arg)
-	{
-		cout << "Base2 value = " << arg << endl;
-	}
+
+    // Doesn't have a method called "Set_Int"
 };
 
 struct Derived2 : virtual Derived1A,virtual Derived1B,virtual Base2 {
@@ -90,6 +88,27 @@ class NonOrganism {
 
 int main(void)
 {
-	My_Program::FurtherDerived object;
-	object.Set_Int(7);
+    cout << "=======================================================================================" << endl
+         << "    START OF constructors for FurtherDerived" << endl
+         << "=======================================================================================" << endl;
+
+	My_Program::FurtherDerived a;
+
+    cout << "=======================================================================================" << endl
+         << "    START OF continuity methods for FurtherDerived" << endl
+         << "=======================================================================================" << endl;
+
+	a.Set_Int(7);
+
+    cout << "\n\n=======================================================================================" << endl
+         << "    START OF constructors for Derived1B" << endl
+         << "=======================================================================================" << endl;
+
+	My_Program::Derived1B b;
+
+    cout << "=======================================================================================" << endl
+         << "    START OF continuity methods for Derived1B" << endl
+         << "=======================================================================================" << endl;
+
+	b.Set_Int(7);
 }

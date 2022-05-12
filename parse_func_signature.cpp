@@ -77,8 +77,21 @@ void ParseFuncSig(string s)
     cout << other << endl;
 }
 
+typedef int (*FuncPtr)(int);
+
+int (*(&Func(void))[3u])(int)
+{
+    static FuncPtr local[3u];
+
+    return local;
+}
+
 int main()
 {
+    FuncPtr (&ref)[3u] = Func();
+
+    ref[0u] = nullptr;
+
     for ( auto const &e : sigs )
     {
         ParseFuncSig(e);

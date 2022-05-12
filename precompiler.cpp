@@ -102,7 +102,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <regex>          // regex, regex_replace, smatch, match_results
 #include <exception>      // exception
 #include <chrono>         // duration_cast, milliseconds, steady_clock
-#include <sstream>        // ostringstream;
+#include <sstream>        // ostringstream
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -456,12 +456,14 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     "};\n\n";
 
     cout <<
-    "template<class Base, class Derived>\n"
-    "class MethodInvoker final : public IMethodInvoker {\n"
-    "protected:\n"
+    "template<class Derived>\n"
+    "struct MethodInvoker final {\n"
     "\n"
-    "    // All methods have one extra\n"
-    "    // parameter for 'this' as 'void*'\n";
+    "    template<class Base>\n"
+    "    class MI final : public IMethodInvoker {\n"
+    "    protected:\n"
+    "        // All methods have one extra\n"
+    "        // parameter for 'this' as 'void*'\n";
 
     for ( auto const &method : func_signatures )
     {
@@ -470,26 +472,27 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
         string const tmp1 = regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
         string const tmp2 = regex_replace(method, my_regex, "$2");
 
-        cout << "    " << tmp1 << " override\n" <<
-                "    {\n"
-                "        Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
+        cout << "        " << tmp1 << " override\n" <<
+                "        {\n"
+                "            Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
-                "        if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << "____WITHOUT_CONTINUITY>::value )\n"
-                "        {\n"
-                "            return p->Base::Set_Int____WITHOUT_CONTINUITY(arg);\n"
-                "        }\n"
-                "        else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << ">::value )\n"
-                "        {\n"
-                "            return p->Base::Set_Int(arg);\n"
-                "        }\n"
-                "        else\n"
-                "        {\n"
-                "            return;\n"
-                "        }\n"
-                "    }\n\n";
+                "            if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << "____WITHOUT_CONTINUITY>::value )\n"
+                "            {\n"
+                "                return p->Base::Set_Int____WITHOUT_CONTINUITY(arg);\n"
+                "            }\n"
+                "            else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << ">::value )\n"
+                "            {\n"
+                "                return p->Base::Set_Int(arg);\n"
+                "            }\n"
+                "            else\n"
+                "            {\n"
+                "                return;\n"
+                "            }\n"
+                "        }\n\n";
     }
 
-    cout << "};\n\n";
+    cout << "    };\n"
+            "};\n\n";
 
     cout <<
     "class Invoker final {\n"
@@ -1479,8 +1482,115 @@ CurlyBracketManager::CurlyPair const &Find_Curly_Pair_For_Function_Body_In_Class
     throw runtime_error("Cannot find function body for method marked continue");
 }
 
-bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &arg_list)
+class IndentedOstream {
+public:
+
+    class Indent   {};
+    class Unindent {};
+
+protected:
+
+    bool            is_first_time = true;
+    unsigned        next_indentation = 1u;
+    string   const  str_white;
+    std::ostream   &os;
+
+    void PrintIndentation(void)
+    {
+        os << str_white;
+
+        for ( unsigned i = 1u; i != next_indentation; ++i )
+        {
+            os << "    ";
+        }
+    }
+
+public:
+
+    IndentedOstream(std::ostream &arg_os, string_view const arg_sv) : os(arg_os), str_white(arg_sv) {}
+
+    template<typename ArgType>
+    IndentedOstream &operator<<(ArgType const &arg)
+    {
+        if ( is_first_time )
+        {
+            PrintIndentation();
+            is_first_time = false;
+        }
+
+        os << arg;
+
+#if 0
+        if ( static_cast<void*>(&arg) == static_cast<void*>(&endl< char,std::char_traits<char> >) )
+        {
+            PrintIndentation();
+        }
+#endif
+
+        return *this;
+    }
+
+    IndentedOstream &operator<<(char const *p)
+    {
+        static char buf[1024u];
+
+        if ( is_first_time )
+        {
+            PrintIndentation();
+            is_first_time = false;
+        }
+
+        for ( char const *q = p; '\0' != *q; ++q )
+        {
+            if ( '\n' == *q )
+            {
+                memcpy(buf, p, q-p + 1u);  // could be equivalent to memcpy(buf, "{\n", 2u); or even memcpy(buf, "\n", 1u);
+
+                buf[q-p] = '\0';
+
+                //strcpy(buf, "[]");
+
+                //clog << "\nPutting in stream [" << buf << "]" << endl;
+
+                os << buf << endl;
+
+                PrintIndentation();
+
+                p = q + 1u;
+            }
+        }
+
+        //clog << "\nPutting in stream [" << p << "]" << endl;
+        os << p;
+
+        return *this;
+    }
+
+    IndentedOstream &operator<<(string const &arg)
+    {
+        return *this << arg.c_str();
+    }
+
+    IndentedOstream &operator<<(Indent const &)
+    {
+        ++next_indentation;
+
+        return *this;
+    }
+
+    IndentedOstream &operator<<(Unindent const &)
+    {
+        --next_indentation;
+
+        return *this;
+    }
+};
+
+bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &list_methods)
 {
+    using Indent   = IndentedOstream::Indent;
+    using Unindent = IndentedOstream::Unindent;
+
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
     bool retval = false;
@@ -1495,7 +1605,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         retval = true;
 
-        arg_list.push_back( string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );
+        list_methods.push_back( string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );
 
         // The loop on the next line replaces "continue" with "        "
         for ( char *p = const_cast<char*>(&*(((*iter)[4u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
@@ -1519,37 +1629,46 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         string derived_replaced(svclass);
         boost::replace_all(derived_replaced, "::", "_scope_");
 
-        ostringstream &s = std::get<1u>(g_func_alterations[index]);
+        IndentedOstream s( std::get<1u>(g_func_alterations[index]), "    " );
 
-        s << "\n" << arg_list.back() << "\n"
-          << "{\n"
-             "    using namespace Continuity_Methods::Helpers::" << derived_replaced << ";\n\n";
+        s << "\n" << list_methods.back() << "\n{";
+
+        s << Indent();
+
+        s << "\nusing namespace Continuity_Methods::Helpers::" << derived_replaced << ";\n\n";
+
+        s << "using MethodInvokerT = MethodInvoker<" << svclass << ">;\n\n";
 
         for ( auto &e : bases )
         {
-            s << "    static MethodInvoker<" << e << ", " << svclass << "> mi_";
+            s << "static MethodInvokerT::MI< " << e << " > mi_";
 
             boost::replace_all(e, "::", "_scope_");
 
             s << e << ";\n";
         }
 
-        s << "\n    Invoker methods[" << bases.size() << "u] = {\n";
+        s << "\nInvoker methods[" << bases.size() << "u] = {";
+        s << Indent();
         for ( auto &e : bases )
         {
             boost::replace_all(e, "::", "_scope_");
 
-            s << "        Invoker(mi_" << e << ", " << "this),\n";
+            s << "\nInvoker(mi_" << e << ", " << "this),";
         }
-        s << "    };\n\n";
 
-        s << "    for ( auto &e : methods )\n"
-             "    {\n"
-             "        e.Set_Int(arg);\n"
-             "    }\n"
-             "\n"
-             "    this->Set_Int____WITHOUT_CONTINUITY(arg);\n"
+        s << Unindent();
+
+        s << "\n};\n\n";
+
+        s << "for ( auto &e : methods )\n"
+             "{\n"
+             "    e.Set_Int(arg);\n"
              "}\n\n";
+
+        s << Unindent();
+
+        s << "\n}\n\n";
     }
 
     return retval;

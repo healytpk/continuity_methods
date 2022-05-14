@@ -8,8 +8,28 @@
 #include <unordered_map>
 #include <string_view>
 #include <list>
+#include <cctype>  // isalpha, isdigit
 
 using namespace std;
+
+char const *const g_strs_keywords[] = {
+    "alignas", "alignof", "and", "and_eq", "asm", "atomic_cancel",
+    "atomic_commit", "atomic_noexcept", "auto", "bitand", "bitor",
+    "bool", "break", "case", "catch", "char", "char8_t", "char16_t",
+    "char32_t", "class", "compl", "concept", "const", "consteval",
+    "constexpr", "constinit", "const_cast", "continue", "co_await",
+    "co_return", "co_yield", "decltype", "default", "delete", "do",
+    "double", "dynamic_cast", "else", "enum", "explicit", "export",
+    "extern", "false", "float", "for", "friend", "goto", "if", "inline",
+    "int", "long", "mutable", "namespace", "new", "noexcept", "not",
+    "not_eq", "nullptr", "operator", "or", "or_eq", "private",
+    "protected", "public", "reflexpr", "register", "reinterpret_cast",
+    "requires", "return", "short", "signed", "sizeof", "static",
+    "static_assert", "static_cast", "struct", "switch", "synchronized",
+    "template", "this", "thread_local", "throw", "true", "try",
+    "typedef", "typeid", "typename", "union", "unsigned", "using",
+    "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+};
 
 template<
     class BidirIt,
@@ -311,6 +331,46 @@ protected:
         }
     }
 
+public:  // REVISIT FIX -- This should be protected
+
+    static void Find_And_Erase_All_Keywords(string &s)
+    {
+        auto Is_Valid_Char = [](char const c) -> bool
+        {
+            return std::isalpha(c) || std::isdigit(c) || ('_' == c);
+        };
+
+        for ( auto const &e : g_strs_keywords )
+        {
+            for ( size_t i = 0u; i < s.size(); ++i )
+            {
+                i = s.find(e, i);
+
+                if ( -1 == i ) break;
+
+                cout << "Found keyword: " << e << endl;
+
+                size_t const one_past_last = i + strlen(e);
+
+                if ( (one_past_last < s.size()) && Is_Valid_Char(s[one_past_last]) )
+                {
+                    cout << "disregarding" << endl;
+                    continue;
+                }
+
+                if (     (0u != i)       && Is_Valid_Char(s[i-1u]) )
+                {
+                    cout << "disregarding" << endl;
+                    continue;
+                }
+
+                cout << "= = = = ERASING = = = =" << endl;
+
+                s.erase(i,one_past_last - i);
+            }
+        }
+    }
+
 public:
 
     string_view Full_Param_List(void) const
@@ -445,8 +505,18 @@ void Remove_Unnecessary_Whitespace(string &s)
 }
 
 
-int main()
+int main(void)
 {
+    //string str("const I am a voltile restricted restrict pointer that has an if statement in between if you believe me const");
+
+    string str("pconst*const*const*consted*const");
+
+    Function_Signature::Find_And_Erase_All_Keywords(str);
+
+    cout << str << endl;
+
+    return 0;
+
     FuncPtr (&ref)[3u] = Func();
 
     ref[0u] = nullptr;

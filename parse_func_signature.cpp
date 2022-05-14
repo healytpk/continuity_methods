@@ -302,10 +302,8 @@ protected:
     string_view _name;
     std::unordered_map<size_t,size_t> _found_decltypes;
 
-    void Find_All_Decltypes(void)
+    void Find_All_Decltypes(string_view const s)
     {
-        string_view const s { _original };
-
         static regex const my_regex("decltype\\s*\\(");
         svregex_top_level_iterator iter(s.cbegin(), s.cend(), my_regex);
 
@@ -344,29 +342,54 @@ public:  // REVISIT FIX -- This should be protected
         {
             for ( size_t i = 0u; i < s.size(); ++i )
             {
-                i = s.find(e, i);
+                i = s.find(e, i);  // e.g. find the word "volatile"
 
                 if ( -1 == i ) break;
 
-                cout << "Found keyword: " << e << endl;
+                //cout << "Found keyword: " << e << endl;
 
                 size_t const one_past_last = i + strlen(e);
 
                 if ( (one_past_last < s.size()) && Is_Valid_Char(s[one_past_last]) )
                 {
-                    cout << "disregarding" << endl;
+                    //cout << "disregarding" << endl;
                     continue;
                 }
 
                 if (     (0u != i)       && Is_Valid_Char(s[i-1u]) )
                 {
-                    cout << "disregarding" << endl;
+                    //cout << "disregarding" << endl;
                     continue;
                 }
 
-                cout << "= = = = ERASING = = = =" << endl;
+                //cout << "= = = = ERASING = = = =" << endl;
 
                 s.erase(i,one_past_last - i);
+
+                --i;  // Because it will be incremented automatically
+
+#if 0
+                // Now if there is "\(.*\)" then delete it too
+
+                while ( i < s.size() && std::isspace(s[i]) ) ++i;
+
+                if ( i >= s.size() || '(' != s[i] ) { --i; continue; }
+
+                size_t count = 1u;
+                for ( size_t j = i + 1u; j != s.size(); ++j )
+                {
+                    if      ( ')' == s[j] ) --count;
+                    else if ( '(' == s[j] ) ++count;
+
+                    if ( 0u == count )
+                    {
+                        s.erase(i, j - i);
+                        break;
+                    }
+                }
+
+                if ( 0u != count ) throw runtime_error("unmatched parentheses after a keyword");
+#endif
             }
         }
     }
@@ -377,8 +400,9 @@ public:
     {
         string_view const s { _original };
 
-        char const *p = _name.cend();
+        char const *p = (_original.cbegin() + _original.find(_name) + _name.size()).base();
 
+        //cout << "------------- BAD CHAR = " << *p << "  (name = " << _name << ")" << endl;
         assert( '(' == *p );
 
         ++p;
@@ -416,15 +440,21 @@ public:
 
     Function_Signature(string_view const arg) : _original(arg)
     {
-        string_view const s{ _original };
+        string without_keywords{ _original };
 
-        Find_All_Decltypes();
+        //cout << "Before: " << without_keywords << endl;
+        Find_And_Erase_All_Keywords(without_keywords);
+        without_keywords.insert(0u," ");
+        Find_All_Decltypes(without_keywords);
+        //cout << "After: " << without_keywords << endl;
 
+        string_view const s{without_keywords};
         static regex const my_regex("[\\s\\&\\*]([A-z_][A-z_0-9]*)\\s*\\(");
 
         //cout << "Searching for function name in '" << s << "'" << endl;
         svregex_top_level_iterator iter(s.cbegin(), s.cend(), my_regex, std::regex_constants::match_default, true);
 
+        unsigned count = 0u;
         for ( ; iter != svregex_top_level_iterator(); ++iter )
         {
             //cout << " - - - match - - - " << endl;
@@ -445,25 +475,19 @@ public:
 
             if ( should_continue ) continue;
 
-            _name = string_view( (*iter)[1u].first, (*iter)[1u].second );
+            string_view const found { (*iter)[1u].first, (*iter)[1u].second };
 
-            static char const *const disregard[] = {
-                "int", "double", "short", "long", "signed", "unsigned",
-                "volatile", "const", "restrict"
-            };
+            size_t location = _original.find(found);
 
-            for ( auto const &e : disregard )
-            {
-                if ( e == _name )
-                {
-                    //cout << "Disregarding '" << e << "'" << endl;
-                    _name = {};
-                    should_continue = true;
-                    break;
-                }
-            }
+            assert( -1 != location );
 
-            if ( should_continue ) continue;
+            _name = string_view( _original.cbegin() + location, _original.cbegin() + location + found.size() );
+
+            //cout << "SECOND " << _name << endl;
+
+            ++count;
+
+            if ( 1u == count ) continue;
 
             break;
         }
@@ -508,7 +532,7 @@ void Remove_Unnecessary_Whitespace(string &s)
 int main(void)
 {
     //string str("const I am a voltile restricted restrict pointer that has an if statement in between if you believe me const");
-
+#if 0
     string str("pconst*const*const*consted*const");
 
     Function_Signature::Find_And_Erase_All_Keywords(str);
@@ -516,6 +540,7 @@ int main(void)
     cout << str << endl;
 
     return 0;
+#endif
 
     FuncPtr (&ref)[3u] = Func();
 

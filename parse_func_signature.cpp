@@ -438,6 +438,17 @@ public:
         }
     }
 
+    string Original_Function_Renamed(void) const
+    {
+        string str( _original.cbegin().base(), _name.cend() );
+
+        str += "____WITHOUT_CONTINUITY";
+
+        str += string_view( _name.cend(), _original.cend().base() );
+
+        return str;
+    }
+
     Function_Signature(string_view const arg) : _original(arg)
     {
         string without_keywords{ _original };
@@ -553,14 +564,16 @@ int main(void)
 
         cout << ++i << ": Name  : " << fsig.Name()            << endl;
 
+        cout <<   i << ": Original Renamed : " << fsig.Original_Function_Renamed() << endl;
+
         list<string_view> params;
         fsig.Params(params);
 
         cout <<   i << ": Quantity of Params: " << params.size() << endl;
 
-        for ( auto const &e : params )
+        for ( auto const &f : params )
         {
-            cout << "                       " << e << endl;
+            cout << "                       " << f << endl;
         }
     }
 }

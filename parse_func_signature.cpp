@@ -10,6 +10,8 @@
 #include <list>
 #include <cctype>  // isalpha, isdigit
 
+#include <algorithm>  // all_of
+
 using namespace std;
 
 char const *const g_strs_keywords[] = {
@@ -38,12 +40,7 @@ inline bool Is_Valid_Identifier_Char(char const c)
 
 inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
 {
-    for ( auto const &e : sv )
-    {
-        if ( false == Is_Valid_Identifier_Char(e) ) return false;
-    }
-
-    return true;
+    return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
 }
 
 template<

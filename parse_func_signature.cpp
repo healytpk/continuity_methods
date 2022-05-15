@@ -10,7 +10,7 @@
 #include <list>
 #include <cctype>  // isalpha, isdigit
 
-#include <algorithm>  // all_of, none_of
+#include <algorithm>  // all_of, none_of, any_of
 
 using namespace std;
 
@@ -95,7 +95,7 @@ protected:
             }
         }
 
-        return std::none_of( counts.cbegin(), counts.cend(), [](size_t const z){ return 0u == z };
+        return std::none_of( counts.cbegin(), counts.cend(), [](size_t const z){ return 0u == z; } );
     }
 
 public:
@@ -524,19 +524,12 @@ public:
             size_t const index_first = (*iter)[0u].first  - s.cbegin();
             size_t const index_last  = (*iter)[0u].second - s.cbegin() - 1u;
 
-            bool should_continue = false;
-
-            for ( auto const &e : _found_decltypes )
+            if ( std::any_of(_found_decltypes.cbegin(),
+                             _found_decltypes.cend(),
+                             [index_first,index_last](auto const &e){ return index_first >= e.first && index_last <= e.second; } ) )
             {
-                if ( index_first >= e.first && index_last <= e.second )
-                {
-                    // Ignore this match
-                    should_continue = true;
-                    break;
-                }
+                continue;
             }
-
-            if ( should_continue ) continue;
 
             string_view const found { (*iter)[1u].first, (*iter)[1u].second };
 

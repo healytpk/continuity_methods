@@ -36,6 +36,16 @@ inline bool Is_Valid_Identifier_Char(char const c)
     return std::isalpha(c) || std::isdigit(c) || ('_' == c);
 }
 
+inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
+{
+    for ( auto const &e : sv )
+    {
+        if ( false == Is_Valid_Identifier_Char(e) ) return false;
+    }
+
+    return true;
+}
+
 template<
     class BidirIt,
     class CharT = typename std::iterator_traits<BidirIt>::value_type,
@@ -304,17 +314,24 @@ class Function_Parameter {
 protected:
 
     string_view const _original;
+    string_view _name;
 
 public:
 
     Function_Parameter(string_view const arg) : _original(arg)
     {
+        if ( _original.empty() ) throw runtime_error("Function parameter shouldn't be blank here");
 
+        _name = _original;
+
+        while ( false == _name.empty() && false == Is_Entire_String_Valid_Identifier(_name) ) _name.remove_prefix(1u);
+
+        if ( _name.empty() ) throw runtime_error("Unable to get identifier from parameter");
     }
 
     string Name(void) const
     {
-        return string(_original);
+        return string(_name);
     }
 };
 
@@ -456,7 +473,7 @@ public:
 
         for ( ; iter != svregex_top_level_token_iterator(); ++iter )
         {
-            if ( "void" ==  *iter ) return _params;  // REVISIT FIX - watch out for whitespace
+            if ( "void" ==  *iter || "" == *iter ) return _params;  // REVISIT FIX - watch out for whitespace
 
             _params.emplace_back( string_view(iter->first, iter->second) );
 
@@ -591,10 +608,10 @@ string sigs[] = {
     "void Func(void)",
     "int Func(int j)",
     "void Func(int const k)",
-    "void Func(int, vector<int> &)",
+    "void Func(int i, vector<int> &vec)",
     "SomeClass<T, (g_count_lasers > 4u)> Func(int a, vector<decltype(int())> b, char c)",
     "typename SomeClass<T, (g_count_lasers > 4u)>::type Func(int a, vector<decltype(int())> b, char c)",
-    "long int (*(&Func(void))[3u])(int)",
+    "long int (*(&Func(void))[3u])(int count)",
     "decltype(SomeOtherFunc(arg)) Func(void)",
     "long long int const Func()",
     "SomeClass const (*const volatile (&Func(void))[3u])(int)",

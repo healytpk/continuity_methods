@@ -508,7 +508,7 @@ public:
 
             _params.emplace_back( string_view(iter->first, iter->second) );
 
-            cout << "  Parameter Name: " << _params.back().Name() << endl;
+            //cout << "  Parameter Name: " << _params.back().Name() << endl;
         }
 
         return _params;
@@ -684,18 +684,21 @@ int main(void)
     unsigned i = -1;
     for ( auto const &e : sigs )
     {
+        ++i;
+
         cout << "===================================================" << endl;
 
-        cout << ++i << ": Intact Signature : " << e << endl;
+        //cout << i << ": Intact Signature : " << e << endl;
 
         Function_Signature fsig(e);
 
-        cout << i << ": Name of Method : " << fsig.Name() << endl;
+        cout << i << ": Address of Method : &MyClass::" << fsig.Name() << endl;
 
-        cout << i << ": Original Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
+        cout << i << ": Original Signature Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
 
         list<Function_Parameter> const &params = fsig.Params();
 
+#if 0
         if ( 0u != params.size() )
         {
             cout << i << ": Quantity of Params: " << params.size() << endl;
@@ -709,8 +712,9 @@ int main(void)
         {
             cout << i << ": No params" << endl;
         }
+#endif
 
-        cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
         cout << i << ": Signature of replacement method : "; fsig.Signature_Of_Replacement_Function(cout); cout << endl;
+        cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
     }
 }

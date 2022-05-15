@@ -294,6 +294,20 @@ using r_svregex_top_level_token_iterator = regex_top_level_token_iterator<string
 using r_sregex_top_level_iterator        = regex_top_level_iterator      <     string::const_reverse_iterator>;
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
+class Function_Parameter {
+
+protected:
+
+    string_view const _original;
+
+public:
+
+    Function_Parameter(string_view const arg) : _original(arg)
+    {
+
+    }
+};
+
 class Function_Signature {
 
 protected:
@@ -438,15 +452,13 @@ public:
         }
     }
 
-    string Original_Function_Renamed(void) const
+    void Original_Function_Renamed(ostream &os) const
     {
-        string str( _original.cbegin().base(), _name.cend() );
+        os << string_view( _original.cbegin().base(), _name.cend() );
 
-        str += "____WITHOUT_CONTINUITY";
+        os << "____WITHOUT_CONTINUITY";
 
-        str += string_view( _name.cend(), _original.cend().base() );
-
-        return str;
+        os << string_view( _name.cend(), _original.cend().base() );
     }
 
     Function_Signature(string_view const arg) : _original(arg)
@@ -564,7 +576,7 @@ int main(void)
 
         cout << ++i << ": Name  : " << fsig.Name()            << endl;
 
-        cout <<   i << ": Original Renamed : " << fsig.Original_Function_Renamed() << endl;
+        cout <<   i << ": Original Renamed : "; fsig.Original_Function_Renamed(cout); cout << endl;
 
         list<string_view> params;
         fsig.Params(params);

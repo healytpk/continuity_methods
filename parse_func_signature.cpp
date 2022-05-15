@@ -31,6 +31,11 @@ char const *const g_strs_keywords[] = {
     "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
 };
 
+inline bool Is_Valid_Identifier_Char(char const c)
+{
+    return std::isalpha(c) || std::isdigit(c) || ('_' == c);
+}
+
 template<
     class BidirIt,
     class CharT = typename std::iterator_traits<BidirIt>::value_type,
@@ -306,6 +311,11 @@ public:
     {
 
     }
+
+    string Name(void) const
+    {
+        return string(_original);
+    }
 };
 
 class Function_Signature {
@@ -315,6 +325,7 @@ protected:
     string _original;
     string_view _name;
     std::unordered_map<size_t,size_t> _found_decltypes;
+    list<Function_Parameter> _params;
 
     void Find_All_Decltypes(string_view const s)
     {
@@ -347,11 +358,6 @@ public:  // REVISIT FIX -- This should be protected
 
     static void Find_And_Erase_All_Keywords(string &s)
     {
-        auto Is_Valid_Char = [](char const c) -> bool
-        {
-            return std::isalpha(c) || std::isdigit(c) || ('_' == c);
-        };
-
         for ( auto const &e : g_strs_keywords )
         {
             for ( size_t i = 0u; i < s.size(); ++i )
@@ -364,13 +370,13 @@ public:  // REVISIT FIX -- This should be protected
 
                 size_t const one_past_last = i + strlen(e);
 
-                if ( (one_past_last < s.size()) && Is_Valid_Char(s[one_past_last]) )
+                if ( (one_past_last < s.size()) && Is_Valid_Identifier_Char(s[one_past_last]) )
                 {
                     //cout << "disregarding" << endl;
                     continue;
                 }
 
-                if (     (0u != i)       && Is_Valid_Char(s[i-1u]) )
+                if (     (0u != i)       && Is_Valid_Identifier_Char(s[i-1u]) )
                 {
                     //cout << "disregarding" << endl;
                     continue;
@@ -414,7 +420,7 @@ public:
     {
         string_view const s { _original };
 
-        char const *p = (_original.cbegin() + _original.find(_name) + _name.size()).base();
+        char const *p = _name.cend();  // REVISIT FIX - watch out for whitespace, e.g. "int Func (void)"
 
         //cout << "------------- BAD CHAR = " << *p << "  (name = " << _name << ")" << endl;
         assert( '(' == *p );
@@ -439,8 +445,10 @@ public:
         return string_view(s.cbegin() + index, s.cbegin() + i);
     }
 
-    void Params(list<string_view> &params) const
+    list<Function_Parameter> Params(void)
     {
+        _params.clear();
+
         string_view const full{ Full_Param_List() };
 
         static regex const my_regex(",");
@@ -448,17 +456,40 @@ public:
 
         for ( ; iter != svregex_top_level_token_iterator(); ++iter )
         {
-            params.emplace_back( iter->first, iter->second );
+            if ( "void" ==  *iter ) return _params;  // REVISIT FIX - watch out for whitespace
+
+            _params.emplace_back( string_view(iter->first, iter->second) );
+
+            cout << "  Parameter Name: " << _params.back().Name() << endl;
         }
+
+        return _params;
     }
 
-    void Original_Function_Renamed(ostream &os) const
+    void Original_Function_Signature_Renamed(ostream &os) const
     {
         os << string_view( _original.cbegin().base(), _name.cend() );
 
         os << "____WITHOUT_CONTINUITY";
 
         os << string_view( _name.cend(), _original.cend().base() );
+    }
+
+    void Invocation_Of_Original_Function(ostream &os) const
+    {
+        os << _name << "____WITHOUT_CONTINUITY(";
+
+        for ( auto const &e : _params )
+        {
+            os << e.Name();
+
+            if ( &e != &_params.back() )
+            {
+                os << ", ";
+            }
+        }
+
+        os << ")";
     }
 
     Function_Signature(string_view const arg) : _original(arg)
@@ -500,11 +531,34 @@ public:
 
             string_view const found { (*iter)[1u].first, (*iter)[1u].second };
 
-            size_t location = _original.find(found);
+            for ( size_t location = 0u; location < _original.size(); ++location)
+            {
+                //cout << "Searching for '" << found << "' inside '" << _original << "'" << endl;
 
-            assert( -1 != location );
+                location = _original.find(found, location);
 
-            _name = string_view( _original.cbegin() + location, _original.cbegin() + location + found.size() );
+                assert( -1 != location );
+
+                //cout << "Found at location " << location << endl;
+
+                size_t const one_past_last = location + found.size();
+
+                if ( (one_past_last < _original.size()) && Is_Valid_Identifier_Char(_original[one_past_last]) )
+                {
+                    //cout << "disregarding AAA" << endl;
+                    continue;
+                }
+
+                if (     (0u != location)       && Is_Valid_Identifier_Char(_original[location-1u]) )
+                {
+                    //cout << "disregarding BBB because previous char at location " << location - 1u << " is " << s[location - 1u] << endl;
+                    continue;
+                }
+
+                _name = string_view( _original.cbegin() + location, _original.cbegin() + location + found.size() );
+
+                break;
+            }
 
             //cout << "SECOND " << _name << endl;
 
@@ -572,20 +626,32 @@ int main(void)
     unsigned i = -1;
     for ( auto const &e : sigs )
     {
+        cout << "===================================================" << endl;
+
+        cout << ++i << ": Intact Signature : " << e << endl;
+
         Function_Signature fsig(e);
 
-        cout << ++i << ": Name  : " << fsig.Name()            << endl;
+        cout << i << ": Name of Method : " << fsig.Name() << endl;
 
-        cout <<   i << ": Original Renamed : "; fsig.Original_Function_Renamed(cout); cout << endl;
+        cout << i << ": Original Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
 
-        list<string_view> params;
-        fsig.Params(params);
+        list<Function_Parameter> const &params = fsig.Params();
 
-        cout <<   i << ": Quantity of Params: " << params.size() << endl;
-
-        for ( auto const &f : params )
+        if ( 0u != params.size() )
         {
-            cout << "                       " << f << endl;
+            cout << i << ": Quantity of Params: " << params.size() << endl;
+
+            for ( auto const &f : params )
+            {
+                cout << "                       " << f.Name() << endl;
+            }
         }
+        else
+        {
+            cout << i << ": No params" << endl;
+        }
+
+        cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
     }
 }

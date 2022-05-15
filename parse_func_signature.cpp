@@ -10,7 +10,7 @@
 #include <list>
 #include <cctype>  // isalpha, isdigit
 
-#include <algorithm>  // all_of, none_of, any_of
+#include <algorithm>  // all_of, any_of
 
 using namespace std;
 
@@ -95,7 +95,7 @@ protected:
             }
         }
 
-        return std::none_of( counts.cbegin(), counts.cend(), [](size_t const z){ return 0u == z; } );
+        return std::all_of( counts.cbegin(), counts.cend(), [](size_t const z){ return 0u == z; } );
     }
 
 public:

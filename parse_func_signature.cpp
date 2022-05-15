@@ -10,7 +10,7 @@
 #include <list>
 #include <cctype>  // isalpha, isdigit
 
-#include <algorithm>  // all_of
+#include <algorithm>  // all_of, none_of
 
 using namespace std;
 
@@ -64,7 +64,7 @@ protected:
     {
         assert( base != Base() );  // Is_Top_Level should never be called on a "no more matches" token iterator
 
-        size_t counts[4u] = {};  /* (), [], {}, <> */
+        std::array<size_t,4u> counts{};  /* (), [], {}, <> */
 
         for ( BidirIt iter = _a; iter != (*base).second; ++iter )
         {
@@ -95,12 +95,7 @@ protected:
             }
         }
 
-        for ( auto const &count : counts )
-        {
-            if ( 0u != count ) return false;
-        }
-
-        return true;
+        return std::none_of( counts.cbegin(), counts.cend(), [](size_t const z){ return 0u == z };
     }
 
 public:

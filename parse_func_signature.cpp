@@ -66,7 +66,16 @@ inline bool Is_Valid_Identifier_Char(char const c)
 
 inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
 {
-    return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
+    assert( false == sv.empty() );
+
+    if ( std::isalpha(sv.front()) || ('_' == sv.front()) )  // First character can't be a digit
+    {
+        return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
+    }
+    else
+    {
+        return false;
+    }
 }
 
 template<

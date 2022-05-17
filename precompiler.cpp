@@ -2132,26 +2132,6 @@ void Print_Final_Output(void)
     cout << string_view( g_intact.cbegin() + i, g_intact.cend() );
 }
 
-void my_terminate_handler(void)
-{
-    std::exception_ptr eptr = std::current_exception();
-
-    try
-    {
-        if ( nullptr != eptr ) std::rethrow_exception(eptr);
-    }
-    catch(const std::exception& e)
-    {
-        clog << "=====================================================================================================" << endl;
-        clog << "Exception: " << e.what() << endl;
-        clog << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
-        clog << "Milliseconds taken: " << GetTickCount() - g_timestamp_program_start << endl;
-        clog << "=====================================================================================================" << endl;
-    }
-
-    std::abort();
-}
-
 void Print_Header(void)
 {
     cout << "namespace Continuity_Methods {\n"
@@ -2180,6 +2160,26 @@ void Print_Header(void)
             "    };\n"
             "\n"
             "}\n\n";
+}
+
+void my_terminate_handler(void)
+{
+    std::exception_ptr eptr = std::current_exception();
+
+    try
+    {
+        if ( nullptr != eptr ) std::rethrow_exception(eptr);
+    }
+    catch(const std::exception& e)
+    {
+        clog << "=====================================================================================================" << endl;
+        clog << "Exception: " << e.what() << endl;
+        clog << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
+        clog << "Milliseconds taken: " << GetTickCount() - g_timestamp_program_start << endl;
+        clog << "=====================================================================================================" << endl;
+    }
+
+    std::abort();
 }
 
 int main(int const argc, char **const argv)

@@ -661,9 +661,9 @@ public:
     }
 
     template<class T>
-    void Invocation____WITH_VOID_POINTER_THIS(T &os) const
+    void Invocation____WITH_VOID_POINTER_THIS(T &os, string_view const param_name = "arg_this") const
     {
-        os << _name << "(arg_this";
+        os << _name << "(" << param_name;
 
         for ( auto const &e : _params )
         {
@@ -766,6 +766,7 @@ int main(void)
         cout << i << ": Invoke original renamed method : p->"; fsig.Invocation____WITHOUT_CONTINUITY(cout); cout << ";" << endl;
         cout << i << ": Invoke intact : p->"; fsig.Invocation(cout); cout << ";" << endl;
         cout << i << ": Invoke intact with void pointer this: p->"; fsig.Invocation____WITH_VOID_POINTER_THIS(cout); cout << ";" << endl;
+        cout << i << ": Invoke intact with void pointer this called '_this' : p->"; fsig.Invocation____WITH_VOID_POINTER_THIS(cout, "_this"); cout << ";" << endl;
         cout << i << ": Signature of replacement method with Void Pointer This : "; fsig.Signature_Of_Replacement_Function____With_Void_Pointer_This(cout); cout << ";" << endl;
     }
 }

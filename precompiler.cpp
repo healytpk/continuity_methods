@@ -7,7 +7,7 @@
 */
 
 // =================================================================
-// Section 1 of 8 : Override global 'new' and 'delete' for max speed
+// Section 1 of 7 : Override global 'new' and 'delete' for max speed
 // =================================================================
 
 decltype(sizeof(1)) g_total_allocation = 0u;
@@ -70,7 +70,7 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #endif // if override global 'new' and 'delete' for max speed is enabled
 
 // =========================================================================
-// Section 2 of 8 : Include standard header files, and define global objects
+// Section 2 of 7 : Include standard header files, and define global objects
 // =========================================================================
 
 bool constexpr verbose = false;
@@ -134,6 +134,7 @@ using std::views::split;
 
 using std::runtime_error;
 
+using std::ostream;
 using std::ostringstream;
 
 std::uintmax_t GetTickCount(void)
@@ -145,7 +146,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 3 of 8: regex_top_level_token_iterator
+// Section 3 of 7 : regex_top_level_token_iterator
 // ==========================================================================
 
 template<
@@ -412,7 +413,7 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 4 of 8 : Process keywords and identifiers
+// Section 4 of 7 : Process keywords and identifiers
 // ==========================================================================
 
 inline bool Is_Valid_Identifier_Char(char const c)
@@ -540,9 +541,261 @@ void Find_And_Erase_All_Keywords(string &s)
     }
 }
 
+// ==========================================================================
+// Section 5 of 7 : Parse function signatures
+// ==========================================================================
+
+class Function_Signature {
+protected:
+
+    class Parameter {
+    protected:
+
+        string _original;
+        string _name;  // REVISIT FIX - Maybe see about a string_view here
+
+    public:
+
+        explicit Parameter(string_view const arg) : _original(arg)
+        {
+            if ( _original.empty() ) throw runtime_error("Function parameter shouldn't be blank here");
+
+            _name = _original;
+
+            while ( false == _name.empty() && false == Is_Entire_String_Valid_Identifier(_name) )
+            {
+                //_name.remove_prefix(1u);
+                _name.erase(0u,1u);
+            }
+
+            if ( _name.empty() )
+            {
+                _name  = "param_";
+                _name += Unique_3_Hex_Chars().c;
+
+                _original += ' ';
+                _original += _name;
+            }
+        }
+
+        string_view Name(void) const
+        {
+            return _name;
+        }
+
+        string_view Full(void) const
+        {
+            return _original;
+        }
+    };
+
+    string _original;
+    string_view _name;
+    std::unordered_map<size_t,size_t> _found_decltypes;
+    list<Parameter> _params;
+
+    void Find_All_Decltypes(string_view const s)
+    {
+        static regex const my_regex("decltype\\s*\\(");
+        svregex_top_level_iterator iter(s.cbegin(), s.cend(), my_regex);
+
+        for ( ; iter != svregex_top_level_iterator(); ++iter )
+        {
+            size_t const index = (*iter)[0u].second - s.cbegin();
+
+            size_t count = 1u;
+
+            size_t i;
+            for ( i = index + 1u; i != s.size(); ++i )
+            {
+                if      ( ')' == s[i] ) --count;
+                else if ( '(' == s[i] ) ++count;
+
+                if ( 0u == count ) break;
+            }
+
+            if ( 0u != count ) throw runtime_error("Mismatched parentheses when trying to find decltype's");
+
+            //cout << "=================== Found a decltype =======================" << endl;
+            _found_decltypes[index] = i;
+        }
+    }
+
+    string_view Full_Param_List(void) const
+    {
+        string_view const s { _original };
+
+        char const *p = _name.cend();  // REVISIT FIX - watch out for whitespace, e.g. "int Func (void)"
+
+        //cout << "------------- BAD CHAR = " << *p << "  (name = " << _name << ")" << endl;
+        assert( '(' == *p );
+
+        ++p;
+
+        size_t const index = p - s.cbegin();
+
+        size_t count = 1u;
+
+        size_t i;
+        for ( i = index; i != s.size(); ++i )
+        {
+            if      ( ')' == s[i] ) --count;
+            else if ( '(' == s[i] ) ++count;
+
+            if ( 0u == count ) break;
+        }
+
+        if ( 0u != count ) throw runtime_error("Mismatched parentheses when trying to find decltype's");
+
+        return string_view(s.cbegin() + index, s.cbegin() + i);
+    }
+
+    void ProcessParams(void)
+    {
+        _params.clear();
+
+        string_view const full{ Full_Param_List() };
+
+        static regex const my_regex(",");
+        svregex_top_level_token_iterator iter(full.cbegin(), full.cend(), my_regex, -1);
+
+        for ( ; iter != svregex_top_level_token_iterator(); ++iter )
+        {
+            if ( "void" ==  *iter || "" == *iter ) return;  // REVISIT FIX - watch out for whitespace
+
+            _params.emplace_back( string_view(iter->first, iter->second) );
+
+            //cout << "  Parameter Name: " << _params.back().Name() << endl;
+        }
+    }
+
+public:
+
+    explicit Function_Signature(string_view const arg) : _original(arg)
+    {
+        string without_keywords{ _original };
+
+        //cout << "Before: " << without_keywords << endl;
+        Find_And_Erase_All_Keywords(without_keywords);
+        without_keywords.insert(0u," ");
+        Find_All_Decltypes(without_keywords);
+        //cout << "After: " << without_keywords << endl;
+
+        string_view const s{without_keywords};
+        static regex const my_regex("[\\s\\&\\*]([A-z_][A-z_0-9]*)\\s*\\(");
+
+        //cout << "Searching for function name in '" << s << "'" << endl;
+        svregex_top_level_iterator iter(s.cbegin(), s.cend(), my_regex, std::regex_constants::match_default, true);
+
+        unsigned count = 0u;
+        for ( ; iter != svregex_top_level_iterator(); ++iter )
+        {
+            //cout << " - - - match - - - " << endl;
+            size_t const index_first = (*iter)[0u].first  - s.cbegin();
+            size_t const index_last  = (*iter)[0u].second - s.cbegin() - 1u;
+
+            if ( std::any_of(_found_decltypes.cbegin(),
+                             _found_decltypes.cend(),
+                             [index_first,index_last](auto const &e){ return index_first >= e.first && index_last <= e.second; } ) )
+            {
+                continue;
+            }
+
+            string_view const found { (*iter)[1u].first, (*iter)[1u].second };
+
+            for ( size_t location = 0u; location < _original.size(); ++location)
+            {
+                //cout << "Searching for '" << found << "' inside '" << _original << "'" << endl;
+
+                location = _original.find(found, location);
+
+                assert( -1 != location );
+
+                //cout << "Found at location " << location << endl;
+
+                size_t const one_past_last = location + found.size();
+
+                if ( (one_past_last < _original.size()) && Is_Valid_Identifier_Char(_original[one_past_last]) )
+                {
+                    //cout << "disregarding AAA" << endl;
+                    continue;
+                }
+
+                if (     (0u != location)       && Is_Valid_Identifier_Char(_original[location-1u]) )
+                {
+                    //cout << "disregarding BBB because previous char at location " << location - 1u << " is " << s[location - 1u] << endl;
+                    continue;
+                }
+
+                _name = string_view( _original.cbegin() + location, _original.cbegin() + location + found.size() );
+
+                break;
+            }
+
+            //cout << "SECOND " << _name << endl;
+
+            ++count;
+
+            if ( 1u == count ) continue;
+
+            break;
+        }
+
+        if ( _name.empty() ) throw runtime_error("Couldn't determine name of function");
+
+        ProcessParams();
+    }
+
+    void Original_Function_Signature_Renamed(ostream &os) const
+    {
+        os << string_view( _original.cbegin().base(), _name.cend() );
+
+        os << "____WITHOUT_CONTINUITY";
+
+        os << string_view( _name.cend(), _original.cend().base() );
+    }
+
+    void Signature_Of_Replacement_Function(ostream &os) const
+    {
+        os << string_view( _original.cbegin().base(), _name.cend() );
+
+        os << '(';
+
+        for ( auto &e : _params )
+        {
+            os << e.Full();
+
+            if ( &e != &_params.back() ) os << ", ";
+        }
+
+        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+    }
+
+    void Invocation_Of_Original_Function(ostream &os) const
+    {
+        os << _name << "____WITHOUT_CONTINUITY(";
+
+        for ( auto const &e : _params )
+        {
+            os << e.Name();
+
+            if ( &e != &_params.back() )
+            {
+                os << ", ";
+            }
+        }
+
+        os << ")";
+    }
+
+    string_view Name(void) const
+    {
+        return _name;
+    }
+};
 
 // ==========================================================================
-// Section 5 of 8 : Generate the auxillary code needed for Continuity Methods
+// Section 6 of 7 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname, list<string> const &func_signatures)
@@ -660,7 +913,7 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 }
 
 // =============================================================
-// Section 6 of 8 : Parse all the class definitions in the input
+// Section 7 of 7 : Parse all the class definitions in the input
 // =============================================================
 
 string g_intact;

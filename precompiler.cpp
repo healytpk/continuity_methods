@@ -178,7 +178,6 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cctype>         // isspace, isalpha, isdigit
 #include <list>           // list
 #include <map>            // map
-#include <unordered_map>  // unordered_map
 #include <ranges>         // views::filter
 #include <array>          // array
 #include <tuple>          // tuple
@@ -677,7 +676,7 @@ protected:
 
     string const _original;
     string_view _name;
-    std::unordered_map<size_t,size_t> _found_decltypes;
+    fifo_map<size_t,size_t> _found_decltypes;
     list<Parameter> _params;
 
     void Find_All_Decltypes(string_view const s)
@@ -1193,7 +1192,7 @@ struct Method_Info {
     Method_Info(void) : fsig("int Dummy(int)") {}
 };
 
-std::unordered_map< string, std::map<size_t, Method_Info> > g_func_alterations_all;
+fifo_map< string, fifo_map<size_t, Method_Info> > g_func_alterations_all;
 
 // ==========================================================================
 // Section 7 of 8 : Generate the auxillary code needed for Continuity Methods
@@ -1205,7 +1204,7 @@ void Print_Helper_Classes_For_Class(string classname)
             "// Helper classes for continuity methods within class " << classname << "\n"
             "// ==========================================================================\n\n";
 
-    std::map<size_t, Method_Info> const &g_func_alterations = g_func_alterations_all.at(classname);
+    fifo_map<size_t, Method_Info> const &g_func_alterations = g_func_alterations_all.at(classname);
 
     boost::replace_all(classname, "::", "_scope_");
 
@@ -1332,7 +1331,7 @@ void Print_Helper_Classes_For_Class(string classname)
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)
 {
-    static std::unordered_map<size_t, string> strlits;
+    static fifo_map<size_t, string> strlits;
 
     if ( undo )
     {
@@ -1414,7 +1413,7 @@ void Replace_All_String_Literals_With_Spaces(bool undo = false)
 
 void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
 {
-    static std::unordered_map<size_t, string> directives;
+    static fifo_map<size_t, string> directives;
 
     if ( undo )
     {
@@ -1475,7 +1474,7 @@ CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(voi
     return this->_parent;
 }
 
-std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair const *>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+fifo_map< string, tuple< list<CurlyBracketManager::CurlyPair const *>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 /* For example:
 
          e.first "class"
@@ -1621,7 +1620,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
     retval.insert(0u, "::");
 
-    //std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+    //fifo_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 
     std::get<0u>( g_scope_names[retval] ).push_back(&cp);  // Note that these are pointers
 
@@ -1724,7 +1723,7 @@ bool Strip_Last_Scope(string &str)
     return true;
 }
 
-std::unordered_map<string,string> g_psuedonyms;
+fifo_map<string,string> g_psuedonyms;
 
 string Find_Class_Relative_To_Scope(string &prefix, string classname)
 {
@@ -2163,7 +2162,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         retval = true;
 
-        std::map<size_t, Method_Info> &g_func_alterations = g_func_alterations_all[string(svclass)];
+        fifo_map<size_t, Method_Info> &g_func_alterations = g_func_alterations_all[string(svclass)];
 
         size_t const index = ((*iter)[2u]).second - g_intact.cbegin() - 1u;  // REVISIT FIX - corner cases such as '{}'
 
@@ -2396,8 +2395,6 @@ int main(int const argc, char **const argv)
 
     Print_Header();
 
-    g_scope_names.reserve(5000u);
-
     std::copy( istream_iterator<char>(cin), istream_iterator<char>(), back_inserter(g_intact) );
 
     clog << "Bytes: " << g_intact.size() << endl;
@@ -2421,7 +2418,7 @@ int main(int const argc, char **const argv)
     only_print_numbers = false;
     g_curly_manager.Print();
 
-    //std::unordered_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
+    //fifo_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 
     clog << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )

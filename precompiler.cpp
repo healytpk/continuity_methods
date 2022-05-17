@@ -589,7 +589,7 @@ protected:
         }
     };
 
-    string _original;
+    string const _original;
     string_view _name;
     std::unordered_map<size_t,size_t> _found_decltypes;
     list<Parameter> _params;
@@ -746,7 +746,8 @@ public:
         ProcessParams();
     }
 
-    void Original_Function_Signature_Renamed(ostream &os) const
+    template<class T>
+    void Original_Function_Signature_Renamed(T &os) const
     {
         os << string_view( _original.cbegin().base(), _name.cend() );
 
@@ -755,7 +756,8 @@ public:
         os << string_view( _name.cend(), _original.cend().base() );
     }
 
-    void Signature_Of_Replacement_Function(ostream &os) const
+    template<class T>
+    void Signature_Of_Replacement_Function(T &os) const
     {
         os << string_view( _original.cbegin().base(), _name.cend() );
 
@@ -771,7 +773,8 @@ public:
         os << string_view( Full_Param_List().cend(), _original.cend().base() );
     }
 
-    void Invocation_Of_Original_Function(ostream &os) const
+    template<class T>
+    void Invocation_Of_Original_Function(T &os) const
     {
         os << _name << "____WITHOUT_CONTINUITY(";
 
@@ -791,6 +794,11 @@ public:
     string_view Name(void) const
     {
         return _name;
+    }
+
+    string_view Original(void) const
+    {
+        return _original;
     }
 };
 

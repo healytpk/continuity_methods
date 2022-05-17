@@ -298,6 +298,7 @@ private:
 
 protected:
 
+    bool const _disregard_normal_parentheses;
     BidirIt const _a, _b;  // set in constructor's initialiser list
 
     bool Is_Top_Level(void) const
@@ -337,6 +338,8 @@ protected:
 
         for ( auto const &count : counts )
         {
+            if ( _disregard_normal_parentheses && (&count == &counts[0u]) ) continue;
+
             if ( 0u != count ) return false;
         }
 
@@ -345,7 +348,7 @@ protected:
 
 public:
 
-    regex_top_level_iterator(void) : Base(), _a(), _b() {}
+    regex_top_level_iterator(void) : Base(), _a(), _b(), _disregard_normal_parentheses(false) {}
 
     void Keep_Searching_If_Necessary(void)
     {
@@ -360,8 +363,9 @@ public:
 
     regex_top_level_iterator(BidirIt const a, BidirIt const b,
                              typename Base::regex_type const &re,
-                             std::regex_constants::match_flag_type const m = std::regex_constants::match_default )
-      : Base(a,b,re,m), _a(a), _b(b)
+                             std::regex_constants::match_flag_type const m = std::regex_constants::match_default,
+                             bool arg_disregard_normal_parentheses = false )
+      : Base(a,b,re,m), _a(a), _b(b), _disregard_normal_parentheses(arg_disregard_normal_parentheses)
     {
         Keep_Searching_If_Necessary();
     }

@@ -14,28 +14,50 @@
 
 using namespace std;
 
-inline uint16_t Unique_2_Bytes(void)
+inline bool Is_Valid_Identifier_Char(char const c)
 {
-    static std::atomic<uint16_t> retval = -1;
+    return std::isalpha(static_cast<char unsigned>(c)) || std::isdigit(static_cast<char unsigned>(c)) || ('_' == c);
+}
+
+inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
+{
+    assert( false == sv.empty() );
+
+    if ( std::isalpha(static_cast<char unsigned>(sv.front())) || ('_' == sv.front()) )  // First character can't be a digit
+    {
+        return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
+    }
+    else
+    {
+        return false;
+    }
+}
+
+struct ShortStr {
+    char c[4u];
+};
+
+inline short unsigned Unique_12_Bit(void)
+{
+    static std::atomic<short unsigned> retval = -1;
 
     return ++retval;
 }
 
-inline string Unique_4_Hex_Chars(void)
+inline ShortStr Unique_3_Hex_Chars(void)
 {
-    string str(4u, 'x');
+    ShortStr str;
 
-    uint16_t const x = Unique_2_Bytes();
+    short unsigned const x = Unique_12_Bit();
 
     static char const alphabet[] = "0123456789abcdef";
 
-    unsigned const count_bytes = 2*sizeof(x);
-
-    for ( unsigned i = 0u; i != count_bytes; ++i )
+    for ( unsigned i = 0u; i != 3u; ++i )
     {
-        decltype(x) const max_shift = 8u*count_bytes - 4u;
-        str[i] = alphabet[ (i >> (max_shift - 4u*i)) & 0xf ];
+        str.c[i] = alphabet[ (x >> (8u - 4u*i)) & 0xf ];
     }
+
+    str.c[3u] = '\0';
 
     return str;
 }
@@ -59,22 +81,61 @@ char const *const g_strs_keywords[] = {
     "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
 };
 
-inline bool Is_Valid_Identifier_Char(char const c)
+void Find_And_Erase_All_Keywords(string &s)
 {
-    return std::isalpha(c) || std::isdigit(c) || ('_' == c);
-}
-
-inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
-{
-    assert( false == sv.empty() );
-
-    if ( std::isalpha(sv.front()) || ('_' == sv.front()) )  // First character can't be a digit
+    for ( auto const &e : g_strs_keywords )
     {
-        return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
-    }
-    else
-    {
-        return false;
+        for ( size_t i = 0u; i < s.size(); ++i )
+        {
+            i = s.find(e, i);  // e.g. find the word "volatile"
+
+            if ( -1 == i ) break;
+
+            //cout << "Found keyword: " << e << endl;
+
+            size_t const one_past_last = i + strlen(e);
+
+            if ( (one_past_last < s.size()) && Is_Valid_Identifier_Char(s[one_past_last]) )
+            {
+                //cout << "disregarding" << endl;
+                continue;
+            }
+
+            if (     (0u != i)       && Is_Valid_Identifier_Char(s[i-1u]) )
+            {
+                //cout << "disregarding" << endl;
+                continue;
+            }
+
+            //cout << "= = = = ERASING = = = =" << endl;
+
+            s.erase(i,one_past_last - i);
+
+            --i;  // Because it will be incremented automatically
+
+#if 0
+            // Now if there is "\(.*\)" then delete it too
+
+            while ( i < s.size() && std::isspace(s[i]) ) ++i;
+
+            if ( i >= s.size() || '(' != s[i] ) { --i; continue; }
+
+            size_t count = 1u;
+            for ( size_t j = i + 1u; j != s.size(); ++j )
+            {
+                if      ( ')' == s[j] ) --count;
+                else if ( '(' == s[j] ) ++count;
+
+                if ( 0u == count )
+                {
+                    s.erase(i, j - i);
+                    break;
+                }
+            }
+
+            if ( 0u != count ) throw runtime_error("unmatched parentheses after a keyword");
+#endif
+        }
     }
 }
 
@@ -336,113 +397,54 @@ using r_svregex_top_level_token_iterator = regex_top_level_token_iterator<string
 using r_sregex_top_level_iterator        = regex_top_level_iterator      <     string::const_reverse_iterator>;
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
-static void Find_And_Erase_All_Keywords(string &s)
-{
-    for ( auto const &e : g_strs_keywords )
-    {
-        for ( size_t i = 0u; i < s.size(); ++i )
-        {
-            i = s.find(e, i);  // e.g. find the word "volatile"
-
-            if ( -1 == i ) break;
-
-            //cout << "Found keyword: " << e << endl;
-
-            size_t const one_past_last = i + strlen(e);
-
-            if ( (one_past_last < s.size()) && Is_Valid_Identifier_Char(s[one_past_last]) )
-            {
-                //cout << "disregarding" << endl;
-                continue;
-            }
-
-            if (     (0u != i)       && Is_Valid_Identifier_Char(s[i-1u]) )
-            {
-                //cout << "disregarding" << endl;
-                continue;
-            }
-
-            //cout << "= = = = ERASING = = = =" << endl;
-
-            s.erase(i,one_past_last - i);
-
-            --i;  // Because it will be incremented automatically
-
-#if 0
-            // Now if there is "\(.*\)" then delete it too
-
-            while ( i < s.size() && std::isspace(s[i]) ) ++i;
-
-            if ( i >= s.size() || '(' != s[i] ) { --i; continue; }
-
-            size_t count = 1u;
-            for ( size_t j = i + 1u; j != s.size(); ++j )
-            {
-                if      ( ')' == s[j] ) --count;
-                else if ( '(' == s[j] ) ++count;
-
-                if ( 0u == count )
-                {
-                    s.erase(i, j - i);
-                    break;
-                }
-            }
-
-            if ( 0u != count ) throw runtime_error("unmatched parentheses after a keyword");
-#endif
-        }
-    }
-}
-
-class Function_Parameter {
-
-protected:
-
-    string _original;
-    string _name;  // REVISIT FIX - Maybe see about a string_view here
-
-public:
-
-    Function_Parameter(string_view const arg) : _original(arg)
-    {
-        if ( _original.empty() ) throw runtime_error("Function parameter shouldn't be blank here");
-
-        _name = _original;
-
-        while ( false == _name.empty() && false == Is_Entire_String_Valid_Identifier(_name) )
-        {
-            //_name.remove_prefix(1u);
-            _name.erase(0u,1u);
-        }
-
-        if ( _name.empty() )
-        {
-            _name  = "param_";
-            _name += Unique_4_Hex_Chars();
-
-            _original += _name;
-        }
-    }
-
-    string_view Name(void) const
-    {
-        return _name;
-    }
-
-    string_view Full(void) const
-    {
-        return _original;
-    }
-};
-
 class Function_Signature {
-
 protected:
+
+    class Parameter {
+    protected:
+
+        string _original;
+        string _name;  // REVISIT FIX - Maybe see about a string_view here
+
+    public:
+
+        explicit Parameter(string_view const arg) : _original(arg)
+        {
+            if ( _original.empty() ) throw runtime_error("Function parameter shouldn't be blank here");
+
+            _name = _original;
+
+            while ( false == _name.empty() && false == Is_Entire_String_Valid_Identifier(_name) )
+            {
+                //_name.remove_prefix(1u);
+                _name.erase(0u,1u);
+            }
+
+            if ( _name.empty() )
+            {
+                _name  = "param_";
+                _name += Unique_3_Hex_Chars().c;
+
+                _original += ' ';
+                _original += _name;
+            }
+        }
+
+        string_view Name(void) const
+        {
+            return _name;
+        }
+
+        string_view Full(void) const
+        {
+            return _original;
+        }
+    };
 
     string _original;
     string_view _name;
     std::unordered_map<size_t,size_t> _found_decltypes;
-    list<Function_Parameter> _params;
+    list<Parameter> _params;
 
     void Find_All_Decltypes(string_view const s)
     {
@@ -470,8 +472,6 @@ protected:
             _found_decltypes[index] = i;
         }
     }
-
-public:
 
     string_view Full_Param_List(void) const
     {
@@ -502,7 +502,7 @@ public:
         return string_view(s.cbegin() + index, s.cbegin() + i);
     }
 
-    list<Function_Parameter> Params(void)
+    void ProcessParams(void)
     {
         _params.clear();
 
@@ -513,59 +513,17 @@ public:
 
         for ( ; iter != svregex_top_level_token_iterator(); ++iter )
         {
-            if ( "void" ==  *iter || "" == *iter ) return _params;  // REVISIT FIX - watch out for whitespace
+            if ( "void" ==  *iter || "" == *iter ) return;  // REVISIT FIX - watch out for whitespace
 
             _params.emplace_back( string_view(iter->first, iter->second) );
 
             //cout << "  Parameter Name: " << _params.back().Name() << endl;
         }
-
-        return _params;
     }
 
-    void Original_Function_Signature_Renamed(ostream &os) const
-    {
-        os << string_view( _original.cbegin().base(), _name.cend() );
+public:
 
-        os << "____WITHOUT_CONTINUITY";
-
-        os << string_view( _name.cend(), _original.cend().base() );
-    }
-
-    void Invocation_Of_Original_Function(ostream &os) const
-    {
-        os << _name << "____WITHOUT_CONTINUITY(";
-
-        for ( auto const &e : _params )
-        {
-            os << e.Name();
-
-            if ( &e != &_params.back() )
-            {
-                os << ", ";
-            }
-        }
-
-        os << ")";
-    }
-
-    void Signature_Of_Replacement_Function(ostream &os) const
-    {
-        os << string_view( _original.cbegin().base(), _name.cend() );
-
-        os << '(';
-
-        for ( auto &e : _params )
-        {
-            os << e.Full();
-
-            if ( &e != &_params.back() ) os << ", ";
-        }
-
-        os << string_view( Full_Param_List().cend(), _original.cend().base() );
-    }
-
-    Function_Signature(string_view const arg) : _original(arg)
+    explicit Function_Signature(string_view const arg) : _original(arg)
     {
         string without_keywords{ _original };
 
@@ -636,6 +594,50 @@ public:
         }
 
         if ( _name.empty() ) throw runtime_error("Couldn't determine name of function");
+
+        ProcessParams();
+    }
+
+    void Original_Function_Signature_Renamed(ostream &os) const
+    {
+        os << string_view( _original.cbegin().base(), _name.cend() );
+
+        os << "____WITHOUT_CONTINUITY";
+
+        os << string_view( _name.cend(), _original.cend().base() );
+    }
+
+    void Signature_Of_Replacement_Function(ostream &os) const
+    {
+        os << string_view( _original.cbegin().base(), _name.cend() );
+
+        os << '(';
+
+        for ( auto &e : _params )
+        {
+            os << e.Full();
+
+            if ( &e != &_params.back() ) os << ", ";
+        }
+
+        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+    }
+
+    void Invocation_Of_Original_Function(ostream &os) const
+    {
+        os << _name << "____WITHOUT_CONTINUITY(";
+
+        for ( auto const &e : _params )
+        {
+            os << e.Name();
+
+            if ( &e != &_params.back() )
+            {
+                os << ", ";
+            }
+        }
+
+        os << ")";
     }
 
     string_view Name(void) const
@@ -702,27 +704,7 @@ int main(void)
         Function_Signature fsig(e);
 
         cout << i << ": Address of Method : &MyClass::" << fsig.Name() << endl;
-
         cout << i << ": Original Signature Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
-
-        list<Function_Parameter> const &params = fsig.Params();
-
-#if 0
-        if ( 0u != params.size() )
-        {
-            cout << i << ": Quantity of Params: " << params.size() << endl;
-
-            for ( auto const &f : params )
-            {
-                cout << "                       " << f.Name() << endl;
-            }
-        }
-        else
-        {
-            cout << i << ": No params" << endl;
-        }
-#endif
-
         cout << i << ": Signature of replacement method : "; fsig.Signature_Of_Replacement_Function(cout); cout << endl;
         cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
     }

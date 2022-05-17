@@ -607,20 +607,20 @@ public:
         os << string_view( _name.cend(), _original.cend().base() );
     }
 
-    void Signature_Of_Replacement_Function(ostream &os) const
+    void Append_Signature_Of_Replacement_Function(string &s) const
     {
-        os << string_view( _original.cbegin().base(), _name.cend() );
+        s += string_view( _original.cbegin().base(), _name.cend() );
 
-        os << '(';
+        s += '(';
 
         for ( auto &e : _params )
         {
-            os << e.Full();
+            s += e.Full();
 
-            if ( &e != &_params.back() ) os << ", ";
+            if ( &e != &_params.back() ) s += ", ";
         }
 
-        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+        s += string_view( Full_Param_List().cend(), _original.cend().base() );
     }
 
     void Invocation_Of_Original_Function(ostream &os) const
@@ -710,7 +710,9 @@ int main(void)
 
         cout << i << ": Address of Method : &MyClass::" << fsig.Name() << endl;
         cout << i << ": Original Signature Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
-        cout << i << ": Signature of replacement method : "; fsig.Signature_Of_Replacement_Function(cout); cout << endl;
+        string str;
+        fsig.Append_Signature_Of_Replacement_Function(str);
+        cout << i << ": Signature of replacement method : " << str << endl;
         cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
     }
 }

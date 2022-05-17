@@ -7,7 +7,7 @@
 */
 
 // =================================================================
-// Section 1 of 7 : Override global 'new' and 'delete' for max speed
+// Section 1 of 8 : Override global 'new' and 'delete' for max speed
 // =================================================================
 
 decltype(sizeof(1)) g_total_allocation = 0u;
@@ -69,8 +69,94 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 
 #endif // if override global 'new' and 'delete' for max speed is enabled
 
+// ==========================================================================
+// Section 2 of 8 : Implementation of container type : FIFO map
+// ==========================================================================
+
+#include <list>       // list
+#include <utility>    // pair
+#include <algorithm>  // find
+#include <stdexcept>  // out_of_range
+
+template <class T_key_type, class T_mapped_type>
+class fifo_map {
+public:
+
+    typedef T_key_type    key_type   ;
+    typedef T_mapped_type mapped_type;
+
+protected:
+
+    typedef std::pair<key_type,mapped_type> BasicPairType;
+
+    struct PairType : BasicPairType {
+
+        typedef BasicPairType Base;
+
+        PairType(void) : Base() {}
+
+        PairType(key_type const &k) : Base(k, mapped_type()) {}
+
+        template<class T>
+        PairType(key_type const &k, T const &m) : Base(k,m) {}
+
+        bool operator==(key_type const &rhs) const
+        {
+            return this->first == rhs;  // We don't compare the second
+        }
+    };
+
+    typedef PairType value_type;
+
+    std::list<PairType> data;
+
+public:
+
+    mapped_type &operator[](key_type const &k)
+    {
+        typename decltype(data)::iterator iter = std::find( data.begin(), data.end(), k );
+
+        if ( iter != data.end() ) return iter->second;
+
+        data.emplace_back(k);
+
+        return data.back().second;
+    }
+
+    mapped_type const &at(key_type const &k) const
+    {
+        typename decltype(data)::const_iterator iter = std::find( data.cbegin(), data.cend(), k );
+
+        if ( iter == data.end() ) throw std::out_of_range("blah blah");
+
+        return iter->second;
+    }
+
+    mapped_type &at(key_type const &k)
+    {
+        return const_cast<mapped_type&>( const_cast<fifo_map const *>(this)->at(k) );
+    }
+
+    template<class T>
+    void emplace(key_type const &k, T const &m)
+    {
+        data.emplace_back(k,m);
+    }
+
+    std::size_t const size(void) const { return data.size(); }
+
+    typename decltype(data)::const_iterator cbegin(void) const { return data.cbegin(); }
+    typename decltype(data)::const_iterator cend  (void) const { return data.cend  (); }
+
+    typename decltype(data)::const_iterator begin(void) const { return data.cbegin(); }
+    typename decltype(data)::const_iterator end  (void) const { return data.cend  (); }
+
+    typename decltype(data)::iterator begin(void) { return data.begin(); }
+    typename decltype(data)::iterator end  (void) { return data.end  (); }
+};
+
 // =========================================================================
-// Section 2 of 7 : Include standard header files, and define global objects
+// Section 3 of 8 : Include standard header files, and define global objects
 // =========================================================================
 
 bool constexpr verbose = false;
@@ -146,7 +232,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 3 of 7 : regex_top_level_token_iterator
+// Section 4 of 8 : regex_top_level_token_iterator
 // ==========================================================================
 
 template<
@@ -413,7 +499,7 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 4 of 7 : Process keywords and identifiers
+// Section 5 of 8 : Process keywords and identifiers
 // ==========================================================================
 
 inline bool Is_Valid_Identifier_Char(char const c)
@@ -542,7 +628,7 @@ void Find_And_Erase_All_Keywords(string &s)
 }
 
 // ==========================================================================
-// Section 5 of 7 : Parse function signatures
+// Section 6 of 8 : Parse function signatures
 // ==========================================================================
 
 class Function_Signature {
@@ -1110,7 +1196,7 @@ struct Method_Info {
 std::unordered_map< string, std::map<size_t, Method_Info> > g_func_alterations_all;
 
 // ==========================================================================
-// Section 6 of 7 : Generate the auxillary code needed for Continuity Methods
+// Section 7 of 8 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname)
@@ -1241,7 +1327,7 @@ void Print_Helper_Classes_For_Class(string classname)
 }
 
 // =============================================================
-// Section 7 of 7 : Parse all the class definitions in the input
+// Section 8 of 8 : Parse all the class definitions in the input
 // =============================================================
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)

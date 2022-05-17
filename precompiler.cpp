@@ -82,14 +82,14 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cstring>        // memset, memcpy
 #include <cstdio>         // freopen, stdin
 #include <iostream>       // cout, clog, endl
-#include <algorithm>      // copy, replace, count
+#include <algorithm>      // copy, replace, count, all_of, any_of
 #include <iterator>       // next, distance, back_inserter, istream_iterator, iterator_traits
 #include <string>         // string, to_string
 #include <ios>            // ios::binary
 #include <iomanip>        // noskipws
 #include <stdexcept>      // out_of_range, runtime_error
 #include <utility>        // pair<>
-#include <cctype>         // isspace
+#include <cctype>         // isspace, isalpha, isdigit
 #include <list>           // list
 #include <map>            // map
 #include <unordered_map>  // unordered_map
@@ -103,6 +103,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <exception>      // exception
 #include <chrono>         // duration_cast, milliseconds, steady_clock
 #include <sstream>        // ostringstream
+#include <atomic>         // atomic<>
 
 #include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
 #include <boost/algorithm/string/replace.hpp>   // replace_all
@@ -407,7 +408,137 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 4 of 8 : Generate the auxillary code needed for Continuity Methods
+// Section 4 of 8 : Process keywords and identifiers
+// ==========================================================================
+
+inline bool Is_Valid_Identifier_Char(char const c)
+{
+    return std::isalpha(static_cast<char unsigned>(c)) || std::isdigit(static_cast<char unsigned>(c)) || ('_' == c);
+}
+
+inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
+{
+    assert( false == sv.empty() );
+
+    if ( std::isalpha(static_cast<char unsigned>(sv.front())) || ('_' == sv.front()) )  // First character can't be a digit
+    {
+        return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
+    }
+    else
+    {
+        return false;
+    }
+}
+
+struct ShortStr {
+    char c[4u];
+};
+
+inline short unsigned Unique_12_Bit(void)
+{
+    static std::atomic<short unsigned> retval = -1;
+
+    return ++retval;
+}
+
+inline ShortStr Unique_3_Hex_Chars(void)
+{
+    ShortStr str;
+
+    short unsigned const x = Unique_12_Bit();
+
+    static char const alphabet[] = "0123456789abcdef";
+
+    for ( unsigned i = 0u; i != 3u; ++i )
+    {
+        str.c[i] = alphabet[ (x >> (8u - 4u*i)) & 0xf ];
+    }
+
+    str.c[3u] = '\0';
+
+    return str;
+}
+
+char const *const g_strs_keywords[] = {
+    "alignas", "alignof", "and", "and_eq", "asm", "atomic_cancel",
+    "atomic_commit", "atomic_noexcept", "auto", "bitand", "bitor",
+    "bool", "break", "case", "catch", "char", "char8_t", "char16_t",
+    "char32_t", "class", "compl", "concept", "const", "consteval",
+    "constexpr", "constinit", "const_cast", "continue", "co_await",
+    "co_return", "co_yield", "decltype", "default", "delete", "do",
+    "double", "dynamic_cast", "else", "enum", "explicit", "export",
+    "extern", "false", "float", "for", "friend", "goto", "if", "inline",
+    "int", "long", "mutable", "namespace", "new", "noexcept", "not",
+    "not_eq", "nullptr", "operator", "or", "or_eq", "private",
+    "protected", "public", "reflexpr", "register", "reinterpret_cast",
+    "requires", "return", "short", "signed", "sizeof", "static",
+    "static_assert", "static_cast", "struct", "switch", "synchronized",
+    "template", "this", "thread_local", "throw", "true", "try",
+    "typedef", "typeid", "typename", "union", "unsigned", "using",
+    "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+};
+
+void Find_And_Erase_All_Keywords(string &s)
+{
+    for ( auto const &e : g_strs_keywords )
+    {
+        for ( size_t i = 0u; i < s.size(); ++i )
+        {
+            i = s.find(e, i);  // e.g. find the word "volatile"
+
+            if ( -1 == i ) break;
+
+            //cout << "Found keyword: " << e << endl;
+
+            size_t const one_past_last = i + strlen(e);
+
+            if ( (one_past_last < s.size()) && Is_Valid_Identifier_Char(s[one_past_last]) )
+            {
+                //cout << "disregarding" << endl;
+                continue;
+            }
+
+            if (     (0u != i)       && Is_Valid_Identifier_Char(s[i-1u]) )
+            {
+                //cout << "disregarding" << endl;
+                continue;
+            }
+
+            //cout << "= = = = ERASING = = = =" << endl;
+
+            s.erase(i,one_past_last - i);
+
+            --i;  // Because it will be incremented automatically
+
+#if 0
+            // Now if there is "\(.*\)" then delete it too
+
+            while ( i < s.size() && std::isspace(s[i]) ) ++i;
+
+            if ( i >= s.size() || '(' != s[i] ) { --i; continue; }
+
+            size_t count = 1u;
+            for ( size_t j = i + 1u; j != s.size(); ++j )
+            {
+                if      ( ')' == s[j] ) --count;
+                else if ( '(' == s[j] ) ++count;
+
+                if ( 0u == count )
+                {
+                    s.erase(i, j - i);
+                    break;
+                }
+            }
+
+            if ( 0u != count ) throw runtime_error("unmatched parentheses after a keyword");
+#endif
+        }
+    }
+}
+
+
+// ==========================================================================
+// Section 5 of 8 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname, list<string> const &func_signatures)
@@ -525,7 +656,7 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 }
 
 // =============================================================
-// Section 5 of 8 : Parse all the class definitions in the input
+// Section 6 of 8 : Parse all the class definitions in the input
 // =============================================================
 
 string g_intact;

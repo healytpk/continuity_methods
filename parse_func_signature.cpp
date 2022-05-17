@@ -441,7 +441,7 @@ protected:
         }
     };
 
-    string _original;
+    string const _original;
     string_view _name;
     std::unordered_map<size_t,size_t> _found_decltypes;
     list<Parameter> _params;
@@ -643,6 +643,11 @@ public:
     string_view Name(void) const
     {
         return _name;
+    }
+
+    string_view Original(void) const
+    {
+        return _original;
     }
 };
 

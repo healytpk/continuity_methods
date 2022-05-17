@@ -791,7 +791,39 @@ public:
     }
 
     template<class T>
-    void Invocation_Of_Original_Function(T &os) const
+    void Invocation(T &os) const
+    {
+        os << _name << "(";
+
+        for ( auto const &e : _params )
+        {
+            os << e.Name();
+
+            if ( &e != &_params.back() )
+            {
+                os << ", ";
+            }
+        }
+
+        os << ")";
+    }
+
+    template<class T>
+    void Invocation____WITH_VOID_POINTER_THIS(T &os, string_view const param_name = "arg_this") const
+    {
+        os << _name << "(" << param_name;
+
+        for ( auto const &e : _params )
+        {
+            os << ", ";
+            os << e.Name();
+        }
+
+        os << ")";
+    }
+
+    template<class T>
+    void Invocation____WITHOUT_CONTINUITY(T &os) const
     {
         os << _name << "____WITHOUT_CONTINUITY(";
 
@@ -820,25 +852,283 @@ public:
 };
 
 // ==========================================================================
+// Curly Bracket Manager
+// ==========================================================================
+
+string g_intact;
+
+inline void ThrowIfBadIndex(size_t const char_index)
+{
+    if ( char_index >= g_intact.size() )
+        throw runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");
+}
+
+inline size_t LastChar(void) { return g_intact.size() - 1u; }
+
+inline size_t Lines(void) { return std::count( g_intact.begin(), g_intact.end(), '\n' ); }
+
+inline size_t LineOf(size_t const char_index)
+{
+    ThrowIfBadIndex(char_index);
+
+    return std::count( g_intact.begin(), std::next(g_intact.begin(), char_index), '\n' );
+}
+
+inline size_t StartLine(size_t char_index)
+{
+    ThrowIfBadIndex(char_index);
+
+    while ( (0u != char_index) && ('\n' != g_intact[char_index]) )
+    {
+        --char_index;
+    }
+
+    return char_index;
+}
+
+inline size_t EndLine(size_t char_index)
+{
+    ThrowIfBadIndex(char_index);
+
+    while ( (LastChar() != char_index) && ('\n' != g_intact[char_index]) )
+    {
+        ++char_index;
+    }
+
+    return char_index;
+}
+
+string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
+{
+    ThrowIfBadIndex(char_index);
+
+    if ( 0u == char_index ) return {};
+
+    if ( '{' != g_intact[char_index] ) throw runtime_error("This isn't an open curly bracket!");
+
+    size_t i = char_index;
+
+    while ( --i )
+    {
+        bool break_out_of_loop = false;
+
+        switch ( g_intact[i] )
+        {
+        case '}':
+        case '{':
+        case ';':     // REVISIT FIX - What if we have "for (int i = 0; i != -1; ++i) { . . . }"
+        //case '(':
+        //case ')':
+        //case '<':
+        //case '>':
+
+            break_out_of_loop = true;
+            break;
+
+        default:
+
+            continue;
+        }
+
+        if ( break_out_of_loop ) break;
+    }
+
+    string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
+
+    retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
+
+    boost::algorithm::replace_all(retval, "::", "mOnKeY");
+    boost::algorithm::replace_all(retval, ":", " : ");
+    boost::algorithm::replace_all(retval, "mOnKeY", "::");
+    retval = regex_replace(retval, regex("\\s"), " ");
+
+    boost::algorithm::trim_all(retval);
+
+    if ( retval.starts_with("template") ) return {};
+
+    //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
+    retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
+    retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
+    //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
+
+    return retval;
+}
+
+class CurlyBracketManager {
+public:
+
+    struct CurlyPair {
+    protected:
+
+        CurlyPair *_parent;
+        pair<size_t,size_t> _indices;
+        std::list<CurlyPair> _nested;
+
+    public:
+
+        CurlyPair(size_t const first, CurlyPair *const arg_parent)
+        {
+            _indices.first  =      first;
+            _indices.second =         -1;
+                    _parent = arg_parent;
+
+            //_nested.reserve(64u);  // We get memory corruption without this - this only applied to vector when it resized, and relocated objects (invalidating iterators)
+        }
+
+        void clear(void) { _nested.clear(); }
+
+        size_t First(void) const noexcept { return _indices.first ; }
+
+        size_t Last (void) const noexcept { return _indices.second; }
+
+        CurlyPair const *Parent(void) const;
+
+        std::list<CurlyPair> const &Nested(void) const noexcept { return _nested; }
+
+        CurlyPair *Add_New_Inner_Scope(size_t const first)
+        {
+            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
+
+            if ( (-1 != _indices.first) && (first <= _indices.first) ) throw runtime_error("Open bracket of inner scope must come after open bracket of outer scope");
+
+            _nested.emplace_back(first, this);
+
+            return &_nested.back();
+        }
+
+        CurlyPair *Close_Scope_And_Go_Back(size_t const last)
+        {
+            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
+
+            if ( nullptr ==        _parent ) throw runtime_error("The root pair is NEVER supposed to get closed");
+            if (    last <= _indices.first ) throw runtime_error("Closing backet of inner scope must come after open bracket");
+
+            _indices.second = last;
+
+            return _parent;
+        }
+    };
+
+protected:
+
+    CurlyPair _root_pair{ (size_t)-1, nullptr};
+
+    void Print_CurlyPair(CurlyPair const &cp, size_t const indentation = 0u) const
+    {
+        verbose && clog << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
+
+        string str;
+
+        extern tuple< string,string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
+
+        if ( false == only_print_numbers )
+        {
+            str = std::get<1u>(Intro_For_Curly_Pair(cp));
+        }
+
+        if ( false == str.empty() || print_all_scopes )
+        {
+            for ( size_t i = 0u; i != indentation; ++i )
+            {
+                clog << "    ";
+            }
+
+            clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
+
+            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
+
+            if ( false == only_print_numbers )
+            {
+                extern string GetNames(CurlyBracketManager::CurlyPair const &);
+
+                //clog << "    " << GetNames(cp);
+
+                clog << "  [" << GetNames(cp) << "]";
+            }
+
+            clog << endl;
+        }
+
+        for ( CurlyPair const &e : cp.Nested() )
+        {
+            verbose && clog << "    - - - About to recurse" << endl;
+            Print_CurlyPair(e, indentation + 1u);
+        }
+    }
+
+public:
+
+    struct ParentError : std::exception { };
+
+    void Process(void)
+    {
+        verbose && clog << "========= STARTING PROCESSING ===========" << endl;
+
+        _root_pair.clear();
+
+        CurlyPair *current = &_root_pair;
+
+        for ( size_t i = 0u; i != g_intact.size(); ++i )
+        {
+            char const c = g_intact[i];
+
+            if ( '{' == c )
+            {
+                current = current->Add_New_Inner_Scope(i);
+            }
+            else if ( '}' == c )
+            {
+                current = current->Close_Scope_And_Go_Back(i);
+            }
+        }
+
+        verbose && clog << "========= ENDING PROCESSING ===========" << endl;
+    }
+
+    void Print(void) const
+    {
+        for ( CurlyPair const &e : _root_pair.Nested() )
+        {
+            verbose && clog << "    - - - About to recurse" << endl;
+            Print_CurlyPair(e);
+        }
+    }
+
+} g_curly_manager;
+
+struct Method_Info {
+    string::const_iterator iter_first_char;
+    Function_Signature fsig;
+    CurlyBracketManager::CurlyPair const *p_body;
+    ostringstream replacement_body;
+
+    Method_Info(string_view const sv) : fsig(sv) {}
+
+    Method_Info(void) : fsig("int Dummy(int)") {}
+};
+
+std::unordered_map< string, std::map<size_t, Method_Info> > g_func_alterations_all;
+
+// ==========================================================================
 // Section 6 of 7 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
-void Print_Helper_Classes_For_Class(string classname, list<string> const &func_signatures)
+void Print_Helper_Classes_For_Class(string classname)
 {
     cout << "// ==========================================================================\n"
             "// Helper classes for continuity methods within class " << classname << "\n"
             "// ==========================================================================\n\n";
+
+    std::map<size_t, Method_Info> const &g_func_alterations = g_func_alterations_all.at(classname);
 
     boost::replace_all(classname, "::", "_scope_");
 
     cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
 
     cout << "namespace Testers {\n";
-    for ( auto const &method : func_signatures )
+    for ( auto const &e : g_func_alterations )
     {
-        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
-
-        string const tmp1 = regex_replace(method, my_regex, "$2");
+        string_view const tmp1 = e.second.fsig.Name();
 
         cout << "    template<class U, class = decltype(&U::" << tmp1 << "____WITHOUT_CONTINUITY)>\n"
              << "    struct " << tmp1 << "____WITHOUT_CONTINUITY {};\n\n";
@@ -855,13 +1145,13 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     "    // All methods have one extra\n"
     "    // parameter for 'this' as 'void*'\n";
 
-    for ( auto const &method : func_signatures )
+    for ( auto const &e : g_func_alterations )
     {
-        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+        cout << "    virtual ";
 
-        string const tmp1 = regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
+        e.second.fsig.Signature_Of_Replacement_Function____With_Void_Pointer_This(cout);
 
-        cout << "    virtual " << tmp1 << " = 0;\n";
+         cout << " = 0;\n";
     }
 
     cout <<
@@ -878,24 +1168,33 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     "        // All methods have one extra\n"
     "        // parameter for 'this' as 'void*'\n";
 
-    for ( auto const &method : func_signatures )
+    for ( auto const &e : g_func_alterations )
     {
-        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
+        string_view const name = e.second.fsig.Name();
 
-        string const tmp1 = regex_replace(method, my_regex, "$1 $2(void *const arg_this,$3)");
-        string const tmp2 = regex_replace(method, my_regex, "$2");
+        cout << "        ";
 
-        cout << "        " << tmp1 << " override\n" <<
+        e.second.fsig.Signature_Of_Replacement_Function____With_Void_Pointer_This(cout);
+
+        cout << " override\n" <<
                 "        {\n"
                 "            Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
-                "            if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << "____WITHOUT_CONTINUITY>::value )\n"
+                "            if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << "____WITHOUT_CONTINUITY>::value )\n"
                 "            {\n"
-                "                return p->Base::Set_Int____WITHOUT_CONTINUITY(arg);\n"
+                "                return p->Base::";
+
+        e.second.fsig.Invocation____WITHOUT_CONTINUITY(cout);
+
+        cout << ";\n"
                 "            }\n"
-                "            else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << tmp2 << ">::value )\n"
+                "            else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << ">::value )\n"
                 "            {\n"
-                "                return p->Base::Set_Int(arg);\n"
+                "                return p->Base::";
+
+        e.second.fsig.Invocation(cout);
+
+        cout << ";\n"
                 "            }\n"
                 "            else\n"
                 "            {\n"
@@ -919,16 +1218,20 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
     "    Invoker(IMethodInvoker &arg_mi, void *const arg_this)\n"
     "      : _mi(arg_mi), _this(arg_this) {}\n\n";
 
-    for ( auto const &method : func_signatures )
+    for ( auto const &e : g_func_alterations )
     {
-        regex const my_regex("(.+?) (.+?)\\((.*)\\)");
-
-        string const just_the_name = regex_replace(method, my_regex, "$2");
-
         cout << "    // The extra 'this' parameter is no longer needed\n"
-             << "    " << method << " // not virtual\n"
+             << "    ";
+
+        e.second.fsig.Signature_Of_Replacement_Function(cout);
+
+        cout << " // not virtual\n"
              << "    {\n"
-             << "        return _mi." << just_the_name << "(_this, arg);\n"
+             << "        return _mi.";
+
+        e.second.fsig.Invocation____WITH_VOID_POINTER_THIS(cout, "_this");
+
+        cout << ";\n"
              << "    }\n\n";
     }
 
@@ -940,8 +1243,6 @@ void Print_Helper_Classes_For_Class(string classname, list<string> const &func_s
 // =============================================================
 // Section 7 of 7 : Parse all the class definitions in the input
 // =============================================================
-
-string g_intact;
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)
 {
@@ -1077,246 +1378,6 @@ void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
         clog << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
     }
 }
-
-inline void ThrowIfBadIndex(size_t const char_index)
-{
-    if ( char_index >= g_intact.size() )
-        throw runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");
-}
-
-inline size_t LastChar(void) { return g_intact.size() - 1u; }
-
-inline size_t Lines(void) { return std::count( g_intact.begin(), g_intact.end(), '\n' ); }
-
-inline size_t LineOf(size_t const char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    return std::count( g_intact.begin(), std::next(g_intact.begin(), char_index), '\n' );
-}
-
-inline size_t StartLine(size_t char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    while ( (0u != char_index) && ('\n' != g_intact[char_index]) )
-    {
-        --char_index;
-    }
-    
-    return char_index;
-}
-
-inline size_t EndLine(size_t char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    while ( (LastChar() != char_index) && ('\n' != g_intact[char_index]) )
-    {
-        ++char_index;
-    }
-    
-    return char_index;
-}
-
-string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
-{
-    ThrowIfBadIndex(char_index);
-
-    if ( 0u == char_index ) return {};
-
-    if ( '{' != g_intact[char_index] ) throw runtime_error("This isn't an open curly bracket!");
-
-    size_t i = char_index;
-
-    while ( --i )
-    {
-        bool break_out_of_loop = false;
-
-        switch ( g_intact[i] )
-        {
-        case '}':
-        case '{':
-        case ';':     // REVISIT FIX - What if we have "for (int i = 0; i != -1; ++i) { . . . }"
-        //case '(':
-        //case ')':
-        //case '<':
-        //case '>':
-
-            break_out_of_loop = true;
-            break;
-
-        default:
-
-            continue;
-        }
-
-        if ( break_out_of_loop ) break;
-    }
-
-    string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
-
-    retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
-
-    boost::algorithm::replace_all(retval, "::", "mOnKeY");
-    boost::algorithm::replace_all(retval, ":", " : ");
-    boost::algorithm::replace_all(retval, "mOnKeY", "::");
-    retval = regex_replace(retval, regex("\\s"), " ");
-
-    boost::algorithm::trim_all(retval);
-
-    if ( retval.starts_with("template") ) return {};
-
-    //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
-    retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
-    retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
-    //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
-
-    return retval;
-}
-
-class CurlyBracketManager {
-public:
-
-    struct CurlyPair {
-    protected:
-
-        CurlyPair *_parent;
-        pair<size_t,size_t> _indices;
-        std::list<CurlyPair> _nested;
-
-    public:
-
-        CurlyPair(size_t const first, CurlyPair *const arg_parent)
-        {
-            _indices.first  =      first;
-            _indices.second =         -1;
-                    _parent = arg_parent;
-
-            //_nested.reserve(64u);  // We get memory corruption without this - this only applied to vector when it resized, and relocated objects (invalidating iterators)
-        }
-
-        void clear(void) { _nested.clear(); }
-        
-        size_t First(void) const noexcept { return _indices.first ; }
-
-        size_t Last (void) const noexcept { return _indices.second; }
-
-        CurlyPair const *Parent(void) const;
-        
-        std::list<CurlyPair> const &Nested(void) const noexcept { return _nested; }
-
-        CurlyPair *Add_New_Inner_Scope(size_t const first)
-        {
-            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
-
-            if ( (-1 != _indices.first) && (first <= _indices.first) ) throw runtime_error("Open bracket of inner scope must come after open bracket of outer scope");
-
-            _nested.emplace_back(first, this);
-
-            return &_nested.back();
-        }
-        
-        CurlyPair *Close_Scope_And_Go_Back(size_t const last)
-        {
-            if ( nullptr == this ) throw runtime_error("The 'this' pointer in this method is a nullptr!");
-
-            if ( nullptr ==        _parent ) throw runtime_error("The root pair is NEVER supposed to get closed");
-            if (    last <= _indices.first ) throw runtime_error("Closing backet of inner scope must come after open bracket");
-
-            _indices.second = last;
-
-            return _parent;
-        }
-    };
-
-protected:
-
-    CurlyPair _root_pair{ (size_t)-1, nullptr};
-
-    void Print_CurlyPair(CurlyPair const &cp, size_t const indentation = 0u) const
-    {
-        verbose && clog << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
-
-        string str;
-
-        extern tuple< string,string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBracketManager::CurlyPair const &cp);
-
-        if ( false == only_print_numbers )
-        {
-            str = std::get<1u>(Intro_For_Curly_Pair(cp));
-        }
-
-        if ( false == str.empty() || print_all_scopes )
-        {
-            for ( size_t i = 0u; i != indentation; ++i )
-            {
-                clog << "    ";
-            }
-
-            clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
-
-            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
-
-            if ( false == only_print_numbers )
-            {
-                extern string GetNames(CurlyBracketManager::CurlyPair const &);
-
-                //clog << "    " << GetNames(cp);
-
-                clog << "  [" << GetNames(cp) << "]";
-            }
-
-            clog << endl;
-        }
-
-        for ( CurlyPair const &e : cp.Nested() )
-        {
-            verbose && clog << "    - - - About to recurse" << endl;
-            Print_CurlyPair(e, indentation + 1u);
-        }
-    }
-
-public:
-
-    struct ParentError : std::exception { };
-
-    void Process(void)
-    {
-        verbose && clog << "========= STARTING PROCESSING ===========" << endl;
-
-        _root_pair.clear();
-
-        CurlyPair *current = &_root_pair;
-
-        for ( size_t i = 0u; i != g_intact.size(); ++i )
-        {
-            char const c = g_intact[i];
-
-            if ( '{' == c )
-            {
-                current = current->Add_New_Inner_Scope(i);
-            }
-            else if ( '}' == c )
-            {
-                current = current->Close_Scope_And_Go_Back(i);
-            }
-        }
-
-        verbose && clog << "========= ENDING PROCESSING ===========" << endl;
-    }
-    
-    
-    void Print(void) const
-    {
-        for ( CurlyPair const &e : _root_pair.Nested() )
-        {
-            verbose && clog << "    - - - About to recurse" << endl;
-            Print_CurlyPair(e);
-        }
-    }
-
-} g_curly_manager;
 
 CurlyBracketManager::CurlyPair const *CurlyBracketManager::CurlyPair::Parent(void) const
 {
@@ -1883,19 +1944,6 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 // second.first  == CurlyPair const *
 // second.second == entire text of new function
 
-struct Method_Info {
-    string::const_iterator iter_first_char;
-    Function_Signature fsig;
-    CurlyBracketManager::CurlyPair const *p_body;
-    ostringstream replacement_body;
-
-    Method_Info(string_view const sv) : fsig(sv) {}
-
-    Method_Info(void) : fsig("int Dummy(int)") {}
-};
-
-std::map<size_t, Method_Info> g_func_alterations;
-
 CurlyBracketManager::CurlyPair const &Find_Curly_Pair_For_Function_Body_In_Class(CurlyBracketManager::CurlyPair const &parent, size_t const index)
 {
     for ( auto const &e : parent.Nested() )
@@ -2010,7 +2058,7 @@ public:
     }
 };
 
-bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last, list<string> &list_methods)
+bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last)
 {
     using Indent   = IndentedOstream::Indent;
     using Unindent = IndentedOstream::Unindent;
@@ -2029,6 +2077,8 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         retval = true;
 
+        std::map<size_t, Method_Info> &g_func_alterations = g_func_alterations_all[string(svclass)];
+
         size_t const index = ((*iter)[2u]).second - g_intact.cbegin() - 1u;  // REVISIT FIX - corner cases such as '{}'
 
         g_func_alterations.emplace( index, string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );  // create new element
@@ -2036,8 +2086,6 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         g_func_alterations[index].iter_first_char = (*iter)[0u].first;
 
         //g_func_alterations[index].fsig = Function_Signature(string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")");
-
-        list_methods.push_back( string(g_func_alterations[index].fsig.Original()) );
 
         // The loop on the next line replaces "continue" with "        "
         for ( char *p = const_cast<char*>(&*(((*iter)[4u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
@@ -2095,8 +2143,18 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         s << "for ( auto &e : methods )\n"
              "{\n"
-             "    e.Set_Int(arg);\n"
+             "    e.";
+
+        g_func_alterations[index].fsig.Invocation(s);
+
+        s << ";\n"
              "}\n\n";
+
+        s << "this->";
+
+        g_func_alterations[index].fsig.Invocation____WITHOUT_CONTINUITY(s);
+
+        s << ";\n";
 
         s << Unindent();
 
@@ -2152,25 +2210,27 @@ void Print_Final_Output(void)
     Replace_All_Preprocessor_Directives_With_Spaces(true);
 
     size_t i = 0u;
-
-    for ( auto const &e : g_func_alterations )
+    for ( auto const &ee : g_func_alterations_all )
     {
-        Method_Info const &mi = e.second;
-        Function_Signature const &fs = mi.fsig;
+        for ( auto const &e : ee.second )
+        {
+            Method_Info const &mi = e.second;
+            Function_Signature const &fs = mi.fsig;
 
-        cout << string_view( g_intact.cbegin() + i, mi.iter_first_char );
+            cout << string_view( g_intact.cbegin() + i, mi.iter_first_char );
 
-        fs.Original_Function_Signature_Renamed(cout);
+            fs.Original_Function_Signature_Renamed(cout);
 
-        cout << string_view( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
-             << endl
-             << endl;
+            cout << string_view( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
+                 << endl
+                 << endl;
 
-        cout << mi.replacement_body.str() << endl
-             << endl
-             << endl;
+            cout << mi.replacement_body.str() << endl
+                 << endl
+                 << endl;
 
-        i = mi.p_body->Last() + 1u;
+            i = mi.p_body->Last() + 1u;
+        }
     }
 
     cout << string_view( g_intact.cbegin() + i, g_intact.cend() );
@@ -2331,17 +2391,15 @@ int main(int const argc, char **const argv)
     {
         for ( CurlyBracketManager::CurlyPair const *const  &p_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
         {
-            list<string> list_of_methods;
-
             list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*p_curly_pair_pointer);
 
             for ( auto const my_pair : my_list )
             {
-                if ( Find_All_Methods_Marked_Continue_In_Class(e.first, *p_curly_pair_pointer, my_pair.first, my_pair.second, list_of_methods) )
+                if ( Find_All_Methods_Marked_Continue_In_Class(e.first, *p_curly_pair_pointer, my_pair.first, my_pair.second) )
                 {
                     clog << e.first << endl << endl;
 
-                    Print_Helper_Classes_For_Class(e.first, list_of_methods);
+                    Print_Helper_Classes_For_Class(e.first);
                 }
             }
         }

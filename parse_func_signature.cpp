@@ -626,6 +626,23 @@ public:
     }
 
     template<class T>
+    void Signature_Of_Replacement_Function____With_Void_Pointer_This(T &os) const
+    {
+        os << string_view( _original.cbegin().base(), _name.cend() );
+
+        os << "(void *const arg_this";
+
+        for ( auto &e : _params )
+        {
+            os << ", ";
+
+            os << e.Full();
+        }
+
+        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+    }
+
+    template<class T>
     void Invocation_Of_Original_Function(T &os) const
     {
         os << _name << "____WITHOUT_CONTINUITY(";
@@ -715,5 +732,6 @@ int main(void)
         cout << i << ": Original Signature Renamed : "; fsig.Original_Function_Signature_Renamed(cout); cout << endl;
         cout << i << ": Signature of replacement method : "; fsig.Signature_Of_Replacement_Function(cout); cout << endl;
         cout << i << ": Invoke original renamed method : p->"; fsig.Invocation_Of_Original_Function(cout); cout << ";" << endl;
+        cout << i << ": Signature of replacement method with Void Pointer This : "; fsig.Signature_Of_Replacement_Function____With_Void_Pointer_This(cout); cout << ";" << endl;
     }
 }

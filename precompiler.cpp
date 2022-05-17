@@ -1866,7 +1866,18 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 // second.first  == CurlyPair const *
 // second.second == entire text of new function
 
-std::map<size_t, pair<CurlyBracketManager::CurlyPair const *,ostringstream> > g_func_alterations;
+struct Method_Info {
+    string::const_iterator iter_first_char;
+    Function_Signature fsig;
+    CurlyBracketManager::CurlyPair const *p_body;
+    ostringstream replacement_body;
+
+    Method_Info(string_view const sv) : fsig(sv) {}
+
+    Method_Info(void) : fsig("int Dummy(int)") {}
+};
+
+std::map<size_t, Method_Info> g_func_alterations;
 
 CurlyBracketManager::CurlyPair const &Find_Curly_Pair_For_Function_Body_In_Class(CurlyBracketManager::CurlyPair const &parent, size_t const index)
 {
@@ -2001,7 +2012,15 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         retval = true;
 
-        list_methods.push_back( string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );
+        size_t const index = ((*iter)[2u]).second - g_intact.cbegin() - 1u;  // REVISIT FIX - corner cases such as '{}'
+
+        g_func_alterations.emplace( index, string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")" );  // create new element
+
+        g_func_alterations[index].iter_first_char = (*iter)[0u].first;
+
+        //g_func_alterations[index].fsig = Function_Signature(string((*iter)[1u]) + " " + string((*iter)[2u]) + "(" + string((*iter)[3u]) + ")");
+
+        list_methods.push_back( string(g_func_alterations[index].fsig.Original()) );
 
         // The loop on the next line replaces "continue" with "        "
         for ( char *p = const_cast<char*>(&*(((*iter)[4u]).first)); p != &*(((*iter)[4u]).second); ++p )  // const_cast is fine here REVISIT FIX possible dereference null pointer
@@ -2009,12 +2028,8 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             *p = ' ';
         }
 
-        size_t const index = ((*iter)[2u]).second - g_intact.cbegin() - 1u;  // REVISIT FIX - corner cases such as '{}'
-
-        g_func_alterations[index];  // create new element
-
         CurlyBracketManager::CurlyPair const &cp_body = Find_Curly_Pair_For_Function_Body_In_Class(cp, ((*iter)[5u]).second - g_intact.cbegin());
-        g_func_alterations[index].first = &cp_body;  // REVISIT FIX - corner cases such as '{}'
+        g_func_alterations[index].p_body = &cp_body;  // REVISIT FIX - corner cases such as '{}'
 
         if ( ';' == *((*iter)[5u]).first ) throw runtime_error("Can only parse inline member functions within the class definition");
 
@@ -2025,9 +2040,13 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         string derived_replaced(svclass);
         boost::replace_all(derived_replaced, "::", "_scope_");
 
-        IndentedOstream s( std::get<1u>(g_func_alterations[index]), "    " );
+        IndentedOstream s( g_func_alterations[index].replacement_body, "    " );
 
-        s << "\n" << list_methods.back() << "\n{";
+        s << "\n";
+
+        g_func_alterations[index].fsig.Signature_Of_Replacement_Function(s);
+
+        s << "\n{";
 
         s << Indent();
 
@@ -2115,26 +2134,26 @@ void Print_Final_Output(void)
     Replace_All_String_Literals_With_Spaces(true);
     Replace_All_Preprocessor_Directives_With_Spaces(true);
 
-    size_t i = 0u, j = -1;
+    size_t i = 0u;
 
     for ( auto const &e : g_func_alterations )
     {
-        cout << string_view( g_intact.cbegin() + i, g_intact.cbegin() + e.first + 1u)
-             << "____WITHOUT_CONTINUITY";
+        Method_Info const &mi = e.second;
+        Function_Signature const &fs = mi.fsig;
 
-        string str( g_intact.cbegin() + e.first + 1u, g_intact.cbegin() + e.second.first->First() );
+        cout << string_view( g_intact.cbegin() + i, mi.iter_first_char );
 
-        boost::erase_all(str, " override");  // REVISIT FIX - could be "overrideBLAH
+        fs.Original_Function_Signature_Renamed(cout);
 
-        cout << str;
-
-        cout << string_view( g_intact.cbegin() + e.second.first->First(), g_intact.cbegin() + e.second.first->Last() + 1u )
+        cout << string_view( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
              << endl
-             << endl
-             << e.second.second.str()
              << endl;
 
-        i = e.second.first->Last() + 1u;
+        cout << mi.replacement_body.str() << endl
+             << endl
+             << endl;
+
+        i = mi.p_body->Last() + 1u;
     }
 
     cout << string_view( g_intact.cbegin() + i, g_intact.cend() );

@@ -777,14 +777,14 @@ protected:
     {
         string_view const s { _original };
 
-        char const *p = _name.cend();  // REVISIT FIX - watch out for whitespace, e.g. "int Func (void)"
+        char const *p = &*_name.cend();  // REVISIT FIX - watch out for whitespace, e.g. "int Func (void)"
 
         //cout << "------------- BAD CHAR = " << *p << "  (name = " << _name << ")" << endl;
         assert( '(' == *p );
 
         ++p;
 
-        size_t const index = p - s.cbegin();
+        size_t const index = p - &*s.cbegin();
 
         size_t count = 1u;
 
@@ -901,17 +901,17 @@ public:
     template<class T>
     void Original_Function_Signature_Renamed(T &os) const
     {
-        os << string_view( _original.cbegin().base(), _name.cend() );
+        os << string_view( &*_original.cbegin(), &*_name.cend() );
 
         os << "____WITHOUT_CONTINUITY";
 
-        os << string_view( _name.cend(), _original.cend().base() );
+        os << string_view( &*_name.cend(), &*_original.cend() );
     }
 
     template<class T>
     void Signature_Of_Replacement_Function(T &os) const
     {
-        os << string_view( _original.cbegin().base(), _name.cend() );
+        os << string_view(&*_original.cbegin(), &*_name.cend() );
 
         os << '(';
 
@@ -922,13 +922,13 @@ public:
             if ( &e != &_params.back() ) os << ", ";
         }
 
-        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+        os << string_view( &*Full_Param_List().cend(), &*_original.cend() );
     }
 
     template<class T>
     void Signature_Of_Replacement_Function____With_Void_Pointer_This(T &os) const
     {
-        os << string_view( _original.cbegin().base(), _name.cend() );
+        os << string_view(&* _original.cbegin(), &*_name.cend() );
 
         os << "(void *const arg_this";
 
@@ -939,7 +939,7 @@ public:
             os << e.Full();
         }
 
-        os << string_view( Full_Param_List().cend(), _original.cend().base() );
+        os << string_view( &*Full_Param_List().cend(), &*_original.cend() );
     }
 
     template<class T>
@@ -2438,6 +2438,11 @@ void my_terminate_handler(void)
     std::abort();
 }
 
+#   if defined(_WIN32) || defined(_WIN64)
+    extern "C" int _setmode(int fd,int mode);
+    extern "C" int _fileno(std::FILE *stream);
+#endif
+
 int main(int const argc, char **const argv)
 {
     g_timestamp_program_start = GetTickCount();
@@ -2449,8 +2454,6 @@ int main(int const argc, char **const argv)
     bool cin_is_now_in_binary_mode = false;
 
 #   if defined(_WIN32) || defined(_WIN64)
-        extern "C" int ::_setmode(int fd,int mode);
-        extern "C" int ::_fileno(std::FILE *stream);
         cin_is_now_in_binary_mode = ( /* _O_TEXT */ 0x4000 == ::_setmode( ::_fileno(stdin), /* O_BINARY */ 0x8000) );
 #   else
         cin_is_now_in_binary_mode = (nullptr != std::freopen(NULL, "rb", stdin));

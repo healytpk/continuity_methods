@@ -7,12 +7,12 @@
 */
 
 // =================================================================
-// Section 1 of 8 : Override global 'new' and 'delete' for max speed
+// Section 1 of 9 : Override global 'new' and 'delete' for max speed
 // =================================================================
 
 decltype(sizeof(1)) g_total_allocation = 0u;
 
-#if 1  // Change this line to "#if 0" in order to disable this feature
+#if 0  // Change this line to "#if 0" in order to disable this feature
 
 #include <cstddef>    // size_t
 #include <cstdlib>    // malloc
@@ -70,7 +70,78 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #endif // if override global 'new' and 'delete' for max speed is enabled
 
 // ==========================================================================
-// Section 2 of 8 : Implementation of container type : FIFO map
+// Section 2 of 9 : Implementations of functions from Boost
+// ==========================================================================
+
+#include <cassert>
+#include <cstddef>
+#include <cctype>
+#include <string>
+#include <string_view>
+
+namespace make_believe_boost { namespace algorithm {
+
+    void erase_all(std::string &s, std::string_view const sv)
+    {
+        if ( s.empty() || sv.empty() ) return;
+
+        std::size_t i = 0u;
+        while ( (s.size() != i) && (-1 != (i = s.find(sv, i))) )  // deliberate single '='
+        {
+            s.erase(i, sv.size());
+        }
+    }
+
+    void replace_all(std::string &s, std::string_view const sv_old, std::string_view const sv_new)
+    {
+        if ( s.empty() || sv_old.empty() ) return;
+
+        std::size_t i = 0u;
+        while ( (s.size() != i) && (-1 != (i = s.find(sv_old, i))) )  // deliberate single '='
+        {
+            s.erase(i, sv_old.size());
+
+            if ( false == sv_new.empty() )
+            {
+                s.insert(i, sv_new);
+                i += sv_new.size();
+            }
+        }
+    }
+
+    void trim_all(std::string &s)
+    {
+        if ( s.empty() ) return;
+
+        std::size_t i;
+        for( i = s.size() - 1u; 0u != i; --i )
+        {
+            if ( std::isspace(static_cast<char unsigned>(s[i])) )
+            {
+                s[i] = ' ';
+            }
+
+            if ( ' ' == s[i] && std::isspace(static_cast<char unsigned>(s[i - 1u])) )  // REVISIT FIX - make more efficient
+            {
+                s.erase(i, 1u);
+            }
+        }
+
+        assert(0u == i);
+
+        if ( std::isspace(static_cast<char unsigned>(s.front())) )
+        {
+            s.erase(0,1u);
+        }
+    }
+}
+
+using namespace algorithm;
+
+} // close two namespaces make_believe_boost::algorithm
+
+// ==========================================================================
+// Section 3 of 9 : Implementation of container type : FIFO map
 // ==========================================================================
 
 #include <list>       // list
@@ -156,7 +227,7 @@ public:
 };
 
 // =========================================================================
-// Section 3 of 8 : Include standard header files, and define global objects
+// Section 4 of 9 : Include standard header files, and define global objects
 // =========================================================================
 
 bool constexpr verbose = false;
@@ -189,10 +260,6 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <chrono>         // duration_cast, milliseconds, steady_clock
 #include <sstream>        // ostringstream
 #include <atomic>         // atomic<>
-
-#include <boost/algorithm/string/trim_all.hpp>  // trim_all (REVISIT FIX - doesn't strip '\n')
-#include <boost/algorithm/string/replace.hpp>   // replace_all
-#include <boost/algorithm/string/erase.hpp>     // erase_all
 
 using std::cin;
 using std::cout;
@@ -231,7 +298,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 4 of 8 : regex_top_level_token_iterator
+// Section 5 of 9 : regex_top_level_token_iterator
 // ==========================================================================
 
 template<
@@ -498,7 +565,7 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 5 of 8 : Process keywords and identifiers
+// Section 6 of 9 : Process keywords and identifiers
 // ==========================================================================
 
 inline bool Is_Valid_Identifier_Char(char const c)
@@ -627,7 +694,7 @@ void Find_And_Erase_All_Keywords(string &s)
 }
 
 // ==========================================================================
-// Section 6 of 8 : Parse function signatures
+// Section 7 of 9 : Parse function signatures
 // ==========================================================================
 
 class Function_Signature {
@@ -1022,12 +1089,12 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
 
-    boost::algorithm::replace_all(retval, "::", "mOnKeY");
-    boost::algorithm::replace_all(retval, ":", " : ");
-    boost::algorithm::replace_all(retval, "mOnKeY", "::");
+    make_believe_boost::algorithm::replace_all(retval, "::", "mOnKeY");
+    make_believe_boost::algorithm::replace_all(retval, ":", " : ");
+    make_believe_boost::algorithm::replace_all(retval, "mOnKeY", "::");
     retval = regex_replace(retval, regex("\\s"), " ");
 
-    boost::algorithm::trim_all(retval);
+    make_believe_boost::algorithm::trim_all(retval);
 
     if ( retval.starts_with("template") ) return {};
 
@@ -1195,7 +1262,7 @@ struct Method_Info {
 fifo_map< string, fifo_map<size_t, Method_Info> > g_func_alterations_all;
 
 // ==========================================================================
-// Section 7 of 8 : Generate the auxillary code needed for Continuity Methods
+// Section 8 of 9 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname)
@@ -1206,7 +1273,7 @@ void Print_Helper_Classes_For_Class(string classname)
 
     fifo_map<size_t, Method_Info> const &g_func_alterations = g_func_alterations_all.at(classname);
 
-    boost::replace_all(classname, "::", "_scope_");
+    make_believe_boost::replace_all(classname, "::", "_scope_");
 
     cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
 
@@ -1326,7 +1393,7 @@ void Print_Helper_Classes_For_Class(string classname)
 }
 
 // =============================================================
-// Section 8 of 8 : Parse all the class definitions in the input
+// Section 9 of 9 : Parse all the class definitions in the input
 // =============================================================
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)
@@ -1509,7 +1576,7 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
         {
             string word { *iter2 };
 
-            boost::trim_all(word);
+            make_believe_boost::trim_all(word);
 
             if ( "virtual" == word )
             {
@@ -1563,7 +1630,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     if (   !(intro.starts_with("class") || intro.starts_with("struct"))   ) return {};
 
-    boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
+    make_believe_boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
     regex const my_regex("\\s");
@@ -1971,10 +2038,10 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        boost::replace_all(impersonator,"\n"," ");
-        boost::replace_all(original    ,"\n"," ");
-        boost::trim_all(impersonator);
-        boost::trim_all(original    );
+        make_believe_boost::replace_all(impersonator,"\n"," ");
+        make_believe_boost::replace_all(original    ,"\n"," ");
+        make_believe_boost::trim_all(impersonator);
+        make_believe_boost::trim_all(original    );
 
         try
         {
@@ -2005,10 +2072,10 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        boost::replace_all(impersonator,"\n"," ");
-        boost::replace_all(original    ,"\n"," ");
-        boost::trim_all(impersonator);
-        boost::trim_all(original    );
+        make_believe_boost::replace_all(impersonator,"\n"," ");
+        make_believe_boost::replace_all(original    ,"\n"," ");
+        make_believe_boost::trim_all(impersonator);
+        make_believe_boost::trim_all(original    );
 
         try
         {
@@ -2188,7 +2255,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         if ( bases.empty() ) throw runtime_error("Method marked continue inside a class that has no base classes");
 
         string derived_replaced(svclass);
-        boost::replace_all(derived_replaced, "::", "_scope_");
+        make_believe_boost::replace_all(derived_replaced, "::", "_scope_");
 
         IndentedOstream s( g_func_alterations[index].replacement_body, "    " );
 
@@ -2208,7 +2275,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         {
             s << "static MethodInvokerT::MI< " << e << " > mi_";
 
-            boost::replace_all(e, "::", "_scope_");
+            make_believe_boost::replace_all(e, "::", "_scope_");
 
             s << e << ";\n";
         }
@@ -2217,7 +2284,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         s << Indent();
         for ( auto &e : bases )
         {
-            boost::replace_all(e, "::", "_scope_");
+            make_believe_boost::replace_all(e, "::", "_scope_");
 
             s << "\nInvoker(mi_" << e << ", " << "this),";
         }
@@ -2402,9 +2469,9 @@ int main(int const argc, char **const argv)
 
     std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');  // null chars will screw up functions that parse null as end of string
 
-    boost::replace_all(g_intact, "\r\n", " \n");
+    make_believe_boost::replace_all(g_intact, "\r\n", " \n");
 
-    boost::replace_all(g_intact, "\r", "\n");
+    make_believe_boost::replace_all(g_intact, "\r", "\n");
 
     Replace_All_Preprocessor_Directives_With_Spaces();
     Replace_All_String_Literals_With_Spaces();

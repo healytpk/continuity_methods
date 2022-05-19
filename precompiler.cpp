@@ -1802,7 +1802,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         return classname;
     }
 
-    if ( prefix.contains("<") || classname.contains("<") ) return {};  // Don't tolerate any templates
+    if ( -1 != prefix.find("<") || -1 != classname.find("<") ) return {};  // Don't tolerate any templates
 
     auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
@@ -2347,7 +2347,7 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
         clog << "Level " << i << ": " << string_view(str.cbegin(), iter->second);
 
-        if ( string_view(iter->first,iter->second).contains('<') )  // check if right-most is a template class
+        if ( -1 != string_view(iter->first,iter->second).find('<') )  // check if right-most is a template class
         {
             clog << "    <---- template class";
         }

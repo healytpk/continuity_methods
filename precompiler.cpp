@@ -73,13 +73,14 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 // Section 2 of 9 : Implementations of functions from Boost
 // ==========================================================================
 
-#include <cassert>
-#include <cstddef>
-#include <cctype>
-#include <string>
-#include <string_view>
+#include <cassert>     // assert
+#include <cstddef>     // size_t
+#include <cstring>     // strcmp
+#include <cctype>      // isalnum
+#include <string>      // string
+#include <string_view> // string_view
 
-namespace make_believe_boost { namespace algorithm {
+namespace StringAlgorithms {
 
     void erase_all(std::string &s, std::string_view const sv)
     {
@@ -116,29 +117,98 @@ namespace make_believe_boost { namespace algorithm {
         std::size_t i;
         for( i = s.size() - 1u; 0u != i; --i )
         {
-            if ( std::isspace(static_cast<char unsigned>(s[i])) )
+            if ( std::isspace(static_cast<char unsigned>(s[i])) )  // Replace any whitespace character with a space
             {
                 s[i] = ' ';
-            }
 
-            if ( ' ' == s[i] && std::isspace(static_cast<char unsigned>(s[i - 1u])) )  // REVISIT FIX - make more efficient
-            {
-                s.erase(i, 1u);
+                if (std::isspace(static_cast<char unsigned>(s[i - 1u])) )  // Erase space if there's a whitespace character before it
+                {
+                    s.erase(i, 1u);
+                }
             }
         }
 
-        assert(0u == i);
+        assert( 0u == i );
 
         if ( std::isspace(static_cast<char unsigned>(s.front())) )
         {
             s.erase(0,1u);
         }
     }
-}
 
-using namespace algorithm;
+    bool IsIdChar(char const c)
+    {
+        return '_' == c || std::isalnum(static_cast<char unsigned>(c));
+    }
 
-} // close two namespaces make_believe_boost::algorithm
+    bool Is_Space_Necessary(std::string_view const s, std::size_t const i)
+    {
+        // Input string has already had all white
+        // space reduced to one space, and it
+        // neither ends nor begins with a space
+
+        static char const *const double_syms[] = { "+=", "-=", "*=", "/=", "%=", "&=", "^=", "|=", "||", "&&", "==", "!=", ">=", "<=", "<<", ">>", ".*", "++", "--", "->", "::" };
+
+        static char const *const tripple_syms[] = { "<<=", ">>=", "<=>", "->*" };
+
+        assert( ' ' == s[i] );
+
+        if ( IsIdChar(s[i-1u]) && IsIdChar(s[i+1u]) )
+        {
+            return true;
+        }
+
+        for ( char const *const sss : tripple_syms )
+        {
+            char monkey[4u] = {};
+
+            monkey[0u] = s[i - 1u];
+            monkey[1u] = s[i + 1u];
+            monkey[2u] = s[i + 2u];
+
+            if ( 0 == std::strcmp(sss,monkey) ) return true;
+
+            if ( 1u == i ) continue;
+
+            monkey[0u] = s[i - 2u];
+            monkey[1u] = s[i - 1u];
+            monkey[2u] = s[i + 1u];
+
+            if ( 0 == std::strcmp(sss,monkey) ) return true;
+        }
+
+        for ( char const *const ss : double_syms )
+        {
+            char monkey[3u] = {};
+
+            monkey[0u] = s[i - 1u];
+            monkey[1u] = s[i + 1u];
+
+            if ( 0 == std::strcmp(ss,monkey) ) return true;
+        }
+
+        return false;
+    }
+
+    void Remove_Unnecessary_Spaces(std::string &s)
+    {
+        for ( std::size_t i = 0u;
+                  i != s.size()
+              && -1 != (i = s.find(' ',i));
+              ++i )
+        {
+            if ( Is_Space_Necessary(s, i) ) continue;
+
+            s.erase(i--,1u);
+        }
+    }
+
+    void Minimise_Whitespace(std::string &s)
+    {
+        trim_all(s);  // Removes leading whitespace, trailing whitespace, and reduces all other whitespace to one space ' '
+        Remove_Unnecessary_Spaces(s);
+    }
+} // close namespace StringAlgorithms
 
 // ==========================================================================
 // Section 3 of 9 : Implementation of container type : FIFO map
@@ -1089,12 +1159,12 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
 
-    make_believe_boost::algorithm::replace_all(retval, "::", "mOnKeY");
-    make_believe_boost::algorithm::replace_all(retval, ":", " : ");
-    make_believe_boost::algorithm::replace_all(retval, "mOnKeY", "::");
+    StringAlgorithms::replace_all(retval, "::", "mOnKeY");
+    StringAlgorithms::replace_all(retval, ":", " : ");
+    StringAlgorithms::replace_all(retval, "mOnKeY", "::");
     retval = regex_replace(retval, regex("\\s"), " ");
 
-    make_believe_boost::algorithm::trim_all(retval);
+    StringAlgorithms::trim_all(retval);
 
     if ( retval.starts_with("template") ) return {};
 
@@ -1273,7 +1343,7 @@ void Print_Helper_Classes_For_Class(string classname)
 
     fifo_map<size_t, Method_Info> const &g_func_alterations = g_func_alterations_all.at(classname);
 
-    make_believe_boost::replace_all(classname, "::", "_scope_");
+    StringAlgorithms::replace_all(classname, "::", "_scope_");
 
     cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
 
@@ -1576,7 +1646,7 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
         {
             string word { *iter2 };
 
-            make_believe_boost::trim_all(word);
+            StringAlgorithms::trim_all(word);
 
             if ( "virtual" == word )
             {
@@ -1630,7 +1700,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     if (   !(intro.starts_with("class") || intro.starts_with("struct"))   ) return {};
 
-    make_believe_boost::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
+    StringAlgorithms::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
     // The following finds spaces except those found inside angle brackets
     regex const my_regex("\\s");
@@ -2038,10 +2108,10 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        make_believe_boost::replace_all(impersonator,"\n"," ");
-        make_believe_boost::replace_all(original    ,"\n"," ");
-        make_believe_boost::trim_all(impersonator);
-        make_believe_boost::trim_all(original    );
+        StringAlgorithms::replace_all(impersonator,"\n"," ");
+        StringAlgorithms::replace_all(original    ,"\n"," ");
+        StringAlgorithms::trim_all(impersonator);
+        StringAlgorithms::trim_all(original    );
 
         try
         {
@@ -2072,10 +2142,10 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        make_believe_boost::replace_all(impersonator,"\n"," ");
-        make_believe_boost::replace_all(original    ,"\n"," ");
-        make_believe_boost::trim_all(impersonator);
-        make_believe_boost::trim_all(original    );
+        StringAlgorithms::replace_all(impersonator,"\n"," ");
+        StringAlgorithms::replace_all(original    ,"\n"," ");
+        StringAlgorithms::trim_all(impersonator);
+        StringAlgorithms::trim_all(original    );
 
         try
         {
@@ -2255,7 +2325,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         if ( bases.empty() ) throw runtime_error("Method marked continue inside a class that has no base classes");
 
         string derived_replaced(svclass);
-        make_believe_boost::replace_all(derived_replaced, "::", "_scope_");
+        StringAlgorithms::replace_all(derived_replaced, "::", "_scope_");
 
         IndentedOstream s( g_func_alterations[index].replacement_body, "    " );
 
@@ -2275,7 +2345,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         {
             s << "static MethodInvokerT::MI< " << e << " > mi_";
 
-            make_believe_boost::replace_all(e, "::", "_scope_");
+            StringAlgorithms::replace_all(e, "::", "_scope_");
 
             s << e << ";\n";
         }
@@ -2284,7 +2354,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         s << Indent();
         for ( auto &e : bases )
         {
-            make_believe_boost::replace_all(e, "::", "_scope_");
+            StringAlgorithms::replace_all(e, "::", "_scope_");
 
             s << "\nInvoker(mi_" << e << ", " << "this),";
         }
@@ -2472,9 +2542,9 @@ int main(int const argc, char **const argv)
 
     std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');  // null chars will screw up functions that parse null as end of string
 
-    make_believe_boost::replace_all(g_intact, "\r\n", " \n");
+    StringAlgorithms::replace_all(g_intact, "\r\n", " \n");
 
-    make_believe_boost::replace_all(g_intact, "\r", "\n");
+    StringAlgorithms::replace_all(g_intact, "\r", "\n");
 
     Replace_All_Preprocessor_Directives_With_Spaces();
     Replace_All_String_Literals_With_Spaces();

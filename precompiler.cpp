@@ -80,37 +80,11 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <string>      // string
 #include <string_view> // string_view
 
-namespace StringAlgorithms {
+class StringAlgorithms {
 
-    void erase_all(std::string &s, std::string_view const sv)
-    {
-        if ( s.empty() || sv.empty() ) return;
+private:
 
-        std::size_t i = 0u;
-        while ( (s.size() != i) && (-1 != (i = s.find(sv, i))) )  // deliberate single '='
-        {
-            s.erase(i, sv.size());
-        }
-    }
-
-    void replace_all(std::string &s, std::string_view const sv_old, std::string_view const sv_new)
-    {
-        if ( s.empty() || sv_old.empty() ) return;
-
-        std::size_t i = 0u;
-        while ( (s.size() != i) && (-1 != (i = s.find(sv_old, i))) )  // deliberate single '='
-        {
-            s.erase(i, sv_old.size());
-
-            if ( false == sv_new.empty() )
-            {
-                s.insert(i, sv_new);
-                i += sv_new.size();
-            }
-        }
-    }
-
-    void trim_all(std::string &s)
+    static void trim_all(std::string &s)
     {
         if ( s.empty() ) return;
 
@@ -136,12 +110,44 @@ namespace StringAlgorithms {
         }
     }
 
-    bool IsIdChar(char const c)
+public:
+
+    static void erase_all(std::string &s, std::string_view const sv)
+    {
+        if ( s.empty() || sv.empty() ) return;
+
+        std::size_t i = 0u;
+        while ( (s.size() != i) && (-1 != (i = s.find(sv, i))) )  // deliberate single '='
+        {
+            s.erase(i, sv.size());
+        }
+    }
+
+    static void replace_all(std::string &s, std::string_view const sv_old, std::string_view const sv_new)
+    {
+        if ( s.empty() || sv_old.empty() ) return;
+
+        std::size_t i = 0u;
+        while ( (s.size() != i) && (-1 != (i = s.find(sv_old, i))) )  // deliberate single '='
+        {
+            s.erase(i, sv_old.size());
+
+            if ( false == sv_new.empty() )
+            {
+                s.insert(i, sv_new);
+                i += sv_new.size();
+            }
+        }
+    }
+
+private:
+
+    static bool IsIdChar(char const c)
     {
         return '_' == c || std::isalnum(static_cast<char unsigned>(c));
     }
 
-    bool Is_Space_Necessary(std::string_view const s, std::size_t const i)
+    static bool Is_Space_Necessary(std::string_view const s, std::size_t const i)
     {
         // Input string has already had all white
         // space reduced to one space, and it
@@ -190,7 +196,7 @@ namespace StringAlgorithms {
         return false;
     }
 
-    void Remove_Unnecessary_Spaces(std::string &s)
+    static void Remove_Unnecessary_Spaces(std::string &s)
     {
         for ( std::size_t i = 0u;
                   i != s.size()
@@ -203,12 +209,14 @@ namespace StringAlgorithms {
         }
     }
 
-    void Minimise_Whitespace(std::string &s)
+public:
+
+    static void Minimise_Whitespace(std::string &s)
     {
         trim_all(s);  // Removes leading whitespace, trailing whitespace, and reduces all other whitespace to one space ' '
         Remove_Unnecessary_Spaces(s);
     }
-} // close namespace StringAlgorithms
+};
 
 // ==========================================================================
 // Section 3 of 9 : Implementation of container type : FIFO map
@@ -1157,21 +1165,19 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
 
-    retval = regex_replace(retval, regex("\\s*::\\s*"), "::");   // Turns "__cxx11:: collate" into "__cxx11::collate"
-
+    StringAlgorithms::Minimise_Whitespace(retval);
     StringAlgorithms::replace_all(retval, "::", "mOnKeY");
     StringAlgorithms::replace_all(retval, ":", " : ");
     StringAlgorithms::replace_all(retval, "mOnKeY", "::");
-    retval = regex_replace(retval, regex("\\s"), " ");
 
-    StringAlgorithms::trim_all(retval);
-
+#if 1
     if ( retval.starts_with("template") ) return {};
-
+#else
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
     //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
+#endif
 
     return retval;
 }
@@ -1646,7 +1652,7 @@ list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
         {
             string word { *iter2 };
 
-            StringAlgorithms::trim_all(word);
+            StringAlgorithms::Minimise_Whitespace(word);
 
             if ( "virtual" == word )
             {
@@ -2108,10 +2114,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        StringAlgorithms::replace_all(impersonator,"\n"," ");
-        StringAlgorithms::replace_all(original    ,"\n"," ");
-        StringAlgorithms::trim_all(impersonator);
-        StringAlgorithms::trim_all(original    );
+        StringAlgorithms::Minimise_Whitespace(impersonator);
+        StringAlgorithms::Minimise_Whitespace(original    );
 
         try
         {
@@ -2142,10 +2146,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         original = regex_replace(original, regex("typename\\s*"), "");
         original = regex_replace(original, regex("template\\s*"), "");
 
-        StringAlgorithms::replace_all(impersonator,"\n"," ");
-        StringAlgorithms::replace_all(original    ,"\n"," ");
-        StringAlgorithms::trim_all(impersonator);
-        StringAlgorithms::trim_all(original    );
+        StringAlgorithms::Minimise_Whitespace(impersonator);
+        StringAlgorithms::Minimise_Whitespace(original    );
 
         try
         {

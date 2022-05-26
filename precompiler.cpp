@@ -1327,7 +1327,7 @@ public:
 struct Method_Info {
     string::const_iterator iter_first_char;
     Function_Signature fsig;
-    CurlyBracketManager::CurlyPair const *p_body;
+    CurlyBracketManager::CurlyPair const *p_body = nullptr;
     ostringstream replacement_body;
 
     Method_Info(string_view const sv) : fsig(sv) {}

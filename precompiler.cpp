@@ -2408,7 +2408,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         s << "\n};\n\n";
 
-        s << "for ( auto &e : methods )\n"
+        s << "for ( auto &e : methods | Continuity_Methods::constructor_order )\n"
              "{\n"
              "    e.";
 

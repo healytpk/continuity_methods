@@ -1334,6 +1334,51 @@ struct Method_Info {
 
 fifo_map< string, fifo_map<size_t, Method_Info> > g_func_alterations_all;
 
+string_view Indentation_For_CurlyPair(CurlyBracketManager::CurlyPair const &cp)
+{
+    /* Two examples:
+
+    (1)
+
+        "    void Func(void)\n"
+        "    {\n"
+
+    (2)
+
+        "    void Func(void) {\n"
+
+
+    Step 1: Decrement from the location of '{' until you find either '\n' or start of file
+
+    Step 2: Having found the start of the line, move forward until you encounter non-whitespace
+
+    */
+
+    size_t i = cp.First();
+
+    assert( '{' == g_intact[i] );
+
+    for ( ; -1 != i && '\n' != g_intact[i]; --i );
+
+    ++i;
+
+    /* When control reaches here, g_intact[i] is either:
+       (1) The first char in the file
+       (2) The first char on the line
+    */
+
+    size_t const i_first_char = i;
+
+    auto WhiteOtherThanNewLine = [](char const c) -> bool
+    {
+        return '\n' != c && std::isspace( static_cast<char unsigned>(c) );
+    };
+
+    for ( i = i_first_char; WhiteOtherThanNewLine(g_intact[i]); ++i );
+
+    return string_view( &g_intact[i_first_char], &g_intact[i] );  // REVISIT FIX - possible dereference of invalid iterator
+}
+
 // ==========================================================================
 // Section 8 of 9 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================

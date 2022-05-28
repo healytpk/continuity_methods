@@ -327,7 +327,6 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cctype>         // isspace, isalpha, isdigit
 #include <list>           // list
 #include <map>            // map
-#include <ranges>         // views::filter
 #include <array>          // array
 #include <tuple>          // tuple
 #include <utility>        // pair, move
@@ -359,8 +358,6 @@ using std::match_results;
 
 using std::istream_iterator;
 using std::back_inserter;
-using std::views::filter;
-using std::views::split;
 
 using std::runtime_error;
 
@@ -1688,15 +1685,16 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     {
         string str;
 
+        regex const my_regex (" ");
+
         unsigned i = 0u;
-        for ( auto word : intro | std::views::split(' ') )
+        for (sregex_top_level_token_iterator iter(intro.begin(), intro.end(), my_regex, -1);
+             iter != sregex_top_level_token_iterator();
+             ++iter)
         {
             if ( 1u != i++ ) continue;
 
-            for (char ch : word)
-            {
-                str += ch;
-            }
+            str = *iter;
 
             break;
         }
@@ -1855,11 +1853,11 @@ bool Strip_Last_Scope(string &str)
 
     r_sregex_top_level_iterator iter( str.crbegin(), str.crend(), double_colon );  // reverse
 
-    assert( r_sregex_top_level_iterator() != iter );
+    assert( r_sregex_top_level_iterator() != iter );  // cppcheck-suppress assertWithSideEffect
 
     ++iter;  // skip the first match because it's the trailing "::"
 
-    assert( r_sregex_top_level_iterator() != iter );
+    assert( r_sregex_top_level_iterator() != iter );  // cppcheck-suppress assertWithSideEffect
 
     str.resize(  str.size() - std::distance(str.crbegin(), (*iter)[0u].first)  );
 
@@ -2665,14 +2663,18 @@ int main(int const argc, char **const argv)
     }
 
     clog << "====================================== Now the namespaces ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "namespace" == std::get<1u>(arg.second); }) )
+    for ( auto const &e : g_scope_names )
     {
+        if ( "namespace" != std::get<1u>(e.second) ) continue;
+
         clog << e.first << endl;
     }
 
     clog << "====================================== Now the classes that have base classes ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
+    for ( auto const &e : g_scope_names )
     {
+        if ( "struct" != std::get<1u>(e.second) && "class" != std::get<1u>(e.second) ) continue;
+
         list<string> const bases{ Get_All_Bases(e.first) };
 
         if ( bases.empty() ) continue;
@@ -2689,8 +2691,10 @@ int main(int const argc, char **const argv)
     }
 
     clog << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
-    for ( auto const &e : g_scope_names | filter([](auto const &arg){ return "class" == std::get<1u>(arg.second) || "struct" == std::get<1u>(arg.second); }) )
+    for ( auto const &e : g_scope_names )
     {
+        if ( "struct" != std::get<1u>(e.second) && "class" != std::get<1u>(e.second) ) continue;
+
         for ( CurlyBracketManager::CurlyPair const *const  &p_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
         {
             list< pair<size_t,size_t> > const my_list = GetOpenSpacesBetweenInnerCurlyBrackets(*p_curly_pair_pointer);

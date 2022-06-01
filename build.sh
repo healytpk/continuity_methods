@@ -62,3 +62,11 @@ do
         exit 1
     fi
 done
+
+echo "= = = = = Attempting to build with the clang compiler (with 'libstdc++'). . . "
+/opt/clang/bin/clang++ -o clang_prog_libstdc++ -std=c++20 -stdlib=libstdc++ ./precompiler.cpp
+/opt/clang/bin/clang++ -std=c++20 -stdlib=libstdc++ -E -P sample_lasers.cpp | ./clang_prog_libstdc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libstdc++ -std=c++20 -stdlib=libstdc++ -x c++ -
+echo "= = = = = Attempting to build with the clang compiler (with 'libc++'). . . "
+/opt/clang/bin/clang++ -o clang_prog_libc++ -std=c++20 -stdlib=libc++ ./precompiler.cpp
+/opt/clang/bin/clang++ -std=c++20 -stdlib=libc++ -E -P sample_lasers.cpp | ./clang_prog_libc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libc++ -std=c++20 -stdlib=libc++ -x c++ -
+

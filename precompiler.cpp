@@ -2041,7 +2041,7 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
         if constexpr ( verbose )
         {
             clog << " [ALREADY_SEEN=";
-            for ( auto const &e : already_recorded ) clog << e << ", ";
+            for ( auto const &e_already : already_recorded ) clog << e_already << ", ";
             clog << "] ";
             clog << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }

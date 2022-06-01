@@ -2727,9 +2727,9 @@ int main(int const argc, char **const argv)
         clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
              << " | Bases = ";
 
-        for ( auto const &e : bases )
+        for ( auto const &b : bases )
         {
-            clog << e << ", ";
+            clog << b << ", ";
         }
 
         clog << endl;

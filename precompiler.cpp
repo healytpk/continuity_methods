@@ -2372,7 +2372,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         string derived_replaced(svclass);
         StringAlgorithms::replace_all(derived_replaced, "::", "_scope_");
 
-        IndentedOstream s( g_func_alterations[index].replacement_body, "    " );
+        IndentedOstream s( g_func_alterations[index].replacement_body, Indentation_For_CurlyPair(cp_body) );
 
         s << "\n";
 

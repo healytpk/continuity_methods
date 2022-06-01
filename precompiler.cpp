@@ -2597,7 +2597,7 @@ void Print_Header(void)
             "        return { arg };\n"
             "    }\n"
             "\n"
-            "    class intact_order_t {} ;\n"
+            "    class intact_order_t {};\n"
             "\n"
             "    template<typename T, size_t N>\n"
             "    constexpr T (&operator|(T (&arg)[N], intact_order_t))[N]\n"
@@ -2605,8 +2605,8 @@ void Print_Header(void)
             "        return arg;\n"
             "    }\n"
             "\n"
-            "    intact_order_t   constexpr constructor_order;\n"
-            "    reversed_order_t constexpr destructor_order ;\n"
+            "      intact_order_t constexpr constructor_order;\n"
+            "    reversed_order_t constexpr  destructor_order;\n"
             "}\n\n";
 }
 

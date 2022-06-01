@@ -428,12 +428,9 @@ protected:
             }
         }
 
-        for ( auto const &count : counts )
-        {
-            if ( 0u != count ) return false;
-        }
-
-        return true;
+        return std::all_of(std::begin(counts),
+                           std::end(counts),
+                           [](auto const &e){ return 0u == e; });
     }
 
 public:

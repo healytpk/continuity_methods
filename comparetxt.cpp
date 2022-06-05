@@ -27,6 +27,8 @@ int main(int const argc, char **const argv)
     {
         if ( '\r' == bufA[0u] ) continue;
 
+        bool satisfied = false;
+
         while ( cin.read(bufB, 1u) )
         {
             if ( '\r' == bufB[0u] ) continue;
@@ -37,8 +39,12 @@ int main(int const argc, char **const argv)
                 return EXIT_FAILURE;
             }
 
+            satisfied = true;
+
             break;
         }
+
+        if ( false == satisfied ) return EXIT_FAILURE;
     }
 
     while ( cin.read(bufB, 1u) )

@@ -14,7 +14,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1.4.1
     - name: compile precompiler
-      run: cl /Fe:precompiler.exe precompiler.cpp /std:c++20
+      run: cl /Fe:precompiler.exe precompiler.cpp /std:c++20 /EHsc
     - name: create lasers translation unit
       run: type sample_lasers.cpp | precompiler.exe > mswin_trans_lasers.cpp
       shell: cmd
@@ -22,10 +22,10 @@ jobs:
       run: type sample_simple.cpp | precompiler.exe > mswin_trans_simple.cpp
       shell: cmd
     - name: build binary for lasers sample
-      run:  cl /Fe:mswin_bin_lasers.exe mswin_trans_lasers.cpp /std:c++20
+      run:  cl /Fe:mswin_bin_lasers.exe mswin_trans_lasers.cpp /std:c++20 /EHsc
       shell: cmd
     - name: build binary for simple sample
-      run:  cl /Fe:mswin_bin_simple.exe mswin_trans_simple.cpp /std:c++20
+      run:  cl /Fe:mswin_bin_simple.exe mswin_trans_simple.cpp /std:c++20 /EHsc
       shell: cmd
     - name: compare expected output for lasers sample
       run:  mswin_bin_lasers.exe | comparetxt.exe expected_output_lasers.txt

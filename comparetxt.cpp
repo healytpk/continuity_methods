@@ -14,7 +14,7 @@ int main(int const argc, char **const argv)
 
     if ( false == f.is_open() )
     {
-        cout << "Cannot open file: " << argv[1u] << "'\n";
+        cout << "Cannot open file: " << argv[1u] << "\n";
         return EXIT_FAILURE;
     }
 
@@ -23,11 +23,11 @@ int main(int const argc, char **const argv)
     char bufA[2u] = { 'x', '\0' },  // null-terminated
          bufB[2u] = { 'x', '\0' };
 
-    while ( cin.read(bufA, 1u) )
+    while ( f.read(bufA, 1u) )
     {
         if ( '\r' == bufA[0u] ) continue;
 
-        while ( f.read(bufB, 1u) )
+        while ( cin.read(bufB, 1u) )
         {
             if ( '\r' == bufB[0u] ) continue;
 
@@ -39,6 +39,13 @@ int main(int const argc, char **const argv)
 
             break;
         }
+    }
+
+    while ( cin.read(bufB, 1u) )
+    {
+        if ( '\r' == bufB[0u] ) continue;
+
+        return EXIT_FAILURE;
     }
 
     return 0;

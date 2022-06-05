@@ -1,0 +1,3 @@
+Set pin high to switch transistor to allow laser current
+Set TTL pin high to activate nitrogen laser
+Send trigger command to the PicoSecond laser over RS232

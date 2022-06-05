@@ -1,4 +1,4 @@
-name: MSVC build precompiler.cpp
+name: microsoft
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: '*'
 
 jobs:
-  windows:
+  build:
     name: run on windows
     runs-on: windows-latest
     steps:
@@ -21,5 +21,5 @@ jobs:
     - name: upload executable
       uses: actions/upload-artifact@v2
       with:
-        name: windows
+        name: precompiler_for_mswindows
         path: precompiler.exe

@@ -34,4 +34,3 @@ Derived1B::Constructor
 Base1A value = 7
 Base1B value = 7
 Derived1B value = 7
-Z

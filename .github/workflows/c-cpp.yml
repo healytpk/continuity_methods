@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install GCC11, pCap, Boost, wxWidgets
+    - name: Install GCC11
       run: sudo make prereq
     - name: make
-      run: GTK_SUFFIX=3 make 2>&1 | tee build_log.txt
+      run: make 2>&1 | tee build_log.txt
     - uses: actions/upload-artifact@v2
       with:
         name: build_log.txt
@@ -28,4 +28,4 @@ jobs:
         name: cppcheck_html
         path: dir_cppcheck_html/
     - name: Check binary file
-      run: ls -alh dynamo; file dynamo; readelf -a dynamo | grep NEEDED; ldd dynamo
+      run: ls -alh precompiler; file precompiler; readelf -a precompiler | grep NEEDED; ldd precompiler

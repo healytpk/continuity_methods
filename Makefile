@@ -31,7 +31,7 @@ clean:
 cppcheck:
 	rm -rf dir_cppcheck_work dir_cppcheck_html
 	mkdir -p dir_cppcheck_work dir_cppcheck_html
-	(cd ./3rdparty/cppcheck/ && exec ./cppcheck --cppcheck-build-dir=../../dir_cppcheck_work/ --inline-suppr --force --library=std --library=boost --library=wxwidgets --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' $(PREPROCESSOR_DEFINES) ../../*.c ../../*.cpp 2> ../../err.xml)
+	(cd ./3rdparty/cppcheck/ && exec ./cppcheck --cppcheck-build-dir=../../dir_cppcheck_work/ --inline-suppr --force --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' precompiler.cpp 2> ../../err.xml)
 	#cppcheck --cppcheck-build-dir=./dir_cppcheck_work/ --inline-suppr --force --library=std --library=boost --library=wxwidgets --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' $(PREPROCESSOR_DEFINES) ./*.c ./*.cpp 2> err.xml
 	./3rdparty/cppcheck/cppcheck-htmlreport --file=err.xml --report-dir=./dir_cppcheck_html/ --source-dir=./
 

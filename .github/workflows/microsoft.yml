@@ -27,6 +27,9 @@ jobs:
     - name: build binary for simple sample
       run:  cl /Fe:mswin_bin_simple.exe mswin_trans_simple.cpp /std:c++20 /EHsc
       shell: cmd
+    - name: build the separate program for comparing text files
+      run:  cl /Fe:comparetxt.exe comparetxt.cpp /std:c++20 /EHsc
+      shell: cmd
     - name: compare expected output for lasers sample
       run:  mswin_bin_lasers.exe | comparetxt.exe expected_output_lasers.txt
       shell: cmd

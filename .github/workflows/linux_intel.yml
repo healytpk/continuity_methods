@@ -2,9 +2,9 @@ name: linux_intel
 
 on:
   push:
-    branches: [main, master]
+    branches: [notemp]
   pull_request:
-    branches: [main, master]
+    branches: [notemp]
 jobs:
   build_intel_champ_fparser:
     runs-on: ubuntu-20.04

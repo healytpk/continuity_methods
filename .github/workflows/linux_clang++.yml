@@ -22,9 +22,9 @@ jobs:
     - name: Check binary file
       run: ls -alh precompiler; file precompiler; readelf -a precompiler | grep NEEDED; ldd precompiler
     - name: create lasers translation unit
-      run: cat sample_lasers.cpp | ./precompiler > trans_lasers.cpp
+      run: clang++ -std=c++20 -E -P sample_lasers.cpp | ./precompiler > trans_lasers.cpp
     - name: create simple translation unit
-      run: cat sample_simple.cpp | ./precompiler > trans_simple.cpp
+      run: clang++ -std=c++20 -E -P sample_simple.cpp | ./precompiler > trans_simple.cpp
     - name: build binary for lasers sample
       run:  clang++ -o bin_lasers trans_lasers.cpp -std=c++20
     - name: build binary for simple sample

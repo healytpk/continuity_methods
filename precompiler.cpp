@@ -1910,6 +1910,8 @@ fifo_map<string,string> g_psuedonyms;
 
 string Find_Class_Relative_To_Scope(string &prefix, string classname)
 {
+    assert( false == (prefix.empty() && classname.empty()) );
+
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
     if ( classname.starts_with("::") )  // If it's an absolute class name rather than relative
@@ -1928,6 +1930,8 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
             arg_prefix.clear();
         }
         catch(std::out_of_range const &e) {}
+
+        assert( false == (arg_prefix.empty() && arg_classname.empty()) );
     };
 
     string const intact_prefix{ prefix };

@@ -1924,14 +1924,19 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
     auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
+        string const what_we_looked_up{ arg_prefix + arg_classname };
+
         try
         {
-            arg_classname = g_psuedonyms.at(arg_prefix + arg_classname);
+            arg_classname = g_psuedonyms.at(what_we_looked_up);
             arg_prefix.clear();
         }
         catch(std::out_of_range const &e) {}
 
-        assert( false == (arg_prefix.empty() && arg_classname.empty()) );
+        if ( arg_prefix.empty() && arg_classname.empty() )
+        {
+            throw runtime_error("Look-up of '" + what_we_looked_up + "' came back blank");
+        }
     };
 
     string const intact_prefix{ prefix };
@@ -2165,6 +2170,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         {
             string full_name_of_original = Find_Class_Relative_To_Scope(scope_name, original);  // might throw out_of_range
             //cout << "Old = " << original << ", New = " << impersonator << endl;
+            if ( full_name_of_original.empty() ) throw std::out_of_range("");
             g_psuedonyms[scope_name + impersonator] = full_name_of_original;
         }
         catch (std::out_of_range const &e)
@@ -2197,6 +2203,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         {
             string full_name_of_original = Find_Class_Relative_To_Scope(scope_name, original);  // might throw out_of_range
             //cout << "Old = " << original << ", New = " << impersonator << endl;
+            if ( full_name_of_original.empty() ) throw std::out_of_range("");
             g_psuedonyms[scope_name + impersonator] = full_name_of_original;
         }
         catch (std::out_of_range const &e)

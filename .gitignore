@@ -1,4 +1,5 @@
-prog
+precompiler
+precompiler.exe
 transunit_*
 final_*
 bin_*

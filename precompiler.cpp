@@ -1852,7 +1852,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         return { "namespace", str, list< array<string,3u> >() };
     }
 
-    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return tuple< string, string, list< array<string,3u> >  >();
+    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return {};
 
     StringAlgorithms::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
@@ -1868,13 +1868,13 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     if ( sregex_top_level_token_iterator() == iter )
     {
         // Control reaches here if we have an anonymous struct (e.g. inside a function or inside a parent struct)
-        return tuple< string, string, list< array<string,3u> >  >();
+        return {};
     }
 
     string const str{ *iter }; // takes "__cxx11::collate" from "class __cxx11::collate : public locale::facet"
 
-    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This bring us to the sole colon
-    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, {} };  // This brings it to the first word after the colon (e.g. virtual)
+    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, list< array<string,3u> >() };  // This bring us to the sole colon
+    if ( ++iter == sregex_top_level_token_iterator() ) return { "class", str, list< array<string,3u> >() };  // This brings it to the first word after the colon (e.g. virtual)
 
     return { "class", str, Parse_Bases_Of_Class( string( &*(iter->first) ) ) };  // REVISIT FIX might be 'struct' instead of 'class' (public Vs private)
 }
@@ -1891,7 +1891,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
 
     try
     {
-        for ( CurlyBracketManager::CurlyPair const *p = &cp; p = p->Parent(); /* no post-processing */ )  // will throw exception when root pair is reached
+        for ( CurlyBracketManager::CurlyPair const *p = &cp; (p = p->Parent()); /* no post-processing */ )  // will throw exception when root pair is reached
         {
             //clog << "Iteration No. " << iteration << endl;
 
@@ -2746,10 +2746,29 @@ void my_terminate_handler(void)
     std::abort();
 }
 
-#   if defined(_WIN32) || defined(_WIN64)
-    extern "C" int _setmode(int fd,int mode);
-    extern "C" int _fileno(std::FILE *stream);
-#endif
+/* =====================================================================
+   =====================================================================
+   =====================================================================
+     MS-Windows opens 'stdin' in text mode, and so we use the function
+     '_setmode' or 'setmode' to change it to binary mode. The Microsoft
+     compiler calls it '_setmode', while the Embarcadero (formerly known
+     as Borland) compiler calls it 'setmode'. */
+#if defined(_WIN32) || defined(_WIN64)
+#    include <cstdio>  // FILE
+     extern "C" int _fileno(std::FILE *);
+#    ifdef __BORLANDC__
+         extern "C" int setmode(int,int);
+         inline int _setmode(int const fd, int const mode)
+         {
+             return setmode(fd,mode);
+         }
+#    else
+         extern "C" int _setmode(int,int);
+#    endif  // ifdef __BORLANDC__
+#endif  // if defined(_WIN32) || defined(_WIN64)
+/* ==================================================================
+   ==================================================================
+   ================================================================== */
 
 int main(int const argc, char **const argv)
 {

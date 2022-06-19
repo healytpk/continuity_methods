@@ -1777,8 +1777,13 @@ get<2>(e.second) {
                  }
 */
 
-list< array<string,3u> > Parse_Bases_Of_Class(string const &str)
+list< array<string,3u> > Parse_Bases_Of_Class(string str)
 {
+    StringAlgorithms::replace_all(str, "virtual::"  , "virtual ::");
+    StringAlgorithms::replace_all(str, "public::"   , "public ::");
+    StringAlgorithms::replace_all(str, "protected::", "protected ::");
+    StringAlgorithms::replace_all(str, "private::"  , "private ::");
+
     array<string,3u> tmp;
 
     list< array<string,3u> > retval;

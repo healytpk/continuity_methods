@@ -1849,10 +1849,10 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
             break;
         }
 
-        return { "namespace", str, {} };
+        return { "namespace", str, list< array<string,3u> >() };
     }
 
-    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return {};
+    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return tuple< string, string, list< array<string,3u> >  >();
 
     StringAlgorithms::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
@@ -1868,7 +1868,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
     if ( sregex_top_level_token_iterator() == iter )
     {
         // Control reaches here if we have an anonymous struct (e.g. inside a function or inside a parent struct)
-        return {};
+        return tuple< string, string, list< array<string,3u> >  >();
     }
 
     string const str{ *iter }; // takes "__cxx11::collate" from "class __cxx11::collate : public locale::facet"

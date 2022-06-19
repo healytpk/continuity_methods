@@ -79,6 +79,7 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <cctype>      // isalnum
 #include <string>      // string
 #include <string_view> // string_view
+#include <type_traits> // remove_reference_t, remove_cv_t (both for C++17)
 
 class StringAlgorithms {
 
@@ -217,6 +218,37 @@ public:
         Remove_Unnecessary_Spaces(s);
     }
 };
+
+// The following function is to support C++17 which is lacking the
+// constructor for 'string_view' which takes two iterators. Also we want
+// to be able to mix and match different iterator types.
+template<typename A, typename B>
+static std::string_view Sv(A a, B b)  // Pass iterators by value
+{
+    using std::is_same_v;
+    using std::string;
+    using std::string_view;
+
+    typedef std::remove_cv_t< std::remove_reference_t<A> > X;  // C++17 doesn't have remove_cvref_t
+    typedef std::remove_cv_t< std::remove_reference_t<B> > Y;
+
+    static_assert(    is_same_v< X, char *                      >
+                   || is_same_v< X, char const *                >
+                   || is_same_v< X, string::iterator            >
+                   || is_same_v< X, string::const_iterator      >
+                   || is_same_v< X, string_view::iterator       >
+                   || is_same_v< X, string_view::const_iterator >, "First argument is wrong type" );
+
+    static_assert(    is_same_v< Y, char *                      >
+                   || is_same_v< Y, char const *                >
+                   || is_same_v< Y, string::iterator            >
+                   || is_same_v< Y, string::const_iterator      >
+                   || is_same_v< Y, string_view::iterator       >
+                   || is_same_v< Y, string_view::const_iterator >, "Second argument is wrong type" );
+
+    // Now we use the constructor which takes a pointer and an integer length
+    return std::string_view( static_cast<char const *>( &*a ), static_cast<string_view::size_type>( &*b - &*a ) );
+}
 
 // ==========================================================================
 // Section 3 of 9 : Implementation of container type : FIFO map
@@ -871,7 +903,7 @@ protected:
 
         if ( 0u != count ) throw runtime_error("Mismatched parentheses when trying to find decltype's");
 
-        return string_view(s.cbegin() + index, s.cbegin() + i);
+        return Sv(s.cbegin() + index, s.cbegin() + i);
     }
 
     void ProcessParams(void)
@@ -887,7 +919,7 @@ protected:
         {
             if ( "void" ==  *iter || "" == *iter ) return;  // REVISIT FIX - watch out for whitespace
 
-            _params.emplace_back( string_view(iter->first, iter->second) );
+            _params.emplace_back( Sv(iter->first, iter->second) );
 
             //cout << "  Parameter Name: " << _params.back().Name() << endl;
         }
@@ -951,7 +983,7 @@ public:
                     continue;
                 }
 
-                _name = string_view( _original.cbegin() + location, _original.cbegin() + location + found.size() );
+                _name = Sv( _original.cbegin() + location, _original.cbegin() + location + found.size() );
 
                 break;
             }
@@ -973,17 +1005,17 @@ public:
     template<class T>
     void Original_Function_Signature_Renamed(T &os) const
     {
-        os << string_view( &*_original.cbegin(), &*_name.cend() );
+        os << Sv( _original.cbegin(), _name.cend() );
 
         os << "____WITHOUT_CONTINUITY";
 
-        os << string_view( &*_name.cend(), &*_original.cend() );
+        os << Sv( _name.cend(), _original.cend() );
     }
 
     template<class T>
     void Signature_Of_Replacement_Function(T &os) const
     {
-        os << string_view(&*_original.cbegin(), &*_name.cend() );
+        os << Sv( _original.cbegin(), _name.cend() );
 
         os << '(';
 
@@ -994,13 +1026,13 @@ public:
             if ( &e != &_params.back() ) os << ", ";
         }
 
-        os << string_view( &*Full_Param_List().cend(), &*_original.cend() );
+        os << Sv( Full_Param_List().cend(), _original.cend() );
     }
 
     template<class T>
     void Signature_Of_Replacement_Function____With_Void_Pointer_This(T &os) const
     {
-        os << string_view(&* _original.cbegin(), &*_name.cend() );
+        os << Sv( _original.cbegin(), _name.cend() );
 
         os << "(void *const arg_this";
 
@@ -1011,7 +1043,7 @@ public:
             os << e.Full();
         }
 
-        os << string_view( &*Full_Param_List().cend(), &*_original.cend() );
+        os << Sv( Full_Param_List().cend(), _original.cend() );
     }
 
     template<class T>
@@ -1373,7 +1405,7 @@ string_view Indentation_For_CurlyPair(CurlyBracketManager::CurlyPair const &cp)
 
     for ( i = i_first_char; WhiteOtherThanNewLine(g_intact[i]); ++i );
 
-    return string_view( &g_intact[i_first_char], &g_intact[i] );  // REVISIT FIX - possible dereference of invalid iterator
+    return Sv( &g_intact[i_first_char], &g_intact[i] );  // REVISIT FIX - possible dereference of invalid iterator
 }
 
 // ==========================================================================
@@ -2468,9 +2500,9 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
         if ( -1 == i ) continue;
 
-        clog << "Level " << i << ": " << string_view(str.cbegin(), iter->second);
+        clog << "Level " << i << ": " << Sv(str.cbegin(), iter->second);
 
-        if ( -1 != string_view(iter->first,iter->second).find('<') )  // check if right-most is a template class
+        if ( -1 != Sv(iter->first,iter->second).find('<') )  // check if right-most is a template class
         {
             clog << "    <---- template class";
         }
@@ -2492,11 +2524,11 @@ void Print_Final_Output(void)
             Method_Info const &mi = e.second;
             Function_Signature const &fs = mi.fsig;
 
-            cout << string_view( g_intact.cbegin() + i, mi.iter_first_char );
+            cout << Sv( g_intact.cbegin() + i, mi.iter_first_char );
 
             fs.Original_Function_Signature_Renamed(cout);
 
-            cout << string_view( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
+            cout << Sv( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
                  << endl
                  << endl;
 
@@ -2508,7 +2540,7 @@ void Print_Final_Output(void)
         }
     }
 
-    cout << string_view( g_intact.cbegin() + i, g_intact.cend() );
+    cout << Sv( g_intact.cbegin() + i, g_intact.cend() );
 }
 
 void Print_Header(void)

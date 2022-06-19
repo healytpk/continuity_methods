@@ -75,11 +75,11 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 
 #include <cassert>     // assert
 #include <cstddef>     // size_t
-#include <cstring>     // strcmp
+#include <cstring>     // strcmp, strlen
 #include <cctype>      // isalnum
 #include <string>      // string
 #include <string_view> // string_view
-#include <type_traits> // remove_reference_t, remove_cv_t (both for C++17)
+#include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
 
 class StringAlgorithms {
 
@@ -250,6 +250,82 @@ static std::string_view Sv(A a, B b)  // Pass iterators by value
     return std::string_view( static_cast<char const *>( &*a ), static_cast<string_view::size_type>( &*b - &*a ) );
 }
 
+template<typename A, typename B>
+bool starts_with(A const &a, B const &b)
+{
+    using std::size_t;
+    using std::is_same_v;
+    using std::string;
+    using std::string_view;
+
+    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
+    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
+
+    static_assert(    is_same_v< X, string      >
+                   || is_same_v< X, string_view >, "First argument is wrong type" );
+
+    static_assert(    is_same_v< Y, char *       >
+                   || is_same_v< Y, char const * >
+                   || is_same_v< Y, string       >
+                   || is_same_v< Y, string_view  >, "Second argument is wrong type" );
+
+    size_t const sa = a.size();
+
+    size_t sb;
+
+    if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
+    {
+        assert( nullptr != b );
+        sb = std::strlen(b);
+    }
+    else
+    {
+        sb = b.size();
+    }
+
+    if ( sb > sa ) return false;
+
+    return b == a.substr(0u, sb);
+}
+
+template<typename A, typename B>
+bool ends_with(A const &a, B const &b)
+{
+    using std::size_t;
+    using std::is_same_v;
+    using std::string;
+    using std::string_view;
+
+    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
+    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
+
+    static_assert(    is_same_v< X, string      >
+                   || is_same_v< X, string_view >, "First argument is wrong type" );
+
+    static_assert(    is_same_v< Y, char *       >
+                   || is_same_v< Y, char const * >
+                   || is_same_v< Y, string       >
+                   || is_same_v< Y, string_view  >, "Second argument is wrong type" );
+
+    size_t const sa = a.size();
+
+    size_t sb;
+
+    if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
+    {
+        assert( nullptr != b );
+        sb = std::strlen(b);
+    }
+    else
+    {
+        sb = b.size();
+    }
+
+    if ( sb > sa ) return false;
+
+    return b == a.substr(sa - sb);
+}
+
 // ==========================================================================
 // Section 3 of 9 : Implementation of container type : FIFO map
 // ==========================================================================
@@ -324,7 +400,7 @@ public:
         data.emplace_back(k,m);
     }
 
-    std::size_t const size(void) const { return data.size(); }
+    std::size_t size(void) const { return data.size(); }
 
     typename decltype(data)::const_iterator cbegin(void) const { return data.cbegin(); }
     typename decltype(data)::const_iterator cend  (void) const { return data.cend  (); }
@@ -413,7 +489,7 @@ template<
     class CharT = typename std::iterator_traits<BidirIt>::value_type,
     class Traits = std::regex_traits<CharT>
 >
-class regex_top_level_token_iterator : std::regex_token_iterator<BidirIt,CharT,Traits> {
+class regex_top_level_token_iterator : public std::regex_token_iterator<BidirIt,CharT,Traits> {
 private:
 
     using Base = std::regex_token_iterator<BidirIt,CharT,Traits>;
@@ -547,7 +623,7 @@ template<
     class CharT = typename std::iterator_traits<BidirIt>::value_type,
     class Traits = std::regex_traits<CharT>
 >
-class regex_top_level_iterator : std::regex_iterator<BidirIt,CharT,Traits> {
+class regex_top_level_iterator : public std::regex_iterator<BidirIt,CharT,Traits> {
 private:
 
     using Base = std::regex_iterator<BidirIt,CharT,Traits>;
@@ -957,7 +1033,7 @@ public:
                 continue;
             }
 
-            string_view const found { (*iter)[1u].first, (*iter)[1u].second };
+            string_view const found { Sv((*iter)[1u].first, (*iter)[1u].second) };
 
             for ( size_t location = 0u; location < _original.size(); ++location)
             {
@@ -1197,7 +1273,7 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
     StringAlgorithms::replace_all(retval, "mOnKeY", "::");
 
 #if 1
-    if ( retval.starts_with("template") ) return {};
+    if ( starts_with(retval, "template") ) return {};
 #else
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
@@ -1755,7 +1831,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     string intro = TextBeforeOpenCurlyBracket(cp.First());
 
-    if ( intro.starts_with("namespace") )
+    if ( starts_with(intro, "namespace") )
     {
         string str;
 
@@ -1776,7 +1852,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         return { "namespace", str, {} };
     }
 
-    if (   !(intro.starts_with("class") || intro.starts_with("struct"))   ) return {};
+    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return {};
 
     StringAlgorithms::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
 
@@ -1918,7 +1994,7 @@ bool Strip_Last_Scope(string &str)
 
     if ( separator == str ) return false; // If the input is "::"
 
-    if ( (str.size() < (2*seplen + 1u)) || (false == str.starts_with(separator)) || (false == str.ends_with(separator)) )  // minimum = "::A::"
+    if ( (str.size() < (2*seplen + 1u)) || (false == starts_with(str,separator)) || (false == ends_with(str,separator)) )  // minimum = "::A::"
     {
         throw runtime_error("Remove_Last_Scope: Invalid string");
     }
@@ -1946,7 +2022,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    if ( classname.starts_with("::") )  // If it's an absolute class name rather than relative
+    if ( starts_with(classname,"::") )  // If it's an absolute class name rather than relative
     {
         g_scope_names.at(classname);  // just to see if it throws
         return classname;
@@ -2179,7 +2255,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
-    assert( scope_name.ends_with("::") );
+    assert( ends_with(scope_name,"::") );
 
     regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
@@ -2481,9 +2557,9 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
     if ( separator == str ) return; // If the input is "::"
 
-    if ( str.ends_with(separator) ) str.remove_suffix(seplen);  // Turn "::A::B::" into "::A::B"
+    if ( ends_with(str,separator) ) str.remove_suffix(seplen);  // Turn "::A::B::" into "::A::B"
 
-    if ( (str.size() < (seplen + 1u)) || (false == str.starts_with(separator)) || str.ends_with(separator) )  // minimum = "::A"
+    if ( (str.size() < (seplen + 1u)) || (false == starts_with(str,separator)) || ends_with(str,separator) )  // minimum = "::A"
     {
         throw runtime_error("Remove_Last_Scope: Invalid string");
     }

@@ -1,0 +1,36 @@
+=======================================================================================
+    START OF constructors for FurtherDerived
+=======================================================================================
+Base2::Constructor
+Base1A::Constructor
+Derived1A::Constructor
+Base1B::Constructor
+Derived1B::Constructor
+Derived2::Constructor
+FurtherDerived::Constructor
+=======================================================================================
+    START OF continuity methods for FurtherDerived
+=======================================================================================
+Base1A value = 7
+Derived1A value = 7
+Base1B value = 7
+Derived1B value = 7
+Derived2 value = 7
+FurtherDerived starts, value = 7
+monkey = 8
+monkey = 9
+FurtherDerived ends
+
+
+=======================================================================================
+    START OF constructors for Derived1B
+=======================================================================================
+Base1A::Constructor
+Base1B::Constructor
+Derived1B::Constructor
+=======================================================================================
+    START OF continuity methods for Derived1B
+=======================================================================================
+Base1A value = 7
+Base1B value = 7
+Derived1B value = 7

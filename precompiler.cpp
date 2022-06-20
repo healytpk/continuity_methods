@@ -2166,13 +2166,13 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<
         }
 
         size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
-        if ( -1 != index_of_last_colon && (':' != classname[0u]) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+        if ( -1 != index_of_last_colon && (false == starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
             // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
             prefix += classname.substr(0u, index_of_last_colon);
             prefix += "::";
         }
-        else
+        else if ( starts_with(classname, "::") )
         {
             prefix.clear();  // In case the base class begins with two colons: "class MyClass : public ::SomeClass {};"
         }

@@ -1500,7 +1500,7 @@ void Print_Helper_Classes_For_Class(string classname)
 
     cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
 
-    cout << "namespace Testers {\n";
+    cout << "namespace Testers {\n\n";
     for ( auto const &e : g_func_alterations )
     {
         string_view const tmp1 = e.second.fsig.Name();
@@ -1540,6 +1540,7 @@ void Print_Helper_Classes_For_Class(string classname)
     "    template<class Base>\n"
     "    class MI final : public IMethodInvoker {\n"
     "    protected:\n"
+    "\n"
     "        // All methods have one extra\n"
     "        // parameter for 'this' as 'void*'\n";
 
@@ -1553,11 +1554,11 @@ void Print_Helper_Classes_For_Class(string classname)
 
         cout << " override\n" <<
                 "        {\n"
-                "            Base *const p = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
+                "            Base *const p_base_x7c1 = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
                 "            if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << "____WITHOUT_CONTINUITY>::value )\n"
                 "            {\n"
-                "                return p->Base::";
+                "                return p_base_x7c1->Base::";
 
         e.second.fsig.Invocation____WITHOUT_CONTINUITY(cout);
 
@@ -1565,7 +1566,7 @@ void Print_Helper_Classes_For_Class(string classname)
                 "            }\n"
                 "            else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << ">::value )\n"
                 "            {\n"
-                "                return p->Base::";
+                "                return p_base_x7c1->Base::";
 
         e.second.fsig.Invocation(cout);
 
@@ -1573,7 +1574,11 @@ void Print_Helper_Classes_For_Class(string classname)
                 "            }\n"
                 "            else\n"
                 "            {\n"
-                "                return;\n"
+                "                return decltype(static_cast<Derived*>(arg_this)->";
+
+        e.second.fsig.Invocation(cout);
+
+        cout << ")();\n"
                 "            }\n"
                 "        }\n\n";
     }
@@ -2541,15 +2546,15 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         s << ";\n"
              "}\n\n";
 
-        s << "this->";
+        s << "return this->";
 
         g_func_alterations[index].fsig.Invocation____WITHOUT_CONTINUITY(s);
 
-        s << ";\n";
+        s << ";";
 
         s << Unindent();
 
-        s << "\n}\n\n";
+        s << "\n}";
     }
 
     return retval;
@@ -2612,13 +2617,12 @@ void Print_Final_Output(void)
 
             fs.Original_Function_Signature_Renamed(cout);
 
+            /* REVISIT - FIX - Add code here to put in whitespace between function signature and open curly bracket */
+
             cout << Sv( g_intact.cbegin() + mi.p_body->First(), g_intact.cbegin() + mi.p_body->Last() + 1u )
-                 << endl
                  << endl;
 
-            cout << mi.replacement_body.str() << endl
-                 << endl
-                 << endl;
+            cout << mi.replacement_body.str();
 
             i = mi.p_body->Last() + 1u;
         }
@@ -2632,22 +2636,14 @@ void Print_Header(void)
     cout << "namespace Continuity_Methods {\n"
             "\n"
             "    typedef decltype(sizeof(char)) size_t;\n"
-            "    typedef decltype((char*)0 - (char*)0) ptrdiff_t;\n"
+            "    typedef decltype((char*)nullptr - (char*)nullptr) ptrdiff_t;\n"
             "\n"
-            "    template<class T, T v>\n"
-            "    struct integral_constant {\n"
-            "        static constexpr T value = v;\n"
-            "        using value_type = T;\n"
-            "        using type = integral_constant; // using injected-class-name\n"
-            "        constexpr operator value_type() const noexcept { return value; }\n"
-            "        constexpr value_type operator()() const noexcept { return value; } // since c++14\n"
-            "    };\n"
-            "\n"
-            "    using  true_type = integral_constant<bool,  true>;\n"
-            "    using false_type = integral_constant<bool, false>;\n"
+            "    struct  true_type { static constexpr bool value = true ; };\n"
+            "    struct false_type { static constexpr bool value = false; };\n"
             "\n"
             "    template <class T, template <class...> class Test>\n"
             "    struct exists {\n"
+            "\n"
             "        template<class U>\n"
             "        static true_type check(Test<U>*);\n"
             "\n"

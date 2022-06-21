@@ -1,0 +1,52 @@
+#include <iostream>
+using std::cout;
+using std::endl;
+
+int g_arr[5u];
+
+class Laser {
+public:
+    int Trigger(double d, int i, float f, char *p)
+    {
+        cout << "Set pin high to switch transistor to allow laser current" << endl;
+        
+        return 5;
+    }
+};
+
+class Laser_Nitrogen : virtual public Laser {
+public:
+    int Trigger(double d, int i, float f, char *p) continue
+    {
+        cout << "Set TTL pin high to activate nitrogen laser" << endl;
+
+        return 5;
+    }
+};
+
+class Laser_PicoSecond : virtual public Laser {
+public:
+    int Trigger(double d, int i, float f, char *p) continue
+    {
+        cout << "Send trigger command to the PicoSecond laser over RS232" << endl;
+
+        return 5;
+    }
+};
+
+class Laser_NitrogenPicoSecond : public Laser_Nitrogen, public Laser_PicoSecond {
+public:
+    int Trigger(double d, int i, float f, char *p) continue
+    {
+        /* nothing to do here */
+        
+        return 5;
+    }
+};
+
+int main(void)
+{
+	Laser_NitrogenPicoSecond obj;
+
+	obj.Trigger(5.0, 6, 2.4f, nullptr);
+}

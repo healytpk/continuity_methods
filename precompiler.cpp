@@ -2469,6 +2469,8 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
                              iter != std::sregex_iterator();
                              ++iter )
     {
+        bool is_destructor_order = false;
+
         clog << "At least one continue method found" << endl;
 
         retval = true;
@@ -2524,7 +2526,9 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             s << e << ";\n";
         }
 
-        s << "\nInvoker methods[" << bases.size() << "u] = {";
+        s << "static MethodInvokerT::MI< " << svclass << " > mi_" << derived_replaced << ";\n";
+
+        s << "\nInvoker methods[" << bases.size() + 1u << "u] = {";
         s << Indent();
         for ( auto &e : bases )
         {
@@ -2533,24 +2537,26 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             s << "\nInvoker(mi_" << e << ", " << "this),";
         }
 
+        s << "\nInvoker(mi_" << derived_replaced << ", " << "this),";
+
         s << Unindent();
 
         s << "\n};\n\n";
 
-        s << "for ( auto &e : methods | Continuity_Methods::constructor_order )\n"
+        s << "for ( auto &e : methods | Continuity_Methods::" << ( is_destructor_order ? "de" : "con" ) << "structor_order )\n"
              "{\n"
+             "    if ( &e == &methods[" << ( is_destructor_order ? 0u : bases.size() ) << "u] ) return e.";
+
+        g_func_alterations[index].fsig.Invocation(s);
+
+        s << ";\n"
+          << "\n"
              "    e.";
 
         g_func_alterations[index].fsig.Invocation(s);
 
         s << ";\n"
-             "}\n\n";
-
-        s << "return this->";
-
-        g_func_alterations[index].fsig.Invocation____WITHOUT_CONTINUITY(s);
-
-        s << ";";
+             "}";
 
         s << Unindent();
 

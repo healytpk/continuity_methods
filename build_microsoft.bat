@@ -4,9 +4,9 @@ set compiler="C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tool
 
 %compiler% /Fe:precompiler.exe ./precompiler.cpp /std:c++20 /EHsc
 
-%compiler% /EP sample_simple.cpp /std:c++20 | precompiler.exe > trans_simple.cpp
-%compiler% /Fe:bin_simple.exe ./trans_simple.cpp /std:c++20 /EHsc
-bin_simple.exe
+%compiler% /EP sample_lasers.cpp /std:c++20 | precompiler.exe > trans_lasers.cpp
+%compiler% /Fe:bin_lasers.exe ./trans_lasers.cpp /std:c++20 /EHsc
+bin_lasers.exe
 
 %compiler% /EP sample_simple.cpp /std:c++20 | precompiler.exe > trans_simple.cpp
 %compiler% /Fe:bin_simple.exe ./trans_simple.cpp /std:c++20 /EHsc

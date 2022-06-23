@@ -6,6 +6,10 @@
  * 'Continuity Methods'.
 */
 
+#if defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX) && defined(NDEBUG)
+#    error "Don't define NDEBUG and still want to use libstdc++ debugging"
+#endif
+
 // =================================================================
 // Section 1 of 9 : Override global 'new' and 'delete' for max speed
 // =================================================================
@@ -77,7 +81,13 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <cstddef>     // size_t
 #include <cstring>     // strcmp, strlen
 #include <cctype>      // isalnum
-#include <string>      // string
+#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
+#    include <debug/string>
+     using __gnu_debug::string;
+#else
+#    include <string>     // string, to_string
+     using std::string;
+#endif
 #include <string_view> // string_view
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
 
@@ -85,7 +95,7 @@ class StringAlgorithms {
 
 private:
 
-    static void trim_all(std::string &s)
+    static void trim_all(string &s)
     {
         if ( s.empty() ) return;
 
@@ -105,15 +115,18 @@ private:
 
         assert( 0u == i );
 
-        if ( std::isspace(static_cast<char unsigned>(s.front())) )
-        {
-            s.erase(0,1u);
-        }
+        if ( s.empty() ) return;
+
+        if ( std::isspace(static_cast<char unsigned>(s.front())) ) s.erase(            0u, 1u );
+
+        if ( s.empty() ) return;
+
+        if ( std::isspace(static_cast<char unsigned>(s.back() )) ) s.erase( s.size() - 1u, 1u );
     }
 
 public:
 
-    static void erase_all(std::string &s, std::string_view const sv)
+    static void erase_all(string &s, std::string_view const sv)
     {
         if ( s.empty() || sv.empty() ) return;
 
@@ -124,7 +137,7 @@ public:
         }
     }
 
-    static void replace_all(std::string &s, std::string_view const sv_old, std::string_view const sv_new)
+    static void replace_all(string &s, std::string_view const sv_old, std::string_view const sv_new)
     {
         if ( s.empty() || sv_old.empty() ) return;
 
@@ -158,7 +171,9 @@ private:
 
         static char const *const tripple_syms[] = { "<<=", ">>=", "<=>", "->*" };
 
+        assert( i < s.size() );
         assert( ' ' == s[i] );
+        assert( (i + 1u) < s.size() );  // If this fails then 's' ends with a space
 
         if ( IsIdChar(s[i-1u]) && IsIdChar(s[i+1u]) )
         {
@@ -171,11 +186,15 @@ private:
 
             monkey[0u] = s[i - 1u];
             monkey[1u] = s[i + 1u];
+
+            if ( (i + 2u) < s.size() )
+            {
             monkey[2u] = s[i + 2u];
 
             if ( 0 == std::strcmp(sss,monkey) ) return true;
+            }
 
-            if ( 1u == i ) continue;
+            if ( i < 2u ) continue;
 
             monkey[0u] = s[i - 2u];
             monkey[1u] = s[i - 1u];
@@ -197,7 +216,7 @@ private:
         return false;
     }
 
-    static void Remove_Unnecessary_Spaces(std::string &s)
+    static void Remove_Unnecessary_Spaces(string &s)
     {
         for ( std::size_t i = 0u;
                   i != s.size()
@@ -212,9 +231,16 @@ private:
 
 public:
 
-    static void Minimise_Whitespace(std::string &s)
+    static void Minimise_Whitespace(string &s)
     {
+        assert( false == s.empty() );
         trim_all(s);  // Removes leading whitespace, trailing whitespace, and reduces all other whitespace to one space ' '
+
+        if ( s.empty() ) return;
+
+        assert(   false == std::isspace( static_cast<char unsigned>(s.front()) )   );
+        assert(   false == std::isspace( static_cast<char unsigned>(s.back() ) )   );
+
         Remove_Unnecessary_Spaces(s);
     }
 };
@@ -226,7 +252,6 @@ template<typename A, typename B>
 static std::string_view Sv(A a, B b)  // Pass iterators by value
 {
     using std::is_same_v;
-    using std::string;
     using std::string_view;
 
     typedef std::remove_cv_t< std::remove_reference_t<A> > X;  // C++17 doesn't have remove_cvref_t
@@ -255,7 +280,6 @@ bool starts_with(A const &a, B const &b)
 {
     using std::size_t;
     using std::is_same_v;
-    using std::string;
     using std::string_view;
 
     typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
@@ -293,7 +317,6 @@ bool ends_with(A const &a, B const &b)
 {
     using std::size_t;
     using std::is_same_v;
-    using std::string;
     using std::string_view;
 
     typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
@@ -330,7 +353,14 @@ bool ends_with(A const &a, B const &b)
 // Section 3 of 9 : Implementation of container type : FIFO map
 // ==========================================================================
 
-#include <list>       // list
+#include <cstddef>  // Just to get __GLIBCXX__ defined
+#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
+#    include <debug/list>
+     using __gnu_debug::list;
+#else
+#    include <list>
+     using std::list;
+#endif
 #include <utility>    // pair
 #include <algorithm>  // find
 #include <stdexcept>  // out_of_range
@@ -365,7 +395,7 @@ protected:
 
     typedef PairType value_type;
 
-    std::list<PairType> data;
+    list<PairType> data;
 
 public:
 
@@ -422,24 +452,35 @@ bool constexpr print_all_scopes = false;
 bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 #include <cstdlib>        // EXIT_FAILURE, abort
+#include <cctype>         // isspace, isalpha, isdigit
 #include <cstring>        // memset, memcpy
 #include <cstdio>         // freopen, stdin
 #include <iostream>       // cout, clog, endl
 #include <algorithm>      // copy, replace, count, all_of, any_of
 #include <iterator>       // next, distance, back_inserter, istream_iterator, iterator_traits
-#include <string>         // string, to_string
 #include <ios>            // ios::binary
 #include <iomanip>        // noskipws
 #include <stdexcept>      // out_of_range, runtime_error
 #include <utility>        // pair<>
-#include <cctype>         // isspace, isalpha, isdigit
-#include <list>           // list
-#include <map>            // map
+#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
+#    include <debug/string>
+#    include <debug/list>
+#    include <debug/set>
+     using __gnu_debug::string;
+     using __gnu_debug::list;
+     using __gnu_debug::set;
+#else
+#    include <string>     // string, to_string
+#    include <list>       // list
+#    include <set>        // set
+     using std::string;
+     using std::list;
+     using std::set;
+#endif
 #include <array>          // array
 #include <tuple>          // tuple
 #include <utility>        // pair, move
 #include <string_view>    // string_view
-#include <set>            // set
 #include <regex>          // regex, regex_replace, smatch, match_results
 #include <exception>      // exception
 #include <chrono>         // duration_cast, milliseconds, steady_clock
@@ -450,10 +491,8 @@ using std::cin;
 using std::cout;
 using std::clog;
 using std::endl;
-using std::string;
 using std::to_string;
 using std::string_view;
-using std::list;
 using std::array;
 using std::tuple;
 using std::pair;
@@ -1267,6 +1306,8 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 
     string retval = g_intact.substr(i + 1u, char_index - i - 1u);   // REVISIT FIX might overlap
 
+    if ( retval.empty() ) return {};
+
     StringAlgorithms::Minimise_Whitespace(retval);
     StringAlgorithms::replace_all(retval, "::", "mOnKeY");
     StringAlgorithms::replace_all(retval, ":", " : ");
@@ -1292,7 +1333,7 @@ public:
 
         CurlyPair *_parent;
         pair<size_t,size_t> _indices;
-        std::list<CurlyPair> _nested;
+        list<CurlyPair> _nested;
 
     public:
 
@@ -1313,7 +1354,7 @@ public:
 
         CurlyPair const *Parent(void) const;
 
-        std::list<CurlyPair> const &Nested(void) const noexcept { return _nested; }
+        list<CurlyPair> const &Nested(void) const noexcept { return _nested; }
 
         CurlyPair *Add_New_Inner_Scope(size_t const first)
         {
@@ -2134,7 +2175,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, std::set<string> &already_recorded, bool is_virtual, list<string> &retval)
+bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
 {
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
@@ -2200,7 +2241,7 @@ list<string> Get_All_Bases(string_view arg)
     string_view const prefix    = arg.substr(0u, index_of_last_colon + 2u);
     string_view const classname = arg.substr(index_of_last_colon +  2u);
 
-    std::set<string> already_recorded;
+    set<string> already_recorded;
 
     list<string> retval;
 

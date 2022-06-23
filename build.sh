@@ -1,8 +1,14 @@
 #!/bin/sh
 
-rm -rf prog transunit_* final_* bin_*
+rm -rf precompiler transunit_* final_* bin_*
 
-COMMAND_BUILD_PRECOMPILER="g++ -o prog -std=c++20 precompiler.cpp -ggdb3 -Og"
+if [ "$1" == "--extreme" ]; then
+    #-DPRECOMPILER_USE_DEBUG_LIBSTDCXX
+    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -ggdb3 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsanitize=address,leak,undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all"
+else
+    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -ggdb3"
+fi
+
 echo "= = = = = Building 'precompiler.cpp' . . . "
 echo ${COMMAND_BUILD_PRECOMPILER}
 ${COMMAND_BUILD_PRECOMPILER}
@@ -31,7 +37,7 @@ do
 	fi
 done
 
-COMMAND_PRECOMPILER="| ./prog 2> /dev/null"
+COMMAND_PRECOMPILER="| ./precompiler 2> /dev/null"
 find -name "transunit_*.cpp" | xargs -r -n1 basename | while read filename;
 do
     echo "= = = = = Producing C++20 source file from translation unit. . . "
@@ -64,9 +70,9 @@ do
 done
 
 echo "= = = = = Attempting to build with the clang compiler (with 'libstdc++'). . . "
-/opt/clang/bin/clang++ -o clang_prog_libstdc++ -std=c++20 -stdlib=libstdc++ ./precompiler.cpp
-/opt/clang/bin/clang++ -std=c++20 -stdlib=libstdc++ -E -P sample_lasers.cpp | ./clang_prog_libstdc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libstdc++ -std=c++20 -stdlib=libstdc++ -x c++ -
+/opt/clang/bin/clang++ -o clang_precompiler_libstdc++ -std=c++20 -stdlib=libstdc++ ./precompiler.cpp
+/opt/clang/bin/clang++ -std=c++20 -stdlib=libstdc++ -E -P sample_lasers.cpp | ./clang_precompiler_libstdc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libstdc++ -std=c++20 -stdlib=libstdc++ -x c++ -
 echo "= = = = = Attempting to build with the clang compiler (with 'libc++'). . . "
-/opt/clang/bin/clang++ -o clang_prog_libc++ -std=c++20 -stdlib=libc++ ./precompiler.cpp
-/opt/clang/bin/clang++ -std=c++20 -stdlib=libc++ -E -P sample_lasers.cpp | ./clang_prog_libc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libc++ -std=c++20 -stdlib=libc++ -x c++ -
+/opt/clang/bin/clang++ -o clang_precompiler_libc++ -std=c++20 -stdlib=libc++ ./precompiler.cpp
+/opt/clang/bin/clang++ -std=c++20 -stdlib=libc++ -E -P sample_lasers.cpp | ./clang_precompiler_libc++ 2> /dev/null | /opt/clang/bin/clang++ -o bin_clang_lasers_libc++ -std=c++20 -stdlib=libc++ -x c++ -
 

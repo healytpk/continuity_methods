@@ -89,6 +89,7 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
      namespace std_or_gnu_debug { using std::string; }
 #endif
 #include <string_view> // string_view
+#include <algorithm>   // all_of
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
 
 class StringAlgorithms {

@@ -80,18 +80,21 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <cassert>     // assert
 #include <cstddef>     // size_t
 #include <cstring>     // strcmp, strlen
-#include <cctype>      // isalnum
+#include <cctype>      // isalnum, isdigit
 #if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
 #    include <debug/string>
-     using __gnu_debug::string;
+     namespace std_or_gnu_debug { using __gnu_debug::string; }
 #else
 #    include <string>     // string, to_string
-     using std::string;
+     namespace std_or_gnu_debug { using std::string; }
 #endif
 #include <string_view> // string_view
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
 
 class StringAlgorithms {
+
+    typedef std_or_gnu_debug::string string;
+    typedef std::string_view string_view;
 
 private:
 
@@ -126,7 +129,7 @@ private:
 
 public:
 
-    static void erase_all(string &s, std::string_view const sv)
+    static void erase_all(string &s, string_view const sv)
     {
         if ( s.empty() || sv.empty() ) return;
 
@@ -137,7 +140,7 @@ public:
         }
     }
 
-    static void replace_all(string &s, std::string_view const sv_old, std::string_view const sv_new)
+    static void replace_all(string &s, string_view const sv_old, string_view const sv_new)
     {
         if ( s.empty() || sv_old.empty() ) return;
 
@@ -154,14 +157,14 @@ public:
         }
     }
 
-private:
-
-    static bool IsIdChar(char const c)
+    static bool IsIdChar(char const c) noexcept
     {
         return '_' == c || std::isalnum(static_cast<char unsigned>(c));
     }
 
-    static bool Is_Space_Necessary(std::string_view const s, std::size_t const i)
+private:
+
+    static bool Is_Space_Necessary(string_view const s, std::size_t const i)
     {
         // Input string has already had all white
         // space reduced to one space, and it
@@ -243,110 +246,161 @@ public:
 
         Remove_Unnecessary_Spaces(s);
     }
+
+    static bool Is_Entire_String_Valid_Identifier(string_view const sv)
+    {
+        assert( false == sv.empty() );
+
+        if ( false == std::isdigit(static_cast<char unsigned>(sv[0u])) )  // First character can't be a digit
+        {
+            return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return IsIdChar(c); } );
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    static std::size_t FindFirstId(string_view const haystack, string_view const needle)
+    {
+        assert( false == haystack.empty() );
+        assert( false ==   needle.empty() );
+        assert( Is_Entire_String_Valid_Identifier(needle) );
+
+        std::size_t i = 0u;
+
+        for (;; ++i)
+        {
+            i = haystack.find(needle, i);
+
+            if ( -1 == i ) return -1;
+
+            if (    (0u != i) && IsIdChar( haystack[i - 1u] )    ) continue;
+
+            if ( ((i + needle.size()) < haystack.size()) && IsIdChar( haystack[i + needle.size()] ) ) continue;
+
+            return i;
+        }
+    }
+
+    static void EraseAllIds(string &s, string_view const id)
+    {
+        size_t i = 0u;
+
+        while ( -1 != (i = FindFirstId(s,id)) )
+        {
+            s.erase(i,id.size());
+        }
+    }
+
+    template<typename A, typename B>
+    static bool starts_with(A const &a, B const &b)
+    {
+        using std::size_t;
+        using std::is_same_v;
+
+        typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
+        typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
+
+        static_assert(    is_same_v< X, string      >
+                       || is_same_v< X, string_view >, "First argument is wrong type" );
+
+        static_assert(    is_same_v< Y, char *       >
+                       || is_same_v< Y, char const * >
+                       || is_same_v< Y, string       >
+                       || is_same_v< Y, string_view  >, "Second argument is wrong type" );
+
+        size_t const sa = a.size();
+
+        size_t sb;
+
+        if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
+        {
+            assert( nullptr != b );
+            sb = std::strlen(b);
+        }
+        else
+        {
+            sb = b.size();
+        }
+
+        if ( sb > sa ) return false;
+
+        return b == a.substr(0u, sb);
+    }
+
+    template<typename A, typename B>
+    static bool ends_with(A const &a, B const &b)
+    {
+        using std::size_t;
+        using std::is_same_v;
+
+        typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
+        typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
+
+        static_assert(    is_same_v< X, string      >
+                       || is_same_v< X, string_view >, "First argument is wrong type" );
+
+        static_assert(    is_same_v< Y, char *       >
+                       || is_same_v< Y, char const * >
+                       || is_same_v< Y, string       >
+                       || is_same_v< Y, string_view  >, "Second argument is wrong type" );
+
+        size_t const sa = a.size();
+
+        size_t sb;
+
+        if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
+        {
+            assert( nullptr != b );
+            sb = std::strlen(b);
+        }
+        else
+        {
+            sb = b.size();
+        }
+
+        if ( sb > sa ) return false;
+
+        return b == a.substr(sa - sb);
+    }
+
+    // The following function is to support C++17 which is lacking the
+    // constructor for 'string_view' which takes two iterators. Also we want
+    // to be able to mix and match different iterator types.
+    template<typename A, typename B>
+    static string_view Sv(A a, B b)  // Pass iterators by value
+    {
+        using std::is_same_v;
+        using std::string_view;
+        using std_or_gnu_debug::string;
+
+        typedef std::remove_cv_t< std::remove_reference_t<A> > X;  // C++17 doesn't have remove_cvref_t
+        typedef std::remove_cv_t< std::remove_reference_t<B> > Y;
+
+        static_assert(    is_same_v< X, char *                      >
+                       || is_same_v< X, char const *                >
+                       || is_same_v< X, string::iterator            >
+                       || is_same_v< X, string::const_iterator      >
+                       || is_same_v< X, string_view::iterator       >
+                       || is_same_v< X, string_view::const_iterator >, "First argument is wrong type" );
+
+        static_assert(    is_same_v< Y, char *                      >
+                       || is_same_v< Y, char const *                >
+                       || is_same_v< Y, string::iterator            >
+                       || is_same_v< Y, string::const_iterator      >
+                       || is_same_v< Y, string_view::iterator       >
+                       || is_same_v< Y, string_view::const_iterator >, "Second argument is wrong type" );
+
+        // Now we use the constructor which takes a pointer and an integer length
+        return std::string_view( static_cast<char const *>( &*a ), static_cast<string_view::size_type>( &*b - &*a ) );
+    }
 };
 
-// The following function is to support C++17 which is lacking the
-// constructor for 'string_view' which takes two iterators. Also we want
-// to be able to mix and match different iterator types.
 template<typename A, typename B>
 static std::string_view Sv(A a, B b)  // Pass iterators by value
 {
-    using std::is_same_v;
-    using std::string_view;
-
-    typedef std::remove_cv_t< std::remove_reference_t<A> > X;  // C++17 doesn't have remove_cvref_t
-    typedef std::remove_cv_t< std::remove_reference_t<B> > Y;
-
-    static_assert(    is_same_v< X, char *                      >
-                   || is_same_v< X, char const *                >
-                   || is_same_v< X, string::iterator            >
-                   || is_same_v< X, string::const_iterator      >
-                   || is_same_v< X, string_view::iterator       >
-                   || is_same_v< X, string_view::const_iterator >, "First argument is wrong type" );
-
-    static_assert(    is_same_v< Y, char *                      >
-                   || is_same_v< Y, char const *                >
-                   || is_same_v< Y, string::iterator            >
-                   || is_same_v< Y, string::const_iterator      >
-                   || is_same_v< Y, string_view::iterator       >
-                   || is_same_v< Y, string_view::const_iterator >, "Second argument is wrong type" );
-
-    // Now we use the constructor which takes a pointer and an integer length
-    return std::string_view( static_cast<char const *>( &*a ), static_cast<string_view::size_type>( &*b - &*a ) );
-}
-
-template<typename A, typename B>
-bool starts_with(A const &a, B const &b)
-{
-    using std::size_t;
-    using std::is_same_v;
-    using std::string_view;
-
-    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
-    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
-
-    static_assert(    is_same_v< X, string      >
-                   || is_same_v< X, string_view >, "First argument is wrong type" );
-
-    static_assert(    is_same_v< Y, char *       >
-                   || is_same_v< Y, char const * >
-                   || is_same_v< Y, string       >
-                   || is_same_v< Y, string_view  >, "Second argument is wrong type" );
-
-    size_t const sa = a.size();
-
-    size_t sb;
-
-    if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
-    {
-        assert( nullptr != b );
-        sb = std::strlen(b);
-    }
-    else
-    {
-        sb = b.size();
-    }
-
-    if ( sb > sa ) return false;
-
-    return b == a.substr(0u, sb);
-}
-
-template<typename A, typename B>
-bool ends_with(A const &a, B const &b)
-{
-    using std::size_t;
-    using std::is_same_v;
-    using std::string_view;
-
-    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
-    typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<B> > > Y;
-
-    static_assert(    is_same_v< X, string      >
-                   || is_same_v< X, string_view >, "First argument is wrong type" );
-
-    static_assert(    is_same_v< Y, char *       >
-                   || is_same_v< Y, char const * >
-                   || is_same_v< Y, string       >
-                   || is_same_v< Y, string_view  >, "Second argument is wrong type" );
-
-    size_t const sa = a.size();
-
-    size_t sb;
-
-    if constexpr ( is_same_v< Y, char * > || is_same_v< Y, char const * > )
-    {
-        assert( nullptr != b );
-        sb = std::strlen(b);
-    }
-    else
-    {
-        sb = b.size();
-    }
-
-    if ( sb > sa ) return false;
-
-    return b == a.substr(sa - sb);
+    return StringAlgorithms::Sv(a,b);
 }
 
 // ==========================================================================
@@ -787,25 +841,6 @@ using r_svregex_top_level_iterator       = regex_top_level_iterator      <string
 // Section 6 of 9 : Process keywords and identifiers
 // ==========================================================================
 
-inline bool Is_Valid_Identifier_Char(char const c)
-{
-    return std::isalpha(static_cast<char unsigned>(c)) || std::isdigit(static_cast<char unsigned>(c)) || ('_' == c);
-}
-
-inline bool Is_Entire_String_Valid_Identifier(string_view const sv)
-{
-    assert( false == sv.empty() );
-
-    if ( std::isalpha(static_cast<char unsigned>(sv.front())) || ('_' == sv.front()) )  // First character can't be a digit
-    {
-        return std::all_of( sv.cbegin(), sv.cend(), [](char const c){ return Is_Valid_Identifier_Char(c); } );
-    }
-    else
-    {
-        return false;
-    }
-}
-
 struct ShortStr {
     char c[4u];
 };
@@ -868,13 +903,13 @@ void Find_And_Erase_All_Keywords(string &s)
 
             size_t const one_past_last = i + strlen(e);
 
-            if ( (one_past_last < s.size()) && Is_Valid_Identifier_Char(s[one_past_last]) )
+            if ( (one_past_last < s.size()) && StringAlgorithms::IsIdChar(s[one_past_last]) )
             {
                 //cout << "disregarding" << endl;
                 continue;
             }
 
-            if (     (0u != i)       && Is_Valid_Identifier_Char(s[i-1u]) )
+            if ( (0u != i) && StringAlgorithms::IsIdChar(s[i-1u]) )
             {
                 //cout << "disregarding" << endl;
                 continue;
@@ -933,7 +968,7 @@ protected:
 
             _name = _original;
 
-            while ( false == _name.empty() && false == Is_Entire_String_Valid_Identifier(_name) )
+            while ( false == _name.empty() && false == StringAlgorithms::Is_Entire_String_Valid_Identifier(_name) )
             {
                 //_name.remove_prefix(1u);
                 _name.erase(0u,1u);
@@ -1086,13 +1121,13 @@ public:
 
                 size_t const one_past_last = location + found.size();
 
-                if ( (one_past_last < _original.size()) && Is_Valid_Identifier_Char(_original[one_past_last]) )
+                if ( (one_past_last < _original.size()) && StringAlgorithms::IsIdChar(_original[one_past_last]) )
                 {
                     //cout << "disregarding AAA" << endl;
                     continue;
                 }
 
-                if (     (0u != location)       && Is_Valid_Identifier_Char(_original[location-1u]) )
+                if (     (0u != location)       && StringAlgorithms::IsIdChar(_original[location-1u]) )
                 {
                     //cout << "disregarding BBB because previous char at location " << location - 1u << " is " << s[location - 1u] << endl;
                     continue;
@@ -1314,7 +1349,7 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
     StringAlgorithms::replace_all(retval, "mOnKeY", "::");
 
 #if 1
-    if ( starts_with(retval, "template") ) return {};
+    if ( StringAlgorithms::starts_with(retval, "template") ) return {};
 #else
     //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
@@ -1882,7 +1917,7 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
 
     string intro = TextBeforeOpenCurlyBracket(cp.First());
 
-    if ( starts_with(intro, "namespace") )
+    if ( StringAlgorithms::starts_with(intro, "namespace") )
     {
         string str;
 
@@ -1903,9 +1938,9 @@ tuple< string, string, list< array<string,3u> >  > Intro_For_Curly_Pair(CurlyBra
         return { "namespace", str, list< array<string,3u> >() };
     }
 
-    if (   !(starts_with(intro,"class") || starts_with(intro,"struct"))   ) return {};
+    if (   !(StringAlgorithms::starts_with(intro,"class") || StringAlgorithms::starts_with(intro,"struct"))   ) return {};
 
-    StringAlgorithms::erase_all( intro, " final" );   // careful it might be "final{" REVISIT FIX any whitespace not just space
+    StringAlgorithms::EraseAllIds( intro, "final" );
 
     // The following finds spaces except those found inside angle brackets
     regex const my_regex("\\s");
@@ -2045,7 +2080,7 @@ bool Strip_Last_Scope(string &str)
 
     if ( separator == str ) return false; // If the input is "::"
 
-    if ( (str.size() < (2*seplen + 1u)) || (false == starts_with(str,separator)) || (false == ends_with(str,separator)) )  // minimum = "::A::"
+    if ( (str.size() < (2*seplen + 1u)) || (false == StringAlgorithms::starts_with(str,separator)) || (false == StringAlgorithms::ends_with(str,separator)) )  // minimum = "::A::"
     {
         throw runtime_error("Remove_Last_Scope: Invalid string");
     }
@@ -2073,7 +2108,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    if ( starts_with(classname,"::") )  // If it's an absolute class name rather than relative
+    if ( StringAlgorithms::starts_with(classname,"::") )  // If it's an absolute class name rather than relative
     {
         g_scope_names.at(classname);  // just to see if it throws
         return classname;
@@ -2212,13 +2247,13 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<strin
         }
 
         size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
-        if ( -1 != index_of_last_colon && (false == starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+        if ( -1 != index_of_last_colon && (false == StringAlgorithms::starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
             // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
             prefix += classname.substr(0u, index_of_last_colon);
             prefix += "::";
         }
-        else if ( starts_with(classname, "::") )
+        else if ( StringAlgorithms::starts_with(classname, "::") )
         {
             prefix.clear();  // In case the base class begins with two colons: "class MyClass : public ::SomeClass {};"
         }
@@ -2309,7 +2344,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
 
-    assert( ends_with(scope_name,"::") );
+    assert( StringAlgorithms::ends_with(scope_name,"::") );
 
     regex r("using[\\s]+(.+)[\\s]*=[\\s]*(.+)[\\s]*;");
 
@@ -2617,9 +2652,9 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
     if ( separator == str ) return; // If the input is "::"
 
-    if ( ends_with(str,separator) ) str.remove_suffix(seplen);  // Turn "::A::B::" into "::A::B"
+    if ( StringAlgorithms::ends_with(str,separator) ) str.remove_suffix(seplen);  // Turn "::A::B::" into "::A::B"
 
-    if ( (str.size() < (seplen + 1u)) || (false == starts_with(str,separator)) || ends_with(str,separator) )  // minimum = "::A"
+    if ( (str.size() < (seplen + 1u)) || (false == StringAlgorithms::starts_with(str,separator)) || StringAlgorithms::ends_with(str,separator) )  // minimum = "::A"
     {
         throw runtime_error("Remove_Last_Scope: Invalid string");
     }

@@ -1,0 +1,42 @@
+name: mswin_embarcadero
+
+on:
+  push:
+    branches: '*'
+  pull_request:
+    branches: '*'
+
+jobs:
+  build:
+    name: run on windows
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: compile precompiler
+      run: 3rdparty\embarcadero\bcc64.exe -o precompiler.exe precompiler.cpp -std=c++17 import64.a cw64mt.a
+    - name: create lasers translation unit
+      run: 3rdparty\embarcadero\bcc64.exe sample_lasers.cpp -std:c++17 -E -P | precompiler.exe > embarc_trans_lasers.cpp
+      shell: cmd
+    - name: create simple translation unit
+      run: 3rdparty\embarcadero\bcc64.exe sample_simple.cpp -std:c++17 -E -P | precompiler.exe > embarc_trans_simple.cpp
+      shell: cmd
+    - name: build binary for lasers sample
+      run:  3rdparty\embarcadero\bcc64.exe -o embarc_bin_lasers.exe embarc_trans_lasers.cpp -std=c++17 import64.a cw64mt.a
+      shell: cmd
+    - name: build binary for simple sample
+      run:  3rdparty\embarcadero\bcc64.exe -o embarc_bin_simple.exe embarc_trans_simple.cpp -std=c++17 import64.a cw64mt.a
+      shell: cmd
+    - name: build the separate program for comparing text files
+      run:  3rdparty\embarcadero\bcc64.exe -o comparetxt.exe comparetxt.cpp -std=c++17 import64.a cw64mt.a
+      shell: cmd
+    - name: compare expected output for lasers sample
+      run:  embarc_bin_lasers.exe | comparetxt.exe expected_output_lasers.txt
+      shell: cmd
+    - name: compare expected output for simple sample
+      run:  embarc_bin_simple.exe | comparetxt.exe expected_output_simple.txt
+      shell: cmd
+    - name: upload executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: precompiler.exe
+        path: precompiler.exe

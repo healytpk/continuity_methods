@@ -15,10 +15,10 @@ jobs:
     - name: compile precompiler
       run: 3rdparty\embarcadero\bcc64.exe -o precompiler.exe precompiler.cpp -std=c++17 import64.a cw64mt.a
     - name: create lasers translation unit
-      run: 3rdparty\embarcadero\bcc64.exe sample_lasers.cpp -std:c++17 -E -P | precompiler.exe > embarc_trans_lasers.cpp
+      run: 3rdparty\embarcadero\bcc64.exe sample_lasers.cpp -std=c++17 -E -P | precompiler.exe > embarc_trans_lasers.cpp
       shell: cmd
     - name: create simple translation unit
-      run: 3rdparty\embarcadero\bcc64.exe sample_simple.cpp -std:c++17 -E -P | precompiler.exe > embarc_trans_simple.cpp
+      run: 3rdparty\embarcadero\bcc64.exe sample_simple.cpp -std=c++17 -E -P | precompiler.exe > embarc_trans_simple.cpp
       shell: cmd
     - name: build binary for lasers sample
       run:  3rdparty\embarcadero\bcc64.exe -o embarc_bin_lasers.exe embarc_trans_lasers.cpp -std=c++17 import64.a cw64mt.a

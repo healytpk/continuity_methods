@@ -392,6 +392,14 @@ public:
     {
         assert( cxx11_to_address(b) >= cxx11_to_address(a) );
 
+
+        // The next line checks if the string_view is empty, and if it's
+        // not empty it makes sure the last char is not a null char.
+        // This is to try catch an error such as:
+        //     char const brush[] = "brush";
+        //     string_view( brush, brush + sizeof(brush) );
+        assert( (cxx11_to_address(b) == cxx11_to_address(a)) || ('\0' != *(cxx11_to_address(b) - 1u)) );
+
         // Now we use the 'string_view::string_view' constructor which takes a pointer and an integer length.
         // Wise to use static_cast's here to be extra verbose as the class 'string_view' has several constructors.
         return std::string_view(

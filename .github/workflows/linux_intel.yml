@@ -20,7 +20,7 @@ jobs:
         sudo apt update
     - name: install
       run: |
-        sudo apt install -y intel-basekit intel-iotkit
+        sudo apt install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0
     - name: Compile pre-compiler
       run: |
         source /opt/intel/oneapi/setvars.sh; \

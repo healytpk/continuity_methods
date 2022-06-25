@@ -1,0 +1,244 @@
+// stack standard header
+#ifndef _STACK_
+#define _STACK_
+#include <deque>
+_STD_BEGIN
+		// TEMPLATE CLASS stack
+template<class _Ty,
+	class _Cont = deque<_Ty> >
+	class stack
+	{	// LIFO queue implemented with a container
+public:
+	typedef stack<_Ty, _Cont> _Myt;
+	typedef _Cont container_type;
+	typedef typename _Cont::value_type value_type;
+	typedef typename _Cont::size_type size_type;
+	typedef typename _Cont::reference reference;
+	typedef typename _Cont::const_reference const_reference;
+
+	stack()
+		: c()
+		{	// construct with empty container
+		}
+
+	stack(const _Myt& _Right)
+		: c(_Right.c)
+		{	// construct by copying _Right
+		}
+
+	explicit stack(const _Cont& _Container)
+		: c(_Container)
+		{	// construct by copying specified container
+		}
+
+	_Myt& operator=(const _Myt& _Right)
+		{	// assign by copying _Right
+		c = _Right.c;
+		return (*this);
+		}
+
+ #if _HAS_CPP11
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		explicit stack(const _Alloc& _Al)
+		: c(_Al)
+		{	// construct with allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		stack(const _Myt& _Right, const _Alloc& _Al)
+		: c(_Right.c, _Al)
+		{	// construct by copying specified container
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		stack(const _Cont& _Container, const _Alloc& _Al)
+		: c(_Container, _Al)
+		{	// construct by copying specified container
+		}
+ #endif /* _HAS_CPP11 */
+
+	stack(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_constructible<_Cont>::value)
+		: c(_STD move(_Right.c))
+		{	// construct by moving _Right
+		}
+
+	explicit stack(_Cont&& _Container)
+		: c(_STD move(_Container))
+		{	// construct by moving specified container
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		stack(_Myt&& _Right, const _Alloc& _Al)
+		: c(_STD move(_Right.c), _Al)
+		{	// construct by moving specified container
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		stack(_Cont&& _Container, const _Alloc& _Al)
+		: c(_STD move(_Container), _Al)
+		{	// construct by moving specified container
+		}
+
+	_Myt& operator=(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_assignable<_Cont>::value)
+		{	// assign by moving _Right
+		c = _STD move(_Right.c);
+		return (*this);
+		}
+
+	void push(value_type&& _Val)
+		{	// insert element at beginning
+		c.push_back(_STD move(_Val));
+		}
+
+	template<class... _Valty>
+		reference emplace(_Valty&&... _Val)
+		{	// insert element at beginning -- return added with C++17
+		return (c.emplace_back(_STD forward<_Valty>(_Val)...));
+		}
+
+	bool empty() const
+		{	// test if stack is empty
+		return (c.empty());
+		}
+
+	size_type size() const
+		{	// test length of stack
+		return (c.size());
+		}
+
+	reference top()
+		{	// return last element of mutable stack
+		return (c.back());
+		}
+
+	const_reference top() const
+		{	// return last element of nonmutable stack
+		return (c.back());
+		}
+
+	void push(const value_type& _Val)
+		{	// insert element at end
+		c.push_back(_Val);
+		}
+
+	void pop()
+		{	// erase last element
+		c.pop_back();
+		}
+
+	const _Cont& _Get_container() const
+		{	// get reference to container
+		return (c);
+		}
+
+	void swap(_Myt& _Right)
+		_NOEXCEPT_OP(_NOEXCEPT_OP(_Swap_adl(_Right.c, _Right.c)))
+		{	// exchange contents with _Right
+		_Swap_adl(c, _Right.c);
+		}
+
+protected:
+	_Cont c;	// the underlying container
+	};
+
+		// stack TEMPLATE FUNCTIONS
+template<class _Ty,
+	class _Cont> inline
+	void swap(stack<_Ty, _Cont>& _Left,
+		stack<_Ty, _Cont>& _Right)
+			_NOEXCEPT_OP(_NOEXCEPT_OP(_Left.swap(_Right)))
+	{	// swap _Left and _Right stacks
+	_Left.swap(_Right);
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator==(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test for stack equality
+	return (_Left._Get_container() == _Right._Get_container());
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator!=(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test for stack inequality
+	return (!(_Left == _Right));
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator<(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test if _Left < _Right for stacks
+	return (_Left._Get_container() < _Right._Get_container());
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator>(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test if _Left > _Right for stacks
+	return (_Right < _Left);
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator<=(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test if _Left <= _Right for stacks
+	return (!(_Right < _Left));
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator>=(const stack<_Ty, _Cont>& _Left,
+		const stack<_Ty, _Cont>& _Right)
+	{	// test if _Left >= _Right for stacks
+	return (!(_Left < _Right));
+	}
+
+ #if _HAS_DEDUCTION_GUIDES
+template<class _Container>
+	stack(_Container)
+		-> stack<typename _Container::value_type, _Container>;
+
+template<class _Container,
+	class _Alloc,
+	class = enable_if_t<_Is_Alloc_v<_Alloc> > >
+	stack(_Container, _Alloc)
+		-> stack<typename _Container::value_type, _Container>;
+#endif /* _HAS_DEDUCTION_GUIDES */
+_STD_END
+
+ #if _HAS_CPP11
+namespace std {
+template<class _Ty,
+	class _Cont,
+	class _Alloc>
+	struct uses_allocator<stack<_Ty, _Cont>, _Alloc>
+		: uses_allocator<_Cont, _Alloc>
+	{	// true_type if container allocator enabled
+	};
+}	// namespace std
+ #endif /* _HAS_CPP11 */
+
+#endif /* _STACK_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

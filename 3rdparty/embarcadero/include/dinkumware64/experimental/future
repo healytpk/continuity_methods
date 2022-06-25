@@ -1,0 +1,10 @@
+// experimental future header
+#ifndef _EXPERIMENTAL_FUTURE_
+#define _EXPERIMENTAL_FUTURE_
+#include <future>
+#endif /* _EXPERIMENTAL_FUTURE_ */
+
+/*
+ * Copyright (c) by P.J. Plauger.  ALL RIGHTS RESERVED.
+ * Consult your license regarding permissions and restrictions.
+V7.0:0009 */

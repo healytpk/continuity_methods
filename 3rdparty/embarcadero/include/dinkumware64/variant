@@ -1,0 +1,1536 @@
+// variant header
+#ifndef _VARIANT_
+#define _VARIANT_
+
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+
+_STD_BEGIN
+template<class... _Types>
+	class variant;
+
+	// CLASS bad_variant_access
+class bad_variant_access
+	: public logic_error
+	{	// signals access attempt for an empty variant object
+public:
+	typedef logic_error _Mybase;
+
+	explicit bad_variant_access(const string& _Message)
+		: _Mybase(_Message.c_str())
+		{	// construct from message string
+		}
+
+	explicit bad_variant_access(
+		const char *_Message = "access to empty variant object")
+		: _Mybase(_Message)
+		{	// construct from message string
+		}
+	};
+
+_INLINE_VAR _CONST_DATA size_t variant_npos = size_t(-1);
+
+	// TEMPLATE CLASS _Variant_void
+struct _Variant_void
+	{	// mapped void for variant member
+	};
+
+template<class _Ty>
+	struct _Is_variant_void
+		: _Cat_base<is_same<remove_cv_t<_Ty>, _Variant_void>::value>
+	{	// test for mapped void type
+	};
+
+	// TEMPLATE STRUCT _Xtype
+template<class _Type>
+	struct _Xtype
+	{	// map type as needed
+	typedef _Type type;
+	};
+
+template<>
+	struct _Xtype<void>
+	{	// void => _Variant_void
+	typedef _Variant_void type;
+	};
+
+template<class _Type>
+	struct _Xtype<_Type&>
+	{	// T& => reference_wrapper
+	typedef reference_wrapper<_Type> type;
+	};
+
+template<class _Type>
+	struct _Xtype<reference_wrapper<_Type> >
+	{	// reference_wrapper => reference_wrapper
+	typedef reference_wrapper<_Type> type;
+	};
+
+template<class _Type>
+	using _Xtype_t =
+		typename _Xtype<_Type>::type;
+
+	// STRUCT _Max_type_size
+template<class... _Rest>
+	struct _Max_type_size
+	{	// get basic type size
+	static const size_t size = 0;
+	static const size_t alignment = 0;
+	};
+
+template<class _Type1,
+	class... _Rest>
+	struct _Max_type_size<_Type1, _Rest...>
+	{	// get max type size
+	typedef _Xtype_t<_Type1> type;
+	static const size_t _My_size = sizeof (type);
+	static const size_t _Tail_size = _Max_type_size<_Rest...>::size;
+	static const size_t size =
+		_My_size < _Tail_size ? _Tail_size : _My_size;
+
+	static const size_t _My_align = alignment_of<type>::value;
+	static const size_t _Tail_align = _Max_type_size<_Rest...>::alignment;
+	static const size_t alignment =
+		_My_align < _Tail_align ? _Tail_align : _My_align;
+	};
+
+	// TEMPLATE CLASS variant_alternative
+template<size_t _Nth,
+	class... _Types>
+	struct _Nth_type_counter;
+
+template<size_t _Nth,
+	class _Type1,
+	class... _Types>
+	struct _Nth_type_counter<_Nth, _Type1, _Types...>
+	{	// define Nth type
+	typedef typename _Nth_type_counter<_Nth - 1, _Types...>::type type;
+	};
+
+template<class _Type1,
+	class... _Types>
+	struct _Nth_type_counter<0, _Type1, _Types...>
+	{	// define last type
+	typedef _Type1 type;
+	};
+
+template<size_t _Index,
+	class _Type>
+	struct variant_alternative;
+
+template<size_t _Index,
+	class... _Types>
+	struct variant_alternative<_Index, variant<_Types...> >
+	{	// gets type of arbitrary alternative
+	typedef typename _Nth_type_counter<_Index, _Types...>::type type;
+	};
+
+template<size_t _Index,
+	class _Ty>
+	struct variant_alternative<_Index, const _Ty>
+	{	// gets type of arbitrary alternative
+	typedef add_const_t<typename variant_alternative<_Index, _Ty>::type> type;
+	};
+
+template<size_t _Index,
+	class... _Types>
+	using variant_alternative_t =
+		typename variant_alternative<_Index, _Types...>::type;	
+
+	// TEMPLATE CLASS variant_size
+template<class _Ty>
+	struct variant_size;	// undefined
+
+template<class... _Types>
+	struct variant_size<variant<_Types...> >
+		: integral_constant<size_t, sizeof...(_Types)>
+	{	// determines number of elements in a variant
+	};
+
+template<class _Ty>
+	struct variant_size<const _Ty>
+		: public variant_size<_Ty>
+	{	// removes const
+	};
+	
+template<class _Ty>
+	struct variant_size<volatile _Ty>
+		: public variant_size<_Ty>
+	{	// removes volatile
+	};
+	
+template<class _Ty>
+	struct variant_size<const volatile _Ty>
+		: public variant_size<_Ty>
+	{	// removes const and volatile
+	};
+
+	// FORWARD REFERENCES
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >&
+		get(variant<_Types...>& _Obj);
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >&&
+		get(variant<_Types...>&& _Obj);
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >const &
+		get(const variant<_Types...>& _Obj);
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >const &&
+		get(const variant<_Types...>&& _Obj);
+template<class _Ty,
+	class... _Types>
+	_Ty& get(variant<_Types...>& _Obj);
+template<class _Ty,
+	class... _Types>
+	const _Ty& get(const variant<_Types...>& _Obj);
+template<class _Ty,
+	class... _Types>
+	_Ty&& get(variant<_Types...>&& _Obj);
+template<class _Ty,
+	class... _Types>
+	const _Ty&& get(const variant<_Types...>&& _Obj);
+
+	// STRUCT _Count_fn1 AND USAGES
+template<size_t _Index,
+	template<class> class _Is_fn,
+	class...>
+	struct _Count_fn1;
+
+template<size_t _Index,
+	template<class> class _Is_fn,
+	class _Ty0>
+	struct _Count_fn1<_Index, _Is_fn, _Ty0>
+	{	// count a successful call to _Is_fn<_Ty0>
+	static const size_t count = _Is_fn<_Ty0>::value == true;
+	static const size_t index = count != 0 ? _Index : 0;
+	};
+
+template<size_t _Index,
+	template<class> class _Is_fn,
+	class _Ty0,
+	class _Type1,
+	class... _Rest>
+	struct _Count_fn1<_Index, _Is_fn, _Ty0, _Type1, _Rest...>
+	{	// count successful calls to _Is_fn<_Types...>
+	static const size_t count = _Count_fn1<_Index, _Is_fn, _Ty0>::count
+		+ _Count_fn1<_Index + 1, _Is_fn, _Type1, _Rest...>::count;
+	static const size_t index = _Count_fn1<_Index, _Is_fn, _Ty0>::index
+		+ _Count_fn1<_Index + 1, _Is_fn, _Type1, _Rest...>::index;
+	};
+
+template<template<class> class _Is_fn,
+	class... _Types>
+	struct _Has_one
+	{	// determine whether just one type succeeds for _Is_fn
+	static const bool value =
+		_Count_fn1<0, _Is_fn, _Types...>::count == 1;
+	static const size_t index = !value ? variant_npos :
+		_Count_fn1<0, _Is_fn, _Types...>::index;
+	};
+
+template<template<class> class _Is_fn,
+	class... _Types>
+	struct _Has_all
+	{	// determine whether all types succeed for _Is_fn
+	static const bool value =
+		_Count_fn1<0, _Is_fn, _Types...>::count == sizeof... (_Types);
+	};
+
+template<class... _Types>
+	using _All_ca =
+		_Has_all<is_copy_assignable, _Types...>;
+template<class... _Types>
+	using _All_cc =
+		_Has_all<is_copy_constructible, _Types...>;
+template<class... _Types>
+	using _All_ma =
+		_Has_all<is_move_assignable, _Types...>;
+template<class... _Types>
+	using _All_mc =
+		_Has_all<is_move_constructible, _Types...>;
+template<class... _Types>
+	using _All_nma =
+		_Has_all<is_nothrow_move_assignable, _Types...>;
+template<class... _Types>
+	using _All_nmc =
+		_Has_all<is_nothrow_move_constructible, _Types...>;
+template<class... _Types>
+	using _All_ns =
+		_Has_all<is_nothrow_swappable, _Types...>;
+template<class... _Types>
+	using _All_s =
+		_Has_all<is_swappable, _Types...>;
+
+	// STRUCT _Count_fn2 AND USAGES
+template<size_t _Index,
+	template<class, class...> class _Is_fn,
+	class _Ty,
+	class _Type0,
+	class...>
+	struct _Count_fn2
+	{	// count a successful call to _Is_fn<_Ty, _Type0>
+	static const size_t count = _Is_fn<_Ty, _Type0>::value == true;
+	static const size_t index = count != 0 ? _Index : 0;
+	};
+
+template<size_t _Index,
+	template<class, class...> class _Is_fn,
+	class _Ty,
+	class _Type0,
+	class _Type1,
+	class... _Rest>
+	struct _Count_fn2<_Index, _Is_fn, _Ty, _Type0, _Type1, _Rest...>
+	{	// count successful calls to _Is_fn<_Ty, _Type0>...
+	static const size_t count =
+		_Count_fn2<_Index, _Is_fn, _Ty, _Type0>::count
+			+ _Count_fn2<_Index + 1, _Is_fn, _Ty, _Type1, _Rest...>::count;
+	static const size_t index =
+		_Count_fn2<_Index, _Is_fn, _Ty, _Type0>::index
+			+ _Count_fn2<_Index + 1, _Is_fn, _Ty, _Type1, _Rest...>::index;
+	};
+
+template<template<class, class...> class _Is_fn,
+	class _Ty,
+	class... _Types>
+	struct _One_t
+	{	// determine whether just one type succeeds for _Is_fn
+	static const bool value =
+		_Count_fn2<0, _Is_fn, _Ty, _Types...>::count == 1;
+	static const size_t index = !value ? variant_npos :
+		_Count_fn2<0, _Is_fn, _Ty, _Types...>::index;
+	};
+
+template<class _Ty,
+	class... _Types>
+	using _One_ta = _One_t<is_assignable, _Ty&, _Types&...>;
+template<class _Ty,
+	class... _Types>
+	using _One_tc = _One_t<is_constructible, _Ty, _Types...>;
+template<class _Ty,
+	class... _Types>
+	using _One_tna = _One_t<is_nothrow_assignable, _Ty&, _Types&...>;
+template<class _Ty,
+	class... _Types>
+	using _One_tnc = _One_t<is_nothrow_constructible, _Ty, _Types...>;
+template<class _Ty,
+	class... _Types>
+	using _One_ts = _One_t<is_same, _Ty, _Types...>;
+
+	// TEMPLATE STRUCT _Vfunc
+template<class _Ty0,
+	bool _Is_arith>
+	struct _Safe_compare
+	{	// compares arithmetic types
+	int _Doit(_Ty0 *_Left, _Ty0 *_Right)
+		{	// (don't) perform unsafe compare
+		return (2);
+		}
+	};
+
+template<class _Ty0>
+	struct _Safe_compare<_Ty0, true>
+	{	// compares arithmetic types
+	int _Doit(_Ty0 *_Left, _Ty0 *_Right)
+		{	// perform safe compare
+		return (*_Left < *_Right ? -1
+			: *_Left == *_Right ? 0
+			: 1);
+		}
+	};
+
+template<class _Ret,
+	class _Visitor,
+	class... _Targs,
+	size_t... _Idx> inline
+	_Ret _Do_invoke(_Visitor&& _Fn,
+		tuple<_Targs...>&& _Args,
+		index_sequence<_Idx...>)
+	{	// do the actual visit call
+	return (_STD invoke(_STD forward<_Visitor>(_Fn),
+		_STD get<_Idx>(_STD forward<tuple<_Targs...> >(_Args))...));
+	}
+
+template<class...>
+	struct _Vfunc;
+
+template<class _First,
+	class... _Rest>
+	struct _Vfunc<_First, _Rest...>
+	{	// performs various operations by runtime index
+	typedef _Xtype_t<_First> _Ty0;
+
+	template<class _Vtype> inline static
+		int _Compare(size_t _Index, _Vtype *_Left, _Vtype *_Right)
+		{	// perform compare
+		if (_Index == 0)
+			return (_Safe_compare<_Ty0, is_arithmetic<_Ty0>::value>()._Doit(
+				(_Ty0 *)_Left, (_Ty0 *)_Right));
+		else
+			return (_Vfunc<_Rest...>()._Compare(_Index - 1, _Left, _Right));
+		}
+
+	template<class _Vtype> inline static
+		void _Copy(size_t _Index, _Vtype *_Left, const _Vtype *_Right)
+		{	// perform copy construction
+		if (_Index == 0)
+			new((void *)_Left)
+				_Ty0(*(_Ty0 *)_Right);
+		else
+			_Vfunc<_Rest...>()._Copy(_Index - 1, _Left, _Right);
+		}
+
+	template<class _Vtype,
+		class _Alloc> inline static
+		void _Copy_al(size_t _Index, _Vtype *_Left, _Alloc _Al,
+			const _Vtype *_Right)
+		{	// perform uses allocator copy construction
+		if (_Index == 0)
+			new((void *)_Left)
+				_Ty0(_STD allocator_arg, _Al, *(_Ty0 *)_Right);
+		else
+			_Vfunc<_Rest...>()._Copy_al(_Index - 1, _Left, _Al, _Right);
+		}
+
+	template<class _Vtype> inline static
+		void _Delete(size_t _Index, _Vtype *_This)
+		{	// perform placement delete
+		if (_Index == 0)
+			_Destroy((_Ty0 *)_This);
+		else
+			_Vfunc<_Rest...>()._Delete(_Index - 1, _This);
+		}
+
+	template<class _Vtype> inline static
+		size_t _Hash(size_t _Index, _Vtype *_This)
+		{	// perform hash
+		if (_Index == 0)
+			return (std::hash<_First>()(*(_Ty0 *)_This));
+		else
+			return (_Vfunc<_Rest...>()._Hash(_Index - 1, _This));
+		}
+
+	template<class _Vtype> inline static
+		void _Move(size_t _Index, _Vtype *_Left, const _Vtype *_Right)
+		{	// perform move construction
+		if (_Index == 0)
+			new((void *)_Left)
+				_Ty0(_STD move(*(_Ty0 *)_Right));
+		else
+			_Vfunc<_Rest...>()._Move(_Index - 1, _Left, _Right);
+		}
+
+	template<class _Vtype,
+		class _Alloc> inline static
+		void _Move_al(size_t _Index, _Vtype *_Left, _Alloc _Al,
+			const _Vtype *_Right)
+		{	// perform uses allocator move construction
+		if (_Index == 0)
+			new((void *)_Left)
+				_Ty0(_STD allocator_arg, _Al, _STD move(*(_Ty0 *)_Right));
+		else
+			_Vfunc<_Rest...>()._Move_al(_Index - 1, _Left, _Al, _Right);
+		}
+
+	template<class _Ret,
+		class _Visitor,
+		class _V0first,
+		class... _V0rest,
+		class... _Vtypes,
+		class... _Ttypes>
+		_Ret _Visit(size_t _Index,
+			_Visitor&& _Fn,
+			tuple<_Ttypes...>&& _Vals,
+			variant<_V0first, _V0rest...>&& _V0,
+			_Vtypes&&... _Vrest)
+		{	// one or more variants, get their active values
+		if (_Index == size_t(-1))
+			return (_Vfunc<_V0first, _V0rest...>().
+				template _Visit<_Ret>(_V0.index(),
+				_STD forward<_Visitor>(_Fn),
+				_STD forward<tuple<_Ttypes...> >(_Vals),
+				_STD forward<variant<_V0first, _V0rest...> >(_V0),
+				_STD forward<_Vtypes>(_Vrest)...));
+		else if (0 < _Index)
+			return (_Vfunc<_V0rest...>().
+				template _Visit<_Ret>(_Index - 1,
+				_STD forward<_Visitor>(_Fn),
+				_STD forward<tuple<_Ttypes...> >(_Vals),
+				_STD forward<variant<_V0first, _V0rest...> >(_V0),
+				_STD forward<_Vtypes>(_Vrest)...));
+		else
+			{	// get active type from _V0
+			typedef tuple<_Ttypes..., _V0first> _Newtypes;
+			_Newtypes _Newvals(_STD tuple_cat(
+				_STD forward<tuple<_Ttypes...> >(_Vals),
+				_STD forward<tuple<_V0first> >(tuple<_V0first>(
+					_STD forward<_V0first>(_STD get<_V0first>(
+					_STD forward<variant<_V0first, _V0rest...> >(_V0)))))));
+			return (_Visit<_Ret>(size_t(-1),
+				_STD forward<_Visitor>(_Fn),
+				_STD forward<_Newtypes>(_Newvals),
+				_STD forward<_Vtypes>(_Vrest)...));
+			}
+		}
+	
+	template<class _Ret,
+		class _Visitor,
+		class... _Ttypes>
+		_Ret _Visit(size_t _Index,
+			_Visitor _Fn, tuple<_Ttypes...> _Vals)
+		{	// no more values, call the function
+		return (_Do_invoke<_Ret>(_STD forward<_Visitor>(_Fn),
+			_STD forward<tuple<_Ttypes...> >(_Vals),
+			index_sequence_for<_Ttypes...>()));
+		}
+	};
+
+template<>
+	struct _Vfunc<>
+	{	// backstop, called only if _Index too big
+	template<class _Vtype> inline static
+		int _Compare(size_t, _Vtype *, _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::compare failed");
+		}
+
+	template<class _Vtype> inline static
+		void _Copy(size_t, _Vtype *, const _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::copy failed");
+		}
+
+	template<class _Vtype,
+		class _Alloc> inline static
+		void _Copy_al(size_t, _Vtype *, _Alloc, const _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::copy(allocator) failed");
+		}
+
+	template<class _Vtype> inline static
+		void _Delete(size_t, _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::delete failed");
+		}
+
+	template<class _Vtype> inline static
+		size_t _Hash(size_t, _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::hash failed");
+		}
+
+	template<class _Vtype> inline static
+		void _Move(size_t, _Vtype *, const _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::move failed");
+		}
+
+	template<class _Vtype,
+		class _Alloc> inline static
+		void _Move_al(size_t, _Vtype *, _Alloc, const _Vtype *)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::move(allocator) failed");
+		}
+
+	template<class _Ret,
+		class... _Types>
+		_Ret _Visit(_Types... _Vals)
+		{	// just throw
+		_THROW_N(bad_variant_access, "variant::visit failed");
+		}
+	};
+
+ #if _HAS_VARIABLE_TEMPLATES
+template<class _Ty>
+	_INLINE_VAR _CONST_DATA size_t variant_size_v = variant_size<_Ty>::value;
+ #endif /* _HAS_VARIABLE_TEMPLATES */
+
+template<class... _Types,
+	class = enable_if_t<_All_mc<_Types...>::value
+		&& _All_s<_Types...>::value,
+		void> >
+	void swap(variant<_Types...>& _Left,
+		variant<_Types...>&_Right)
+			_NOEXCEPT_OP(_All_s<_Types...>::value)
+	{	// swap _Left and _Right
+	_Left.swap(_Right);
+	}
+
+	// TEMPLATE CLASS variant
+template<class _Type0,
+	class... _Rest>
+	class variant<_Type0, _Rest...>
+	{	// variant with one or more elements
+public:
+	typedef _Xtype_t<_Type0> _Ty0;
+	typedef variant<_Type0, _Rest...> _Mytype;
+
+	template<class _T0 = _Ty0,
+		class = enable_if_t<
+			is_default_constructible<_T0>::value,
+			void> >
+		_CONST_FUNX variant()
+			_NOEXCEPT_OP(is_nothrow_default_constructible<_Ty0>::value)
+		: _Idx(0),
+			_Val_by_excep(false)
+		{	// default construct
+		new((void *)this)
+			_Ty0();
+		}
+
+	variant(const variant& _Right)
+		: _Idx(_Right._Idx),
+			_Val_by_excep(_Right._Val_by_excep)
+		{	// copy construct
+		if (!_Val_by_excep)
+			_Vfunc<_Ty0, _Rest...>()._Copy(index(), this, &_Right);
+		}
+
+	variant(variant&& _Right)
+		_NOEXCEPT_OP((_All_nmc<_Ty0, _Rest...>::value))
+		: _Idx(_Right._Idx),
+			_Val_by_excep(_Right._Val_by_excep)
+		{	// move construct
+		if (!_Val_by_excep)
+			_Vfunc<_Ty0, _Rest...>()._Move(index(), this, &_Right);
+		}
+
+	template<class _Ty,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			!is_same<decay_t<_Ty>, variant>::value
+				&& _One_tc<_Ty, _T0, _Rest...>::value,
+			void> >
+		_CONST_FUNX variant(const _Ty& _Val)
+			_NOEXCEPT_OP((_One_tnc<_Ty, _T0, _Rest...>::value))
+			: _Idx(_One_tc<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct from forwarded _Val
+		const size_t _Ridx = _One_tc<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_Val);
+		}
+
+	template<class _Ty,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			!is_same<decay_t<_Ty>, variant>::value
+				&& _One_tc<_Ty, _T0, _Rest...>::value,
+			void> >
+		_CONST_FUNX variant(_Ty&& _Val)
+			_NOEXCEPT_OP((_One_tnc<_Ty, _T0, _Rest...>::value))
+			: _Idx(_One_tc<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct from forwarded _Val
+		const size_t _Ridx = _One_tc<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_STD forward<_Ty>(_Val));
+		}
+
+	// IN-PLACE CONSTRUCTORS
+	template<class _Ty,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			_One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty, _Args...>::value,
+			void> >
+		_CONST_FUNX explicit variant(_STD in_place_type_t<_Ty>,
+			_Args&&... _Vals)
+			: _Idx(_One_ts<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct with _Args...
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_STD forward<_Args>(_Vals)...);
+		}
+
+	template<class _Ty,
+		class _Other,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			_One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty, _XSTD initializer_list<_Other>&,
+					_Args...>::value,
+			void> >
+		_CONST_FUNX explicit variant(_STD in_place_type_t<_Ty>,
+			_XSTD initializer_list<_Other> _Ilist, _Args&&... _Vals)
+			: _Idx(_One_ts<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct with _Ilist, _Args...
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_STD forward<_XSTD initializer_list<_Other> >(_Ilist),
+				_STD forward<_Args>(_Vals)...);
+		}
+
+	template<const size_t _Index,
+		class... _Args,
+		class = enable_if_t<
+			_Index < 1 + sizeof...(_Rest)
+				&& is_constructible<variant_alternative_t<_Index, _Mytype>,
+					_Args...>::value,
+			void> >
+		_CONST_FUNX explicit variant(_STD in_place_index_t<_Index>,
+			_Args&&... _Vals)
+			: _Idx(_Index),
+				_Val_by_excep(false)
+		{	// construct with _Vals...
+		typedef _Xtype_t<variant_alternative_t<_Index, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_STD forward<_Args>(_Vals)...);
+		}
+
+	template<size_t _Index,
+		class _Other,
+		class... _Args,
+		class = enable_if_t<
+			_Index < 1 + sizeof...(_Rest)
+				&& is_constructible<variant_alternative_t<_Index, _Mytype>,
+					_XSTD initializer_list<_Other>&, _Args...>::value,
+			void> >
+		_CONST_FUNX explicit variant(_STD in_place_index_t<_Index>,
+			_XSTD initializer_list<_Other> _Ilist, _Args&&..._Vals)
+			: _Idx(_Index),
+				_Val_by_excep(false)
+		{	// construct with _Ilist, _Vals...
+		typedef _Xtype_t<variant_alternative_t<_Index, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(_STD forward<_XSTD initializer_list<_Other> >(_Ilist),
+				_STD forward<_Args>(_Vals)...);
+		}
+
+	// USES ALLOCATOR CONSTRUCTORS
+	template<class _Alloc,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& is_constructible<_T0, allocator_arg_t, _Alloc>::value,
+			void> >
+		variant(allocator_arg_t, const _Alloc& _Al)
+			_NOEXCEPT_OP((is_nothrow_constructible<
+				allocator_arg_t, _Alloc>::value))
+			: _Idx(0), _Val_by_excep(false)
+		{	// default construct with leading allocator
+		new((void *)this)
+			_T0(allocator_arg_t(), _Al);
+		}
+
+	template<class _Alloc,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _All_cc<_T0, _Rest...>::value
+				&& is_constructible<_T0,
+					allocator_arg_t, _Alloc, const _T0&>::value,
+			void> >
+		variant(allocator_arg_t, const _Alloc& _Al,
+			const variant& _Right)
+			: _Idx(_Right._Idx),
+				_Val_by_excep(_Right._Val_by_excep)
+		{	// copy construct with leading allocator
+		if (!_Val_by_excep)
+			_Vfunc<_Ty0, _Rest...>()._Copy_al(index(), this, _Al, &_Right);
+		}
+
+	template<class _Alloc,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _All_mc<_T0, _Rest...>::value
+				&& is_constructible<_T0,
+					allocator_arg_t, _Alloc, _T0&&>::value,
+			void> >
+		variant(allocator_arg_t, const _Alloc& _Al,
+			variant&& _Right)
+			: _Idx(_Right._Idx),
+				_Val_by_excep(_Right._Val_by_excep)
+		{	// move construct with leading allocator
+		if (!_Val_by_excep)
+			_Vfunc<_Ty0, _Rest...>()._Move_al(index(), this, _Al, &_Right);
+		}
+
+	template<class _Alloc,
+		class _Ty,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& !is_same<decay_t<_Ty>, variant>::value
+				&& _One_tc<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty,
+					allocator_arg_t, _Alloc, _Ty>::value,
+			void> >
+		_CONST_FUNX variant(allocator_arg_t, const _Alloc& _Al, _Ty&& _Val)
+			_NOEXCEPT_OP((_One_tnc<_Ty, _T0, _Rest...>::value))
+			: _Idx(_One_tc<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct from forwarded val, leading allocator
+		const size_t _Ridx = _One_tc<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(allocator_arg_t(), _Al, _STD forward<_Ty>(_Val));
+		}
+
+	template<class _Alloc,
+		class _Ty,
+		class _T0 = _Ty0,
+		class... _Args,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty, _Args...>::value,
+			void> >
+		_CONST_FUNX variant(allocator_arg_t, const _Alloc& _Al,
+			_STD in_place_type_t<_Ty>,
+				_Args&&... _Vals)
+			: _Idx(_One_ts<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct from _Args..., leading allocator
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		new((void *)this)
+			_Tyx(allocator_arg_t(), _Al, _STD forward<_Args>(_Vals)...);
+		}
+
+	template<class _Alloc,
+		class _Ty,
+		class _Other,
+		class _T0 = _Ty0,
+		class... _Args,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty, allocator_arg_t, const _Alloc&,
+					_XSTD initializer_list<_Other>, _Args...>::value,
+			void> >
+		_CONST_FUNX variant(allocator_arg_t, const _Alloc& _Al,
+			_STD in_place_type_t<_Ty>,
+			_XSTD initializer_list<_Other> _Ilist,
+			_Args&&... _Vals)
+			: _Idx(_One_ts<_Ty, _T0, _Rest...>::index),
+				_Val_by_excep(false)
+		{	// construct from _Ilist, _Args..., leading allocator
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef variant_alternative_t<_Ridx, _Mytype> _Tyx;
+		new((void *)this)
+			_Tyx(allocator_arg_t(), _Al,
+				_STD forward<_XSTD initializer_list<_Other> >(_Ilist),
+					_STD forward<_Args>(_Vals)...);
+		}
+
+	template<class _Alloc,
+		size_t _Index,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _Index < 1 + sizeof...(_Rest)
+				&& is_constructible<variant_alternative_t<_Index, _Mytype>,
+					allocator_arg_t, _Alloc, _Args...>::value,
+			void> >
+		_CONST_FUNX variant(allocator_arg_t, const _Alloc& _Al,
+			_STD in_place_index_t<_Index>,
+				_Args&&... _Vals)
+			: _Idx(_Index),
+				_Val_by_excep(false)
+		{	// construct from _Vals..., leading allocator, at _Index
+		typedef variant_alternative_t<_Index, _Mytype> _Tyx;
+		new((void *)this)
+			_Tyx(allocator_arg_t(), _Al,
+				_STD forward<_Args>(_Vals)...);
+		}
+
+	template<class _Alloc,
+		size_t _Index,
+		class _Other,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			uses_allocator<_T0, _Alloc>::value
+				&& _Index < 1 + sizeof...(_Rest)
+				&& is_constructible<variant_alternative_t<_Index, _Mytype>,
+					allocator_arg_t, _Alloc, _Args...>::value,
+			void> >
+		_CONST_FUNX variant(allocator_arg_t, const _Alloc& _Al,
+			_STD in_place_index_t<_Index>,
+				_XSTD initializer_list<_Other> _Ilist, _Args&&..._Vals)
+			: _Idx(_Index),
+				_Val_by_excep(false)
+		{	// construct from _Ilist, _Vals..., leading allocator, at _Index
+		typedef variant_alternative_t<_Index, _Mytype> _Tyx;
+		new((void *)this)
+			_Tyx(allocator_arg_t(), _Al,
+				_STD forward<_XSTD initializer_list<_Other> >(_Ilist),
+					_STD forward<_Args>(_Vals)...);
+		}
+
+	~variant() _NOEXCEPT
+		{	// destroy the object
+		if (!_Val_by_excep)
+			_Vfunc<_Ty0, _Rest...>()._Delete(index(), this);
+		(volatile bool&)_Val_by_excep = true;	// [sic] GCC compiler bug
+		}
+
+	variant& operator=(const variant& _Right)
+		{	// copy assign _Right
+		if (this == &_Right)
+			;
+		else if (_Right.valueless_by_exception())
+			this->~variant();
+		else
+			{	// copy existing value
+			_Val_by_excep = false;
+			_Vfunc<_Ty0, _Rest...>()._Copy(index(), this, &_Right);
+			}
+		return (*this);
+		}
+
+	variant& operator=(variant&& _Right)
+		_NOEXCEPT_OP((_All_nmc<_Ty0, _Rest...>::value
+			&& _All_nma<_Ty0, _Rest...>::value))
+		{	// move assign _Right
+		if (this == &_Right)
+			;
+		else if (_Right.valueless_by_exception())
+			this->~variant();
+		else
+			{	// move existing value
+			_Val_by_excep = false;
+			_Vfunc<_Ty0, _Rest...>()._Move(index(), this, &_Right);
+			}
+		return (*this);
+		}
+
+	template<class _Ty,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			!is_same<decay_t<_Ty>, variant>::value
+				&& _One_ta<_Ty, _T0, _Rest...>::value
+				&& _One_ta<_Ty, _T0, _Rest...>::index ==
+					_One_tc<_Ty, _T0, _Rest...>::index,
+			void> >
+		variant& operator=(_Ty&& _Val)
+			_NOEXCEPT_OP((_One_tna<_Ty, _T0, _Rest...>::value
+				&& _One_tnc<_Ty, _T0, _Rest...>::value))
+		{	// assign by forwarding _Val
+		const size_t _Ridx = _One_ta<_Ty, _Ty0, _Rest...>::index;
+		if (!valueless_by_exception() && _Ridx == index())
+			get<_Ridx>(*this) = _STD forward<_Ty>(_Val);
+		else
+			{	// destroy old and move in new
+			this->~variant();
+			new((void *)this)
+				_Ty(_STD forward<_Ty>(_Val));
+			this->_Idx = _Ridx;
+			_Val_by_excep = false;
+			}
+		return (*this);
+		}
+
+	void swap(variant& _Right)
+		_NOEXCEPT_OP((_All_mc<_Ty0, _Rest...>::value
+			&& _All_s<_Ty0, _Rest...>::value))
+		{	// swap *this and _Right
+		if (!valueless_by_exception() && !_Right.valueless_by_exception())
+			{	// swap whole values
+			variant _Temp = *this;
+			*this = _Right;
+			_Right = _Temp;
+			}
+		else if (!valueless_by_exception())
+			{	// left exists, move it
+			_Right = *this;
+			this->~variant();
+			}
+		else if (!_Right.valueless_by_exception())
+			{	// right exists, move it
+			*this = _Right;
+			_Right.~variant();
+			}
+		}
+
+	// TEMPLATE FUNCTION emplace
+	template<class _Ty,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			_One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<_Ty, _Args...>::value,
+			void> >
+		void emplace(_Args&&... _Vals)
+		{	// emplace with _Args... at _Ty
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		this->~variant();
+		new((void *)this)
+			_Tyx(_STD forward<_Args>(_Vals)...);
+		_Idx = _Ridx;
+		_Val_by_excep = false;
+		}
+
+	template<class _Ty,
+		class _Other,
+		class... _Args,
+		class _T0 = _Ty0,
+		class = enable_if_t<
+			_One_ts<_Ty, _T0, _Rest...>::value
+				&& is_constructible<
+					_Ty, _XSTD initializer_list<_Other>&, _Args...>::value,
+			void> >
+		void emplace(_XSTD initializer_list<_Other> _Ilist, _Args&&... _Vals)
+		{	// emplace with _Ilist, _Args... at _Ty
+		const size_t _Ridx = _One_ts<_Ty, _T0, _Rest...>::index;
+		typedef _Xtype_t<variant_alternative_t<_Ridx, _Mytype> > _Tyx;
+		this->~variant();
+		new((void *)this)
+			_Tyx(_Ilist, _STD forward<_Args>(_Vals)...);
+		_Idx = _Ridx;
+		_Val_by_excep = false;
+		}
+
+	template<size_t _Index,
+		class... _Args,
+		class = enable_if_t<
+			_Index < 1 + sizeof...(_Rest)
+				&& is_constructible<
+					variant_alternative_t<_Index, _Mytype>,
+						_Args...>::value,
+			void> >
+		void emplace(_Args&&... _Vals)
+		{	// emplace with _Args... at _Index
+		typedef _Xtype_t<variant_alternative_t<_Index, _Mytype> > _Tyx;
+		this->~variant();
+		new((void *)this)
+			_Tyx(_STD forward<_Args>(_Vals)...);
+		_Idx = _Index;
+		_Val_by_excep = false;
+		}
+
+	template<size_t _Index,
+		class _Other,
+		class... _Args,
+		class = enable_if_t<
+			_Index < 1 + sizeof...(_Rest)
+				&& is_constructible<
+					variant_alternative_t<_Index, _Mytype>,
+						_XSTD initializer_list<_Other>&, _Args...>::value,
+			void> >
+		void emplace(_XSTD initializer_list<_Other> _Ilist, _Args&&... _Vals)
+		{	// emplace with _Ilist, _Args... at _Index
+		typedef _Xtype_t<variant_alternative_t<_Index, _Mytype> > _Tyx;
+		this->~variant();
+		new((void *)this)
+			_Tyx(_Ilist, _STD forward<_Args>(_Vals)...);
+		_Idx = _Index;
+		_Val_by_excep = false;
+		}
+
+	_CONST_FUN size_t index() const _NOEXCEPT
+		{	// get index of stored type, or npos
+		return (valueless_by_exception() ? variant_npos
+			: _Idx);
+		}
+
+	_CONST_FUN bool valueless_by_exception() const _NOEXCEPT
+		{	// return valueless flag
+		return (_Val_by_excep);
+		}
+
+	typename aligned_storage<
+		_Max_type_size<_Type0, _Rest...>::size,
+		_Max_type_size<_Type0, _Rest...>::alignment>::type
+			_Myval;	// MUST COME FIRST
+	size_t _Idx;
+	bool _Val_by_excep;
+	};
+
+	// VALUE ACCESS
+template<class _First,
+	class... _Rest>
+	_First _Nth_type(size_t _Index)
+	{	// get first type in list
+	return (_First());
+	}
+
+template<class _Ty,
+	class... _Types>
+	_CONST_FUN bool holds_alternative(
+		const variant<_Types...>& _Obj) _NOEXCEPT
+	{	// test if _Obj holds alternative _Ty
+	return (_One_ts<_Ty, _Types...>::index == _Obj.index());
+	}
+
+	// TEMPLATE STRUCT _Varty
+template<class _Ty,
+	bool _Is_ref>
+	struct _Varty_helper
+	{	// return plain
+	typedef _Ty& type;
+	};
+
+template<class _Ty>
+	struct _Varty_helper<_Ty, true>
+	{	// return reference wrapper
+	typedef reference_wrapper<remove_reference_t<_Ty> >& type;
+	};
+
+template<class _Ty>
+	struct _Varty
+	{	// return plain
+	typedef typename _Varty_helper<_Ty, is_reference<_Ty>::value>::type type;
+	};
+
+template<class _Type>
+	using _Varty_t =
+		typename _Varty<_Type>::type;
+
+	// TEMPLATE FUNCTION get
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >&
+		get(variant<_Types...>& _Obj)
+	{	// get reference to element _Idx in variant<_Types...>
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Obj.valueless_by_exception()
+		|| _Obj.index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<N>(variant&) failed");
+	return ((_Ty&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >&&
+		get(variant<_Types...>&& _Obj)
+	{	// get rvalue reference to element _Idx in variant<_Types...>
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Obj.valueless_by_exception()
+		|| _Obj.index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<N>(variant&&) failed");
+	return ((_Ty&&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >const &
+		get(const variant<_Types...>& _Obj)
+	{	// get const reference to element _Idx in variant<_Types...>
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Obj.valueless_by_exception()
+		|| _Obj.index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<N>(const variant&) failed");
+	return ((const _Ty&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<size_t _Idx,
+	class... _Types>
+	variant_alternative_t<_Idx, variant<_Types...> >const &&
+		get(const variant<_Types...>&& _Obj)
+	{	// get const rvalue reference to element _Idx in variant<_Types...>
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Obj.valueless_by_exception()
+		|| _Obj.index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<N>(const variant&&) failed");
+	return ((const _Ty&&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	_Ty& get(variant<_Types...>& _Obj)
+	{	// get reference to element _Ty in variant<_Types...>
+	if (_Obj.valueless_by_exception()
+		|| _One_ts<_Ty, _Types...>::index != _Obj._Idx
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<T>(variant&) failed");
+	return ((_Ty&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	const _Ty& get(const variant<_Types...>& _Obj)
+	{	// get const reference to element _Ty in variant<_Types...>
+	if (_Obj.valueless_by_exception()
+		|| _One_ts<_Ty, _Types...>::index == variant_npos
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<T>(const variant&) holds no value");
+	return ((const _Ty&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	_Ty&& get(variant<_Types...>&& _Obj)
+	{	// get rvalue reference to element _Ty in variant<_Types...>
+	if (_Obj.valueless_by_exception()
+		|| _One_ts<_Ty, _Types...>::index == variant_npos
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access, "get<T>(variant&&) holds no value");
+	return ((_Ty&&)_Varty_t<_Ty>(_Obj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	const _Ty&& get(const variant<_Types...>&& _Obj)
+	{	// get const rvalue reference to element _Ty in variant<_Types...>
+	if (_Obj.valueless_by_exception()
+		|| _One_ts<_Ty, _Types...>::index == variant_npos
+		|| _Is_variant_void<_Ty>::value)
+		_THROW_N(bad_variant_access,
+			"get<T>(const variant&&) holds no value");
+	return ((const _Ty&&)_Varty_t<_Ty>(_Obj));
+	}
+
+	// TEMPLATE FUNCTION get_if
+template<size_t _Idx,
+	class _Ty>
+	int *get_if(_Ty *) _NOEXCEPT
+	{	// backstop
+	return (nullptr);
+	}
+
+template<size_t _Idx,
+	class... _Types,
+	class = enable_if_t<_Idx < sizeof...(_Types),
+		void> >
+	_CONST_FUNX add_pointer_t<
+		variant_alternative_t<_Idx, variant<_Types...> > >
+	get_if(variant<_Types...> *_Pobj) _NOEXCEPT
+	{	// get pointer to _Idx element if there, else nullptr
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Pobj->valueless_by_exception()
+		|| _Pobj->index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		return (nullptr);
+	else
+		return (&(_Ty&)_Varty_t<_Ty>(*_Pobj));
+	}
+
+template<size_t _Idx,
+	class... _Types,
+	class = enable_if_t<_Idx < sizeof...(_Types),
+		void> >
+	_CONST_FUNX add_pointer_t<
+		const variant_alternative_t<_Idx, variant<_Types...> > >
+	get_if(const variant<_Types...> *_Pobj) _NOEXCEPT
+	{	// get pointer to _Idx const element if there, else nullptr
+	typedef variant_alternative_t<_Idx, variant<_Types...> > _Ty;
+	if (_Pobj->valueless_by_exception()
+		|| _Pobj->index() != _Idx
+		|| _Is_variant_void<_Ty>::value)
+		return (nullptr);
+	else
+		return (&(const _Ty&)_Varty_t<_Ty>(*_Pobj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	_CONST_FUNX add_pointer_t<_Ty>
+		get_if(variant<_Types...> *_Pobj) _NOEXCEPT
+	{	// get pointer to _Ty element if there, else nullptr
+	if (_Pobj->valueless_by_exception()
+		|| _Pobj->index() != _One_ts<_Ty, _Types...>::index
+		|| _Is_variant_void<_Ty>::value)
+		return (nullptr);
+	else
+		return (&(_Ty&)_Varty_t<_Ty>(*_Pobj));
+	}
+
+template<class _Ty,
+	class... _Types>
+	_CONST_FUNX add_pointer_t<const _Ty>
+		get_if(const variant<_Types...> *_Pobj) _NOEXCEPT
+	{	// get pointer to const _Ty element if there, else nullptr
+	if (_Pobj->valueless_by_exception()
+		|| _Pobj->index() != _One_ts<_Ty, _Types...>::index
+		|| _Is_variant_void<_Ty>::value)
+		return (nullptr);
+	else
+		return (&(const _Ty&)_Varty_t<_Ty>(*_Pobj));
+	}
+
+	// RELATIONAL OPERATORS
+template<class... _Types>
+	_CONST_FUNX bool operator==(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left == _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Lidx != _Ridx ? false
+		: _Left.valueless_by_exception() ? true
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) == 0);
+	}
+
+template<class... _Types>
+	_CONST_FUNX bool operator!=(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left != _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Lidx != _Ridx ? true
+		: _Left.valueless_by_exception() ? false
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) != 0);
+	}
+
+template<class... _Types>
+	_CONST_FUNX bool operator<(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left < _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Right.valueless_by_exception() ? false
+		: _Left.valueless_by_exception() ? true
+		: _Lidx < _Ridx ? true
+		: _Lidx > _Ridx ? false
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) < 0);
+	}
+
+template<class... _Types>
+	_CONST_FUNX bool operator>=(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left >= _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Right.valueless_by_exception() ? true
+		: _Left.valueless_by_exception() ? false
+		: _Lidx > _Ridx ? true
+		: _Lidx < _Ridx ? false
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) >= 0);
+	}
+
+template<class... _Types>
+	_CONST_FUNX bool operator>(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left > _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Left.valueless_by_exception() ? false
+		: _Right.valueless_by_exception() ? true
+		: _Lidx > _Ridx ? true
+		: _Lidx < _Ridx ? false
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) > 0);
+	}
+
+template<class... _Types>
+	_CONST_FUNX bool operator<=(const variant<_Types...>& _Left,
+		const variant<_Types...>& _Right)
+	{	// test if _Left <= _Right
+	size_t _Lidx = _Left.index();
+	size_t _Ridx = _Right.index();
+	return (_Left.valueless_by_exception() ? true
+		: _Right.valueless_by_exception() ? false
+		: _Lidx <= _Ridx ? true
+		: _Lidx > _Ridx ? false
+		: _Vfunc<_Types...>()._Compare(_Lidx, &_Left, &_Right) <= 0);
+	}
+
+	// VISITATION
+template<class _Visitor,
+	class... _Types>
+	struct _Visitor_returns;
+
+template<class _Visitor>
+	struct _Visitor_returns<_Visitor>
+	{	// get return type of no called elements
+	typedef decltype(declval<_Visitor>()()) type;
+	};
+
+template<class _Visitor,
+	class _Type0>
+	struct _Visitor_returns<_Visitor, _Type0>
+	{	// get common return type of single called element of a variant
+	typedef decltype(declval<_Visitor>()(declval<_Type0>())) type;
+	};
+
+template<class _Visitor,
+	class _Type0>
+	struct _Visitor_returns<_Visitor, _Type0&>
+	{	// get common return type of single called element of a variant
+	typedef decltype(declval<_Visitor>()(declval<_Type0&>())) type;
+	};
+
+template<class _Visitor,
+	class _Type0>
+	struct _Visitor_returns<_Visitor, const _Type0>
+	{	// get common return type of single called element of a variant
+	typedef decltype(declval<_Visitor>()(declval<const _Type0>())) type;
+	};
+
+template<class _Visitor,
+	class _Type0>
+	struct _Visitor_returns<_Visitor, const _Type0&>
+	{	// get common return type of single called element of a variant
+	typedef decltype(declval<_Visitor>()(declval<const _Type0&>())) type;
+	};
+
+template<class _Visitor,
+	class _Type0,
+	class _Type1,
+	class... _Rest>
+	struct _Visitor_returns<_Visitor, _Type0, _Type1, _Rest...>
+	{	// get common return type of two or more called elements of a variant
+	typedef typename _Visitor_returns<_Visitor, _Type0>::type _Ty0;
+	typedef typename _Visitor_returns<_Visitor, _Type1, _Rest...>::type _Ty1;
+	typedef common_type_t<_Ty0, _Ty1> type;
+	};
+
+template<class _Visitor,
+	class... _Vars>
+	struct _All_visitor_returns;
+
+template<class _Visitor,
+	class... _Types>
+	struct _All_visitor_returns<_Visitor, variant<_Types...> >
+	{	// get common return type of all called elements of a variant
+	typedef typename _Visitor_returns<_Visitor, _Types...>::type type;
+	};
+
+template<class _Visitor,
+	class... _Types>
+	struct _All_visitor_returns<_Visitor, variant<_Types...>&>
+	{	// get common return type of all called elements of a variant
+	typedef typename _Visitor_returns<_Visitor, _Types&...>::type type;
+	};
+
+template<class _Visitor,
+	class... _Types0,
+	class... _Types1,
+	class... _Rest>
+	struct _All_visitor_returns<_Visitor,
+		variant<_Types0...>, variant<_Types1...>, _Rest...>
+	{	// get common return type of two or more called variants
+	typedef typename _All_visitor_returns<_Visitor,
+		variant<_Types0...> >::type _Ty0;
+	typedef typename _All_visitor_returns<_Visitor,
+		variant<_Types1>..., _Rest...>::type _Ty1;
+	typedef common_type_t<_Ty0, _Ty1> type;
+	};
+
+inline bool _All_variants_valid()
+	{	// no variants, always true
+	return (true);
+	}
+
+template<class _Variant0>
+	bool _All_variants_valid(_Variant0 _Var0)
+	{	// test if first holds value
+	return (!_Var0.valueless_by_exception());
+	}
+
+template<class _Variant0,
+	class _Variant1,
+	class... _Variants>
+	bool _All_variants_valid(_Variant0 _Var0, _Variant1 _Var1,
+		_Variants... _Vars)
+	{	// test if all hold values
+	return (_All_variants_valid(_Var0)
+		&& _All_variants_valid(_Var1, _Vars...));
+	}
+
+	// TEMPLATE FUNCTION visit
+template<class _Visitor,
+	class... _Vtypes>
+	_CONST_FUNX typename _All_visitor_returns<
+		_Visitor, _Vtypes...>::type
+		visit(_Visitor&& _Fn, _Vtypes... _Vars)
+	{	// call visitor for active values of variants
+	if (!_All_variants_valid(_Vars...))
+		_THROW_N(bad_variant_access,
+			"visit(fn, variant...) has valueless variant");
+	typedef typename _All_visitor_returns<
+		_Visitor, _Vtypes...>::type _Ret;
+	return (_Vfunc<char>()._Visit<_Ret>(size_t(-1),
+		_STD forward<_Visitor>(_Fn),
+			tuple<>(),
+			_STD forward<_Vtypes>(_Vars)...));
+	}
+
+template<class _Visitor>
+	void visit(_Visitor&& _Fn)
+	{	// call visitor for no variants
+	_STD forward<_Visitor>(_Fn)();
+	}
+
+	// STRUCT monostate
+struct monostate
+	{	// dummy class for variant<monostate, ...>
+	};
+
+_CONST_FUN bool operator==(monostate, monostate) _NOEXCEPT
+	{	// test if monostate == monostate
+	return (true);
+	}
+
+_CONST_FUN bool operator!=(monostate, monostate) _NOEXCEPT
+	{	// test if monostate != monostate
+	return (false);
+	}
+
+_CONST_FUN bool operator<(monostate, monostate) _NOEXCEPT
+	{	// test if monostate < monostate
+	return (false);
+	}
+
+_CONST_FUN bool operator<=(monostate, monostate) _NOEXCEPT
+	{	// test if monostate >= monostate
+	return (true);
+	}
+
+_CONST_FUN bool operator>(monostate, monostate) _NOEXCEPT
+	{	// test if monostate > monostate
+	return (true);
+	}
+
+_CONST_FUN bool operator>=(monostate, monostate) _NOEXCEPT
+	{	// test if monostate >= monostate
+	return (true);
+	}
+_STD_END
+
+namespace std {
+	// TEMPLATE STRUCT SPECIALIZATION hash
+template<class... _Types>
+	struct hash<_STD variant<_Types...> >
+	{	// hash functor for stored variant
+	size_t operator()(const _STD variant<_Types...>& _Value) const
+		{	// hash stored value to size_t
+ 		if (_Value.valueless_by_exception())
+			return (hash<size_t>()(0));
+		else
+			return (_Vfunc<_Types...>()._Hash(_Value.index(), &_Value));
+		}
+	};
+
+template<>
+	struct hash<_STD monostate>
+	{	// hash functor for lone monostate value
+	size_t operator()(const _STD monostate& _Value) const
+		{	// hash _Value to size_t or throw
+		return (hash<size_t>()(0));
+		}
+	};
+
+template<class... _Types,
+	class _Alloc>
+	struct uses_allocator<_STD variant<_Types...>, _Alloc>
+		: true_type
+	{	// true_type
+	};
+} // namespace std
+#endif /* _VARIANT_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

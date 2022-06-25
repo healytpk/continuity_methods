@@ -1,0 +1,626 @@
+// memory_resource standard header
+#ifndef _MEMORY_RESOURCE_
+#define _MEMORY_RESOURCE_
+
+#include <xmemory1>
+#include <list>
+#include <map>
+#include <mutex>
+#include <vector>
+
+_STD_BEGIN
+	namespace pmr {
+	// POOLS
+struct pool_options
+	{	// options for pools
+	pool_options(size_t _Max = 0,
+		size_t _Largest = 0)
+		: max_blocks_per_chunk(_Max),
+			largest_required_pool_block(_Largest)
+		{	// construct
+		}
+
+	size_t max_blocks_per_chunk;
+	size_t largest_required_pool_block;
+	};
+typedef polymorphic_allocator<char> _Mypoolalloc;
+//	typedef polymorphic_allocator<_New_del_resource> _Mypoolalloc;
+
+struct _Chunk
+	{	// manages a chunk of _Max_elems, each of size _Elem_size bytes
+typedef vector<bool> _Myvectype;
+//	typedef vector<bool, _Mypoolalloc> _Myvectype;
+	struct _Chunk_elem {	// allocated element
+		bool _In_use;		// busy flag
+		union {
+			max_align_t _Boundit;	// force strongest boundary
+			char _Chunk_data[1];	// _Max_elems * _Elem_size
+			};
+		};
+
+	_Chunk(size_t _Elem_size_arg, size_t _Max_elems_arg,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+			_Max_elems(_Max_elems_arg),
+			_Elem_size(_Elem_size_arg),
+_Used_bits(_Max_elems_arg, false),
+//			_Used_bits(_Max_elems, false, _Mypoolalloc(_Upstream)),
+			_Hiwater(0),
+			_Used_count(0),
+			_Pdata((char *)_Mresource->allocate(
+				_Max_elems * (sizeof (_Chunk_elem) + _Elem_size),
+				_Max_align))
+		{	// construct with allocated storage
+		for (size_t _Alloc_idx = 0; _Alloc_idx < _Max_elems; ++_Alloc_idx)
+			{	// mark all elements as free
+			_Chunk_elem *_Newptr = (_Chunk_elem *)(_Pdata
+				+ _Alloc_idx * (sizeof (_Chunk_elem) + _Elem_size));
+			_Newptr->_In_use = false;
+			}
+		}
+
+	_Chunk(_Chunk&& _Right)
+		: _Mresource(_Right._Mresource),
+			_Max_elems(_Right._Max_elems),
+			_Elem_size(_Right._Elem_size),
+			_Used_bits(_STD move(_Right._Used_bits)),
+			_Hiwater(_Right._Hiwater),
+			_Used_count(_Right._Used_count),
+			_Pdata(_Right._Pdata)
+		{	// move construct
+		_Right._Pdata = nullptr;
+		_Right._Used_bits.clear();
+		}
+
+	~_Chunk() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void release()
+		{	// deallocate all blocks
+		if (_Pdata)
+			_Mresource->deallocate(_Pdata,
+				_Max_elems * (sizeof (_Chunk_elem) + _Elem_size),
+				_Max_align);
+		_Pdata = nullptr;
+		_Used_bits.clear();
+		}
+
+	void *allocate(size_t _Bytes, size_t _Bound = _Max_align)
+		{	// try to get a block within chunk
+		size_t _Alloc_idx;
+
+		if (_Max_elems <= _Used_count && !_Gcollect())
+			return (nullptr);
+		else if (_Hiwater < _Max_elems)
+			_Alloc_idx = _Hiwater++;
+		else
+			for (_Alloc_idx = 0; _Alloc_idx < _Max_elems; ++_Alloc_idx)
+				if (!_Used_bits[_Alloc_idx])
+					break;	// should always succeed
+		++_Used_count;
+		_Used_bits[_Alloc_idx] = true;
+		_Chunk_elem *_Newptr = (_Chunk_elem *)(_Pdata
+			+ _Alloc_idx * (sizeof (_Chunk_elem) + _Elem_size));
+		_Newptr->_In_use = true;
+		return ((void *)((char *)_Newptr + _Max_align));
+		}
+
+	void deallocate(void *_Ptr, size_t _Bytes, size_t _Bound = _Max_align)
+		{	// free a block
+		((_Chunk_elem *)_Ptr)->_In_use = false;
+		}
+
+	bool _Gcollect()
+		{	// collect freed elements
+		bool _Empty = true;
+		_Hiwater = 0;
+		_Used_bits.clear();
+		for (size_t _Alloc_idx = 0; _Alloc_idx < _Max_elems; ++_Alloc_idx)
+			{	// count any freed cells
+			_Chunk_elem *_Newptr = (_Chunk_elem *)(_Pdata
+				+ _Alloc_idx * (sizeof (_Chunk_elem) + _Elem_size));
+			if (!_Newptr->_In_use)
+				_Empty = false;
+			else
+				{	// mark as busy
+				_Used_bits[_Alloc_idx] = _Newptr->_In_use;
+				_Hiwater = _Alloc_idx;
+				}
+			}
+		return (!_Empty);
+		}
+
+private:
+	_Myvectype _Used_bits;
+	memory_resource *_Mresource;
+	size_t _Max_elems;
+	size_t _Elem_size;
+	size_t _Used_count;
+	size_t _Hiwater;
+	char *_Pdata;
+	};
+
+struct _Chunk_vec
+	{	// manages a vector of _Chunk, doubling in size up to a limit
+typedef vector<_Chunk> _Myvectype;
+//	typedef vector<_Chunk, _Mypoolalloc> _Myvectype;
+
+	_Chunk_vec(size_t _Elem_size_arg,
+		size_t _Max_chunk_size_arg,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+_Myvec(),
+//			_Myvec(_Mypoolalloc(_Upstream)),
+			_Elem_size(_Elem_size_arg),
+			_Max_chunk_size(_Max_chunk_size_arg)
+		{	// construct with parameters
+		}
+
+	_Chunk_vec(_Chunk_vec&& _Right)
+		: _Mresource(_Right._Mresource),
+			_Myvec(_STD move(_Right._Myvec)),
+			_Elem_size(_Right._Elem_size),
+			_Max_chunk_size(_Right._Max_chunk_size)
+		{	// move construct
+		}
+
+	~_Chunk_vec() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void release()
+		{	// deallocate all blocks
+		_Myvec.clear();
+		}
+
+	void *allocate(size_t _Bytes, size_t _Bound = _Max_align)
+		{	// try to suballocate a chunk
+		for (_Myvectype::iterator _It = _Myvec.end();
+			_It != _Myvec.begin(); )
+			{	// try to allocate within latest existing chunk
+			void *_Ptr = (--_It)->allocate(_Bytes, _Bound);
+			if (_Ptr != nullptr)
+				return (_Ptr);
+			}
+
+		// no suitable entry, make one
+		size_t _New_chunk_size;
+		if (_Myvec.size() == 0)
+			_New_chunk_size = 1;
+		else if (_Myvec.size() == 1 && 2 <= _Max_chunk_size)
+			_New_chunk_size = 2;
+		else if (_Max_chunk_size <= _Myvec.size())
+			_New_chunk_size = _Max_chunk_size;	// stick at _Max_chunk_size
+		else if (_Max_chunk_size / 2 < _Myvec.size())
+			_New_chunk_size = _Max_chunk_size;	// saturate
+		else
+			{	// try squaring size
+			_New_chunk_size = _Myvec.size() * _Myvec.size();
+			if (_Max_chunk_size < _New_chunk_size
+				|| _New_chunk_size < _Myvec.size())
+				_New_chunk_size = _Max_chunk_size;	// too big, roll back
+			}
+ 		_Myvec.emplace_back(_Elem_size, _New_chunk_size, _Mresource);
+		return (_Myvec.back().allocate(_Elem_size, _Bound));
+		}
+
+	void deallocate(void *_Ptr, size_t _Bytes, size_t _Bound = _Max_align)
+		{	// deallocate, pass it down
+		if (0 < _Myvec.size())
+			_Myvec.back().deallocate(_Ptr, _Bytes, _Bound);
+		}
+
+	virtual bool do_is_equal(
+		const memory_resource& _Other) const _NOEXCEPT
+		{	// test for equality
+		return (_Mresource ==
+			dynamic_cast<const memory_resource *>(&_Other));
+		}
+
+//private:
+	_Myvectype _Myvec;
+	memory_resource *_Mresource;
+	size_t _Elem_size;
+	size_t _Max_chunk_size;
+	};
+
+#define _MIN_BLOCK_SIZE	8
+
+struct _Pool_map
+	{	// manages a map of {_Chunk_vec, _Bytes}, rounding blocks up to 2^N
+typedef map<size_t, _Chunk_vec> _Mymaptype;
+
+	_Pool_map(pool_options _Opts,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+_Mymap(),
+//			_Mymap(_Opts.max_blocks_per_chunk,
+//				_Mypoolalloc(upstream_resource())),
+			_Max_chunk_size(_Opts.max_blocks_per_chunk),
+			_Max_chunk_vec_size(_Opts.largest_required_pool_block)
+		{	// construct with parameters
+		}
+
+	memory_resource *upstream_resource() const
+		{	// get memory resource pointer
+		return (_Mresource);
+		}
+
+	~_Pool_map() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void release()
+		{	// deallocate all blocks
+		_Mymap.clear();
+		}
+
+	void *allocate(size_t _Bytes, size_t _Bound = _Max_align)
+		{	// try to suballocate a chunk vector
+		size_t _Block_size = _MIN_BLOCK_SIZE;
+
+		if (_Bytes <= _MIN_BLOCK_SIZE)
+			;
+		else if (_Max_chunk_vec_size < _Bytes)
+			_Block_size = _Bytes;
+		else
+			while (_Block_size < _Bytes)
+				_Block_size *= 2;	// double size until big enough OFLO???
+
+		_Mymaptype::iterator _Pnew =
+			_Mymap.try_emplace(_Mymaptype::iterator(), _Block_size,
+				_Block_size, _Max_chunk_size, _Mresource);
+		return (_Pnew->second.allocate(_Block_size, _Bound));
+		}
+
+	void deallocate(void *_Ptr, size_t _Bytes, size_t _Bound = _Max_align)
+		{	// deallocate, pass it down
+		if (_Mymap.empty())
+			_Xbad_alloc();
+		_Mymap.begin()->second.deallocate(_Ptr, _Bytes, _Bound);
+		}
+
+	virtual bool do_is_equal(
+		const memory_resource& _Other) const _NOEXCEPT
+		{	// test for equality
+		return (_Mresource ==
+			dynamic_cast<const memory_resource *>(&_Other));
+		}
+
+private:
+_Mymaptype _Mymap;
+//	vector<_Chunk_vec, _Mypoolalloc> _Mymap;
+	memory_resource *const _Mresource;
+	size_t _Max_chunk_size;
+	size_t _Max_chunk_vec_size;
+	};
+
+	// CLASS unsynchronized_pool_resource
+class unsynchronized_pool_resource
+	: public memory_resource
+	{	// pool NOT safely shareable across threads
+public:
+	unsynchronized_pool_resource(const pool_options& _Opts,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+			_Poptions(_Opts),
+			_Myvec(_Opts, _Upstream)
+		{	// construct with options and memory resource
+		}
+
+	unsynchronized_pool_resource()
+		: unsynchronized_pool_resource(pool_options(),
+			get_default_resource())
+		{	// default construct
+		}
+
+	explicit unsynchronized_pool_resource(memory_resource *_Upstream)
+		: unsynchronized_pool_resource(pool_options(), _Upstream)
+		{	// construct from memory_resource
+		}
+
+	explicit unsynchronized_pool_resource(const pool_options& _Opts)
+		: unsynchronized_pool_resource(_Opts,
+			get_default_resource())
+		{	// construct from pool_options
+		}
+
+	unsynchronized_pool_resource(
+		const unsynchronized_pool_resource&) = delete;
+	unsynchronized_pool_resource& operator=(
+		const unsynchronized_pool_resource&) = delete;
+
+	virtual ~unsynchronized_pool_resource() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void release()
+		{	// deallocate all blocks
+		_Myvec.release();
+		}
+
+	memory_resource *upstream_resource() const
+		{	// get memory resource pointer
+		return (_Mresource);
+		}
+
+	pool_options options() const
+		{	// get pool options
+		return (_Poptions);
+		}
+
+	void *allocate(size_t _Bytes, size_t _Bound = _Max_align)
+		{	// allocate from pool vector
+		return (do_allocate(_Bytes, _Bound));
+		}
+
+	void deallocate(void *_Ptr, size_t _Bytes, size_t _Bound = _Max_align)
+		{	// deallocate to pool vector
+		return (do_deallocate(_Ptr, _Bytes, _Bound));
+		}
+
+	bool is_equal(
+		const memory_resource& _Other) const _NOEXCEPT
+		{	// test if *this == _Other
+		return (do_is_equal(_Other));
+		}
+
+protected:
+	void *do_allocate(size_t _Bytes, size_t _Bound)
+		{	// allocate from pool vector
+		return (_Myvec.allocate(_Bytes, _Bound));
+		}
+
+	void do_deallocate(void *_Ptr, size_t _Bytes, size_t _Bound)
+		{	// deallocate to pool vector
+		return (_Myvec.deallocate(_Ptr, _Bytes, _Bound));
+		}
+
+	virtual bool do_is_equal(
+		const memory_resource& _Other) const _NOEXCEPT
+		{	// test for equality
+		return (this ==
+			dynamic_cast<const memory_resource *>(&_Other));
+		}
+
+//private:
+	memory_resource *const _Mresource;
+	_Pool_map _Myvec;
+	pool_options _Poptions;
+	};
+
+	// CLASS synchronized_pool_resource
+class synchronized_pool_resource
+	: public unsynchronized_pool_resource
+	{	// pool SAFELY shareable across threads
+public:
+typedef unsynchronized_pool_resource _Mybase;
+
+	synchronized_pool_resource(const pool_options& _Opts,
+		memory_resource *_Upstream)
+		: _Mybase(_Opts, _Upstream)
+		{	// construct with options and memory resource
+		}
+
+	synchronized_pool_resource()
+		: _Mybase()
+		{	// default construct
+		}
+
+	explicit synchronized_pool_resource(memory_resource *_Upstream)
+		: _Mybase(_Upstream)
+		{	// construct from memory_resource
+		}
+
+	explicit synchronized_pool_resource(const pool_options& _Opts)
+		: _Mybase(_Opts)
+		{	// construct from pool_options
+		}
+
+	synchronized_pool_resource(
+		const synchronized_pool_resource&) = delete;
+	synchronized_pool_resource& operator=(
+		const synchronized_pool_resource&) = delete;
+
+	virtual ~synchronized_pool_resource() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void *allocate(size_t _Bytes, size_t _Bound = _Max_align)
+		{	// allocate from pool vector
+		return (do_allocate(_Bytes, _Bound));
+		}
+
+	void deallocate(void *_Ptr, size_t _Bytes, size_t _Bound = _Max_align)
+		{	// deallocate to pool vector
+		do_deallocate(_Ptr, _Bytes, _Bound);
+		}
+
+	void release()
+		{	// deallocate all blocks
+		lock_guard<mutex> _Lock(_My_mtx);
+		_Mybase::release();
+		}
+
+protected:
+	void *do_allocate(size_t _Bytes, size_t _Bound)
+		{	// allocate from pool vector
+		lock_guard<mutex> _Lock(_My_mtx);
+		return (_Myvec.allocate(_Bytes, _Bound));
+		}
+
+	void do_deallocate(void *_Ptr, size_t _Bytes, size_t _Bound)
+		{	// deallocate to pool vector
+		lock_guard<mutex> _Lock(_My_mtx);
+		return (_Myvec.deallocate(_Ptr, _Bytes, _Bound));
+		}
+
+private:
+	mutex _My_mtx;
+	};
+
+	// CLASS monotonic_buffer_resource
+#define _MONOTONIC_INITIAL_SIZE	(32 * sizeof (void *))
+
+struct _Mon_block
+	{	// list element
+	_Mon_block(size_t _Bytes_arg, size_t _Bound_arg, void *_Ptr_arg = 0)
+		: _Ptr((char *)_Ptr_arg),
+			_Bytes(_Bytes_arg),
+			_Bound(_Bound_arg),
+			_Offset(0)
+		{	// construct a _Mon_block
+		}
+
+	char *_Ptr;
+	size_t _Bytes;
+	size_t _Bound;
+	size_t _Offset;
+	};
+
+class monotonic_buffer_resource
+	: public memory_resource
+	{	// pool optimized for quick allocation, slow or no deallocation
+	typedef _Mypoolalloc _Myalloc;
+	typedef _STD list<_Mon_block, _Myalloc> _Mylist;
+
+public:
+	explicit monotonic_buffer_resource(memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+			_Free_space(_Myalloc(_Upstream)),
+			_Initial_size(0)
+		{	// construct with memory resource
+		}
+
+	monotonic_buffer_resource(size_t _Isize,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+			_Free_space(_Myalloc(_Upstream)),
+			_Initial_size(_Isize)
+		{	// construct with block size, memory resource
+		}
+
+	monotonic_buffer_resource(void *_Ibuffer,
+		size_t _Isize,
+		memory_resource *_Upstream)
+		: _Mresource(_Upstream),
+			_Free_space(_Myalloc(_Upstream)),
+			_Initial_size(_Isize)
+		{	// construct with buffer, block size, memory resource
+		_Free_space.push_front(_Mon_block(_Isize, 0, _Ibuffer));
+		}
+
+	monotonic_buffer_resource()
+		: monotonic_buffer_resource(get_default_resource())
+		{	// default construct
+		}
+
+	monotonic_buffer_resource(size_t _Isize)
+		: monotonic_buffer_resource(_Isize, get_default_resource())
+		{	// construct with block size
+		}
+
+	monotonic_buffer_resource(void *_Ibuffer, size_t _Isize)
+		: monotonic_buffer_resource(_Ibuffer, _Isize, get_default_resource())
+		{	// construct with block size
+		}
+
+	monotonic_buffer_resource(const monotonic_buffer_resource&) = delete;
+	monotonic_buffer_resource& operator=(
+		const monotonic_buffer_resource&) = delete;
+
+	~monotonic_buffer_resource() _NOEXCEPT
+		{	// destroy the object
+		this->release();
+		}
+
+	void release()
+		{	// deallocate all blocks
+		for (; 1 < _Free_space.size(); _Free_space.pop_back())
+			{	// free all blocks except first
+			_Mylist::iterator _It = --_Free_space.end();
+			upstream_resource()->deallocate(_It->_Ptr,
+				_It->_Bytes, _It->_Bound);
+			}
+		}
+
+	memory_resource *upstream_resource() const
+		{	// get memory resource pointer
+		return (_Mresource);
+		}
+
+protected:
+	virtual void *do_allocate(size_t _Bytes, size_t _Bound)
+		{	// allocate from blocks
+		if (_Free_space.empty())	// ensure one non-allocated entry
+			_Free_space.push_front(_Mon_block(0, 0));
+
+		if (_Initial_size == 0)
+			_Initial_size = _MONOTONIC_INITIAL_SIZE;
+		_Initial_size = _Roundup(_Initial_size);
+		_Bytes = _Roundup(_Bytes);
+
+		for (; ; )
+			{	// find aligned space, or add more blocks
+			for (_Mylist::iterator _It = _Free_space.begin();
+				++_It != _Free_space.end(); )
+				if (_Bytes <= _It->_Bytes - _It->_Offset)
+					{	// room for aligned storage, return its address
+					void *_Newptr = _It->_Ptr + _It->_Offset;
+					_It->_Offset += _Bytes;
+					return (_Newptr);
+					}
+
+			// add more storage
+			size_t _Next_size = _Free_space.size() <= 1 ? 0
+				: _Free_space.back()._Bytes;
+			do {	// add one or more ever larger blocks
+				if (_Next_size == 0)
+					_Next_size = _Initial_size;
+				else if (2 * _Next_size < _Next_size)
+					_Next_size = _Bytes;	// last try if overflow
+				else
+					_Next_size *= 2;	// double after first block
+
+				_Free_space.push_back(_Mon_block(_Next_size, _Bound,
+					upstream_resource()->allocate(_Next_size, _Bound)));
+				} while (_Next_size < _Bytes);
+			}
+		}
+
+	virtual void do_deallocate(void *_Ptr, size_t _Bytes, size_t _Bound)
+		{	// deallocate a block -- DOES NOTHING
+		}
+
+	virtual bool do_is_equal(
+		const memory_resource& _Other) const _NOEXCEPT
+		{	// test for equality
+		return (this ==
+			dynamic_cast<const memory_resource *>(&_Other));
+		}
+
+private:
+	_Mylist _Free_space;
+	memory_resource *const _Mresource;
+	size_t _Initial_size;
+	};
+
+memory_resource *_Mon_buffer_resource() _NOEXCEPT
+	{	// get pointer to monotonic_buffer_resource
+	static monotonic_buffer_resource _Myresource;
+	return ((memory_resource *)&_Myresource);
+	}
+	}	// namespace pmr
+_STD_END
+#endif /* _MEMORY_RESOURCE_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

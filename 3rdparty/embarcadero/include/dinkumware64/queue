@@ -1,0 +1,532 @@
+// queue standard header
+#ifndef _QUEUE_
+#define _QUEUE_
+#include <algorithm>
+#include <deque>
+#include <vector>
+_STD_BEGIN
+		// TEMPLATE CLASS queue
+template<class _Ty,
+	class _Cont = deque<_Ty> >
+	class queue
+	{	// FIFO queue implemented with a container
+public:
+	typedef queue<_Ty, _Cont> _Myt;
+	typedef _Cont container_type;
+	typedef typename _Cont::value_type value_type;
+	typedef typename _Cont::size_type size_type;
+	typedef typename _Cont::reference reference;
+	typedef typename _Cont::const_reference const_reference;
+
+	queue()
+		: c()
+		{	// construct with empty container
+		}
+
+	queue(const _Myt& _Right)
+		: c(_Right.c)
+		{	// construct by copying _Right container
+		}
+
+	explicit queue(const _Cont& _Container)
+		: c(_Container)
+		{	// construct by copying specified container
+		}
+
+	_Myt& operator=(const _Myt& _Right)
+		{	// assign by copying _Right
+		c = _Right.c;
+		return (*this);
+		}
+
+ #if _HAS_CPP11
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		explicit queue(const _Alloc& _Al)
+		: c(_Al)
+		{	// construct with empty container, allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		queue(const _Cont& _Container, const _Alloc& _Al)
+		: c(_Container, _Al)
+		{	// construct by copying specified container, allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		queue(const _Myt& _Right, const _Alloc& _Al)
+		: c(_Right.c, _Al)
+		{	// construct by copying _Right container, allocator
+		}
+ #endif /* _HAS_CPP11 */
+
+	queue(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_constructible<_Cont>::value)
+		: c(_STD move(_Right.c))
+		{	// construct by moving _Right
+		}
+
+	explicit queue(_Cont&& _Container)
+		: c(_STD move(_Container))
+		{	// construct by moving specified container
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		queue(_Cont&& _Container, const _Alloc& _Al)
+		: c(_STD move(_Container), _Al)
+		{	// construct by moving specified container, allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+				void> >
+		queue(_Myt&& _Right, const _Alloc& _Al)
+		: c(_STD move(_Right.c), _Al)
+		{	// construct by moving _Right container, allocator
+		}
+
+	_Myt& operator=(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_assignable<_Cont>::value)
+		{	// assign by moving _Right
+		c = _STD move(_Right.c);
+		return (*this);
+		}
+
+	void push(value_type&& _Val)
+		{	// insert element at beginning
+		c.push_back(_STD move(_Val));
+		}
+
+	template<class... _Valty>
+		reference emplace(_Valty&&... _Val)
+		{	// insert element at end -- return added with C++17
+		return (c.emplace_back(_STD forward<_Valty>(_Val)...));
+		}
+
+	bool empty() const
+		{	// test if queue is empty
+		return (c.empty());
+		}
+
+	size_type size() const
+		{	// return length of queue
+		return (c.size());
+		}
+
+	reference front()
+		{	// return first element of mutable queue
+		return (c.front());
+		}
+
+	const_reference front() const
+		{	// return first element of nonmutable queue
+		return (c.front());
+		}
+
+	reference back()
+		{	// return last element of mutable queue
+		return (c.back());
+		}
+
+	const_reference back() const
+		{	// return last element of nonmutable queue
+		return (c.back());
+		}
+
+	void push(const value_type& _Val)
+		{	// insert element at beginning
+		c.push_back(_Val);
+		}
+
+	void pop()
+		{	// erase element at end
+		c.pop_front();
+		}
+
+	const _Cont& _Get_container() const
+		{	// get reference to container
+		return (c);
+		}
+
+	void swap(_Myt& _Right)
+		_NOEXCEPT_OP(_NOEXCEPT_OP(_Swap_adl(_Right.c, _Right.c)))
+		{	// exchange contents with _Right
+		_Swap_adl(c, _Right.c);
+		}
+
+protected:
+	_Cont c;	// the underlying container
+	};
+
+		// queue TEMPLATE FUNCTIONS
+
+ #if _HAS_CPP17
+template<class _Ty,
+	class _Cont,
+	class = enable_if_t<is_swappable<_Cont>::value,
+		void> > inline
+
+ #else /* _HAS_CPP17 */
+template<class _Ty,
+	class _Cont> inline
+ #endif /* _HAS_CPP17 */
+
+	void swap(queue<_Ty, _Cont>& _Left,
+		queue<_Ty, _Cont>& _Right)
+			_NOEXCEPT_OP(_NOEXCEPT_OP(_Left.swap(_Right)))
+	{	// swap _Left and _Right queues
+	_Left.swap(_Right);
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator==(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test for queue equality
+	return (_Left._Get_container() == _Right._Get_container());
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator!=(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test for queue inequality
+	return (!(_Left == _Right));
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator<(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test if _Left < _Right for queues
+	return (_Left._Get_container() < _Right._Get_container());
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator>(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test if _Left > _Right for queues
+	return (_Right < _Left);
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator<=(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test if _Left <= _Right for queues
+	return (!(_Right < _Left));
+	}
+
+template<class _Ty,
+	class _Cont> inline
+	bool operator>=(const queue<_Ty, _Cont>& _Left,
+		const queue<_Ty, _Cont>& _Right)
+	{	// test if _Left >= _Right for queues
+	return (!(_Left < _Right));
+	}
+
+		// TEMPLATE CLASS priority_queue
+template<class _Ty,
+	class _Cont = vector<_Ty>,
+	class _Pr = default_order_t<typename _Cont::value_type> >
+	class priority_queue
+	{	// priority queue implemented with a _Cont
+public:
+	typedef priority_queue<_Ty, _Cont, _Pr> _Myt;
+	typedef _Cont container_type;
+	typedef typename _Cont::value_type value_type;
+	typedef typename _Cont::size_type size_type;
+	typedef typename _Cont::reference reference;
+	typedef typename _Cont::const_reference const_reference;
+	typedef _Pr value_compare;
+
+	priority_queue()
+		: c(), comp()
+		{	// construct with empty container, default comparator
+		}
+
+	priority_queue(const _Myt& _Right)
+		: c(_Right.c), comp(_Right.comp)
+		{	// construct by copying _Right
+		}
+
+	explicit priority_queue(const _Pr& _Pred)
+		: c(), comp(_Pred)
+		{	// construct with empty container, specified comparator
+		}
+
+	priority_queue(const _Pr& _Pred, const _Cont& _Container)
+		: c(_Container), comp(_Pred)
+		{	// construct by copying specified container, comparator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _InIt>
+		priority_queue(_InIt _First, _InIt _Last)
+		: c(_First, _Last), comp()
+		{	// construct by copying [_First, _Last), default comparator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _InIt>
+		priority_queue(_InIt _First, _InIt _Last, const _Pr& _Pred)
+		: c(_First, _Last), comp(_Pred)
+		{	// construct by copying [_First, _Last), specified comparator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _InIt>
+		priority_queue(_InIt _First, _InIt _Last, const _Pr& _Pred,
+			const _Cont& _Container)
+		: c(_Container), comp(_Pred)
+		{	// construct by copying [_First, _Last), container, and comparator
+		c.insert(c.end(), _First, _Last);
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	_Myt& operator=(const _Myt& _Right)
+		{	// assign by copying _Right
+		c = _Right.c;
+		comp = _Right.comp;
+		return (*this);
+		}
+
+ #if _HAS_CPP11
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		explicit priority_queue(const _Alloc& _Al)
+		: c(_Al)
+		{	// construct with empty container, allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		priority_queue(const _Pr& _Pred, const _Alloc& _Al)
+		: c(_Al), comp(_Pred)
+		{	// construct with empty container, comparator, allocator
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		priority_queue(const _Pr& _Pred, const _Cont& _Container,
+			const _Alloc& _Al)
+		: c(_Container, _Al), comp(_Pred)
+		{	// construct by copying specified container, comparator, allocator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		priority_queue(const _Myt& _Right, const _Alloc& _Al)
+		: c(_Right.c, _Al), comp(_Right.comp)
+		{	// construct by copying _Right, allocator
+		}
+ #endif /* _HAS_CPP11 */
+
+	priority_queue(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_constructible<_Cont>::value
+			&& is_nothrow_move_constructible<_Pr>::value)
+		: c(_STD move(_Right.c)), comp(_STD move(_Right.comp))
+		{	// construct by moving _Right
+		}
+
+	priority_queue(const _Pr& _Pred, _Cont&& _Container)
+		: c(_STD move(_Container)), comp(_Pred)
+		{	// construct by moving specified container, comparator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _InIt>
+		priority_queue(_InIt _First, _InIt _Last, const _Pr& _Pred,
+			_Cont&& _Container)
+		: c(_STD move(_Container)), comp(_Pred)
+		{	// construct by copying [_First, _Last), moving container
+		c.insert(c.end(), _First, _Last);
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		priority_queue(const _Pr& _Pred, _Cont&& _Container,
+			const _Alloc& _Al)
+		: c(_STD move(_Container), _Al), comp(_Pred)
+		{	// construct by moving specified container, comparator, allocator
+		make_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class _Alloc,
+		class = enable_if_t<uses_allocator<_Cont, _Alloc>::value,
+			void> >
+		priority_queue(_Myt&& _Right, const _Alloc& _Al)
+		: c(_STD move(_Right.c), _Al), comp(_STD move(_Right.comp))
+		{	// construct by moving _Right, allocator
+		}
+
+	_Myt& operator=(_Myt&& _Right)
+		_NOEXCEPT_OP(is_nothrow_move_assignable<_Cont>::value
+			&& is_nothrow_move_assignable<_Pr>::value)
+		{	// assign by moving _Right
+		c = _STD move(_Right.c);
+		comp = _STD move(_Right.comp);
+		return (*this);
+		}
+
+	void push(value_type&& _Val)
+		{	// insert element at beginning
+		c.push_back(_STD move(_Val));
+		push_heap(c.begin(), c.end(), comp);
+		}
+
+	template<class... _Valty>
+		void emplace(_Valty&&... _Val)
+		{	// insert element at beginning
+		c.emplace_back(_STD forward<_Valty>(_Val)...);
+		push_heap(c.begin(), c.end(), comp);
+		}
+
+	bool empty() const
+		{	// test if queue is empty
+		return (c.empty());
+		}
+
+	size_type size() const
+		{	// return length of queue
+		return (c.size());
+		}
+
+	const_reference top() const
+		{	// return highest-priority element
+		return (c.front());
+		}
+
+	void push(const value_type& _Val)
+		{	// insert value in priority order
+		c.push_back(_Val);
+		push_heap(c.begin(), c.end(), comp);
+		}
+
+	void pop()
+		{	// erase highest-priority element
+		pop_heap(c.begin(), c.end(), comp);
+		c.pop_back();
+		}
+
+	void swap(_Myt& _Right)
+		_NOEXCEPT_OP(_NOEXCEPT_OP(_Swap_adl(_Right.c, _Right.c))
+			&& _NOEXCEPT_OP(_Swap_adl(_Right.comp, _Right.comp)))
+		{	// exchange contents with _Right
+		_Swap_adl(c, _Right.c);
+		_Swap_adl(comp, _Right.comp);
+		}
+
+protected:
+	_Cont c;	// the underlying container
+	_Pr comp;	// the comparator functor
+	};
+
+		// priority_queue TEMPLATE FUNCTIONS
+
+ #if _HAS_CPP17
+template<class _Ty,
+	class _Cont,
+	class _Pr,
+	class = enable_if_t<is_swappable<_Cont>::value
+		&& is_swappable<_Pr>::value,
+		void> > inline
+
+ #else /* _HAS_CPP17 */
+template<class _Ty,
+	class _Cont,
+	class _Pr> inline
+ #endif /* _HAS_CPP17 */
+
+	void swap(priority_queue<_Ty, _Cont, _Pr>& _Left,
+		priority_queue<_Ty, _Cont, _Pr>& _Right)
+			_NOEXCEPT_OP(_NOEXCEPT_OP(_Left.swap(_Right)))
+	{	// swap _Left and _Right queues
+	_Left.swap(_Right);
+	}
+
+ #if _HAS_CPP11
+template<class _Ty,
+	class _Cont,
+	class _Alloc>
+	struct uses_allocator<queue<_Ty, _Cont>, _Alloc>
+		: uses_allocator<_Cont, _Alloc>
+	{	// true_type if container allocator enabled
+	};
+
+template<class _Ty,
+	class _Cont,
+	class _Pr,
+	class _Alloc>
+	struct uses_allocator<priority_queue<_Ty, _Cont, _Pr>, _Alloc>
+		: uses_allocator<_Cont, _Alloc>
+	{	// true_type if container allocator enabled
+	};
+ #endif /* _HAS_CPP11 */
+
+ #if _HAS_DEDUCTION_GUIDES
+template<class _Container>
+	queue(_Container)
+		-> queue<typename _Container::value_type, _Container>;
+template<class _Container,
+	class _Alloc,
+	class = enable_if_t<_Is_Alloc_v<_Alloc>,
+		void> >
+	queue(_Container, _Alloc)
+		-> queue<typename _Container::value_type, _Container>;
+
+template<class _Pred,
+	class _Container,
+	class = enable_if_t<_Is_Pred_v<_Pred>,
+		void> >
+	priority_queue(_Pred, _Container)
+		-> priority_queue<typename _Container::value_type, _Container,
+			_Pred>;
+
+template<class _InIt,
+	class _Pred = less<
+		typename iterator_traits<_InIt>::value_type>,
+	class _Container = vector
+		<typename iterator_traits<_InIt>::value_type>,
+	class = enable_if_t<_Is_InIt_v<_InIt>
+		&& _Is_Pred_v<_Pred>,
+		void> >
+	priority_queue(_InIt, _InIt, _Pred = _Pred(),
+		_Container = _Container())
+		-> priority_queue<
+			typename iterator_traits<_InIt>::value_type,
+			_Container, _Pred>;
+
+template<class _Pred,
+	class _Container,
+	class _Alloc,
+	class = enable_if_t<_Is_Pred_v<_Pred>
+		&& _Is_Alloc_v<_Alloc>
+		&& uses_allocator_v<_Container, _Alloc>,
+		void> >
+	priority_queue(_Pred, _Container, _Alloc)
+		-> priority_queue<typename _Container::value_type,
+			_Container, _Pred>;
+#endif /* _HAS_DEDUCTION_GUIDES */
+_STD_END
+#endif /* _QUEUE_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

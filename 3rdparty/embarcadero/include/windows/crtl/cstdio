@@ -1,0 +1,18 @@
+/*  cstdio
+
+    Standard C header file wrapper for stdio.h
+*/
+
+/*
+ *      C/C++ Run Time Library - Version 29.0
+ *
+ *      Copyright (c) 1997, 2021 by Embarcadero Technologies, Inc.
+ *      All Rights Reserved.
+ *
+ */
+
+/* $Revision: 37511 $ */
+
+#define  __USING_CNAME__
+#include <stdio.h>
+#undef   __USING_CNAME__

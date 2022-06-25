@@ -1,0 +1,351 @@
+// any header
+#ifndef _ANY_
+#define _ANY_
+
+#include <string>
+#include <typeinfo>
+
+#define _SMALL_ANY	16	// largest locally stored value
+
+_STD_BEGIN
+	// CLASS bad_any_cast
+class bad_any_cast
+	: public _XSTD bad_cast
+	{	// signals any_cast failure
+public:
+	explicit bad_any_cast(const string& _Message)
+		: _Str(_Message)
+		{	// construct from message string
+		}
+
+	explicit bad_any_cast(const char *_Message)
+		: _Str(_Message)
+		{	// construct from message string
+		}
+
+	virtual const char *what() const noexcept
+		{	// return pointer to message string
+		return (_Str.c_str());
+		}
+
+private:
+	string _Str;	// the stored message string
+	};
+
+	// CLASS any
+struct _Holder_base
+	{	// virtual base for type-erased object
+	virtual ~_Holder_base() _NOEXCEPT
+		{	// destroy the object
+		}
+
+	virtual const _XSTD type_info& _Mytype() const _NOEXCEPT = 0;
+	virtual _Holder_base *_Clone() const = 0;
+	virtual void *_Get_ptr() const = 0;
+	};
+
+template<class _Ty,
+	bool _Small = sizeof (_Ty) <= _SMALL_ANY>
+	struct _Holder
+		: public _Holder_base
+	{	// public interface for small type-erased object
+	_Holder(const _Ty& _Val)
+		: _Myval(_Val)
+		{	// copy construct
+		}
+
+	_Holder(_Ty&& _Val)
+		: _Myval(_STD move(_Val))
+		{	// move construct
+		}
+
+	template<class... _Args,
+		class = enable_if_t<
+			is_copy_constructible<decay_t<_Ty> >::value
+				&& is_constructible<decay_t<_Ty>, _Args...>::value,
+			void> >
+		_Holder(_Args&&... _Vals)
+			: _Myval(_STD move(_Vals)...)
+			{	// construct from _Vals...
+			}
+
+	virtual ~_Holder() _NOEXCEPT
+		{	// destroy the object
+		}
+
+	virtual const _XSTD type_info& _Mytype() const _NOEXCEPT
+		{	// get type information
+		return (typeid(_Ty));
+		}
+
+	virtual _Holder_base *_Clone() const
+		{	// copy held object
+		return (new _Holder(_Myval));
+		}
+
+	virtual void *_Get_ptr() const
+		{	// get pointer to value
+		return ((void *)&_Myval);
+		}
+
+	_Ty _Myval;
+	};
+
+template<class _Ty>
+	struct _Holder<_Ty, false>
+		: public _Holder_base
+	{	// public interface for large type-erased object
+	_Holder(const _Ty& _Val)
+		: _Mypval(new _Ty(_Val))
+		{	// copy construct
+		}
+
+	_Holder(_Ty&& _Val)
+		: _Mypval(new _Ty(_STD move(_Val)))
+		{	// move construct
+		}
+
+	virtual ~_Holder() _NOEXCEPT
+		{	// destroy the object
+		delete (_Mypval);
+		}
+
+	virtual const _XSTD type_info& _Mytype() const _NOEXCEPT
+		{	// get type information
+		return (typeid(_Ty));
+		}
+
+	virtual _Holder_base *_Clone() const
+		{	// copy held object
+		return (new _Holder(*_Mypval));
+		}
+
+	virtual void *_Get_ptr() const
+		{	// get pointer to value
+		return ((void *)_Mypval);
+		}
+
+	_Ty *_Mypval;
+	};
+
+class any
+	{	// stores object of any type
+public:
+	_CONST_FUN any() _NOEXCEPT
+		: _Myptr(nullptr)
+		{	// default construct
+		}
+
+	any(const any& _Other)
+		: _Myptr(_Other._Myptr ? _Other._Myptr->_Clone() : nullptr)
+		{	// copy construct
+		}
+
+	any(any&& _Other) _NOEXCEPT
+		: _Myptr(_Other._Myptr)
+		{	// move construct
+		_Other._Myptr = nullptr;
+		}
+
+	template<class _Ty,
+		class = enable_if_t<
+			!is_same<decay_t<_Ty>, any>::value,
+			void> >
+		any(_Ty&& _Val)
+			: _Myptr(new _Holder<decay_t<_Ty> >(_STD forward<_Ty>(_Val)))
+		{	// construct from value
+		}
+
+	template<class _Ty,
+		class... _Args,
+		class = enable_if_t<
+			is_copy_constructible<decay_t<_Ty> >::value
+				&& is_constructible<decay_t<_Ty>, _Args...>::value,
+			void> >
+		explicit any(_STD in_place_type_t<_Ty>, _Args&&... _Vals)
+			: _Myptr(new _Holder<decay_t<_Ty> >(
+				_STD forward<_Args>(_Vals)...))
+		{	// construct from _Val&&...
+		}
+
+	template<class _Ty,
+		class _Other,
+		class... _Args,
+		class = enable_if_t<
+			is_copy_constructible<decay_t<_Ty> >::value
+				&& is_constructible<decay_t<_Ty>,
+					_XSTD initializer_list<_Other>&, _Args...>::value,
+			void> >
+		explicit any(_STD in_place_type_t<_Ty>,
+			_XSTD initializer_list<_Other> _Ilist, _Args&&..._Vals)
+			: _Myptr(new _Holder<decay_t<_Ty> >(
+				_Ilist, _STD forward<_Args>(_Vals)...))
+		{	// construct from _Ilist, _Vals...
+		}
+
+	~any() _NOEXCEPT
+		{	// destroy the object
+		reset();
+		}
+
+	any& operator=(const any& _Right)
+		{	// copy assign
+		any(_Right).swap(*this);
+		return (*this);
+		}
+
+	any& operator=(any&& _Right)
+		{	// move assign
+		any(_STD move(_Right)).swap(*this);
+		return (*this);
+		}
+
+	template<class _Ty,
+		class = enable_if_t<
+			!is_same<decay_t<_Ty>, any>::value
+				&& is_copy_constructible<decay_t<_Ty> >::value,
+			void> >
+		any& operator=(_Ty&& _Right)
+		{	// copy from _Right
+		any(decay_t<_Ty>(_STD forward<_Ty>(_Right))).swap(*this);
+		return (*this);
+		}
+
+	template<class _Ty,
+		class... _Args,
+		class = enable_if_t<
+			is_copy_constructible<decay_t<_Ty> >::value
+				&& is_constructible<decay_t<_Ty>, _Args...>::value,
+			void> >
+		decay_t<_Ty>& emplace(_Args&&... _Vals)
+		{	// construct from _Vals...
+		reset();
+		_Myptr = new _Holder<decay_t<_Ty> >(
+			_STD forward<_Args>(_Vals)...);
+		return (*(decay_t<_Ty> *)_Myptr);
+		}
+
+	template<class _Ty,
+		class _Other,
+		class... _Args,
+		class = enable_if_t<
+			is_copy_constructible<decay_t<_Ty> >::value
+				&& is_constructible<decay_t<_Ty>,
+					_XSTD initializer_list<_Other>&, _Args...>::value,
+			void> >
+		decay_t<_Ty>& emplace(_XSTD initializer_list<_Other> _Ilist,
+			_Args&&..._Vals)
+		{	// construct from _Ilist, _Vals...
+		reset();
+		_Myptr = new _Holder<decay_t<_Ty> >(
+			_Ilist, _STD forward<_Args>(_Vals)...);
+		return (*(decay_t<_Ty> *)_Myptr);
+		}
+
+	void reset() _NOEXCEPT
+		{	// discard any object
+		delete(_Myptr);
+		_Myptr = nullptr;
+		}
+
+	void swap(any& _Right) _NOEXCEPT
+		{	// swap with _Right
+		_STD swap(_Myptr, _Right._Myptr);
+		}
+
+	bool has_value() const _NOEXCEPT
+		{	// test for no stored object
+		return (_Myptr != nullptr);
+		}
+
+	const _XSTD type_info& type() const _NOEXCEPT
+		{	// get type information for stored object
+		return (_Myptr == nullptr ? typeid(void) : _Myptr->_Mytype());
+		}
+
+	_Holder_base *_Myptr;
+	};
+
+#if defined(__CODEGEARC__)
+inline
+#endif
+void swap(any& _Left, any& _Right) _NOEXCEPT
+	{	// swap _Left and _Right
+	_Left.swap(_Right);
+	}
+
+	// TEMPLATE FUNCTION any_cast
+template<class _Ty>
+	_Ty any_cast(const any& _Left)
+	{	// get const reference to _Left
+	typedef remove_reference_t<_Ty> _Vx;
+	typedef remove_cv_t<_Vx> _Ux;
+	const _Ux *_Ptr = any_cast<_Ux>(&_Left);
+	if (_Left.type() != typeid(_Vx))
+		_THROW_N(bad_any_cast, "bad any_cast call");
+	return (*_Ptr);
+	}
+
+template<class _Ty>
+	_Ty any_cast(any& _Left)
+	{	// get reference to _Left
+	typedef remove_reference_t<_Ty> _Vx;
+	typedef remove_cv_t<_Vx> _Ux;
+	_Ux *_Ptr = any_cast<_Ux>(&_Left);
+	if (_Left.type() != typeid(_Vx))
+		_THROW_N(bad_any_cast, "bad any_cast call");
+	return (*_Ptr);
+	}
+
+template<class _Ty>
+	_Ty any_cast(any&& _Left)
+	{	// get rvalue reference to _Left
+	typedef remove_reference_t<_Ty> _Vx;
+	typedef remove_cv_t<_Vx> _Ux;
+	_Ux *_Ptr = any_cast<_Ux>(&_Left);
+	if (_Left.type() != typeid(_Vx))
+		_THROW_N(bad_any_cast, "bad any_cast call");
+	return (_STD move(*_Ptr));
+	}
+
+template<class _Ty>
+	const _Ty *any_cast(const any *_Pleft) _NOEXCEPT
+	{	// get pointer to const operand
+	if (_Pleft == nullptr || _Pleft->type() !=  typeid(_Ty))
+		return (nullptr);
+	void *_Ptr = _Pleft->_Myptr->_Get_ptr();
+	return ((const _Ty *)_Ptr);
+	}
+
+template<class _Ty>
+	_Ty *any_cast(any *_Pleft) _NOEXCEPT
+	{	// get pointer to operand
+	if (_Pleft == nullptr || _Pleft->type() !=  typeid(_Ty))
+		return (nullptr);
+	void *_Ptr = _Pleft->_Myptr->_Get_ptr();
+	return ((_Ty *)_Ptr);
+	}
+
+	// TEMPLATE FUNCTION make_any
+template<class _Ty,
+	class... _Args>
+	any make_any(_Args&&... _Vals)
+	{	// make any from forward<_Args>(_Vals)...
+	return (any(_STD in_place_type<_Ty>, _STD forward<_Args>(_Vals)...));
+	}
+
+template<class _Ty,
+	class _Other,
+	class... _Args>
+	any make_any(_XSTD initializer_list<_Other> _Ilist, _Args&&... _Vals)
+	{	// make any from forward<_Args>(_Vals)...
+	return (any(_STD in_place_type<_Ty>, _Ilist,
+		_STD forward<_Args>(_Vals)...));
+	}
+_STD_END
+#endif /* _ANY_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

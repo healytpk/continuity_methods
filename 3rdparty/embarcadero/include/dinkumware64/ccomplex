@@ -1,0 +1,18 @@
+// ccomplex standard header
+#ifndef _CCOMPLEX_
+#define _CCOMPLEX_
+
+ #if _IS_GHS
+#include <complex>
+
+ #else /* _IS_GHS */
+// ccomplex standard header -- dummy for no C99 library
+// NOTE: no include guard
+ #endif /* _IS_GHS */
+
+#endif /* _CCOMPLEX_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+V8.03a/17:1422 */

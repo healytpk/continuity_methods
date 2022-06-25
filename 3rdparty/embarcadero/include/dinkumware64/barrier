@@ -1,0 +1,142 @@
+// barrier concurrency header
+#ifndef _BARRIER_
+#define _BARRIER_
+#include <atomic>
+#include <mutex>
+
+_STD_BEGIN
+namespace experimental {
+	namespace concurrency_v1 {
+_NO_RET(_Throw_barrier_error(const char *_Mesg))
+	{	// throw a logic error exception
+	_THROW_N(logic_error, _Mesg);
+	}
+
+ptrdiff_t _Flex_barrier_nop()
+	{	// do nothing
+	return (-1);
+	}
+
+	// CLASS flex_barrier
+class flex_barrier
+	{	// multiuse barrier for one or more threads with completion
+public:
+	template<class _Fn>
+		flex_barrier(ptrdiff_t _Threads, _Fn _Func)
+		:_Thread_count(_Threads), _Wait_count(0), _Completer(_Func)
+		{	// construct with non-negative count
+		if (_Thread_count < 0)
+			_Throw_barrier_error("flex_barrier: bad thread count");
+		atomic_init(&_Leave_count, 0);
+		}
+
+	explicit flex_barrier(ptrdiff_t _Threads)
+		:_Thread_count(_Threads), _Wait_count(0),
+			_Completer(_Flex_barrier_nop)
+		{	// construct with non-negative count
+		if (_Thread_count < 0)
+			_Throw_barrier_error("flex_barrier: bad thread count");
+		atomic_init(&_Leave_count, 0);
+		}
+
+	flex_barrier(const flex_barrier&) = delete;
+	flex_barrier& operator=(const flex_barrier&) = delete;
+
+	~flex_barrier() _NOEXCEPT
+		{	// destroy the object
+		while (!_All_done())
+			;
+		}
+
+	void arrive_and_wait()
+		{	// decrement and wait for all to unblock
+		unique_lock<mutex> _Lock(_Mtx);
+		ptrdiff_t _New_thread_count = 0;
+
+		_Idle.wait(_Lock, _STD bind(&flex_barrier::_All_done, this));
+		if (++_Wait_count < _Thread_count)
+			_Ready.wait(_Lock, _STD bind(&flex_barrier::_All_waiting, this));
+		else
+			{	// no more threads permitted, notify all
+			_Leave_count = _Thread_count;
+			_New_thread_count = _Thread_count;
+			if (_New_thread_count == 0)
+				_Throw_barrier_error("flex_barrier: bad thread count");
+			_Ready.notify_all();
+			}
+
+		if (_Leave_count == 1)
+			{	// last to leave, notify other waiters
+			if (0 < _New_thread_count)
+				_Thread_count = _New_thread_count;
+			_Wait_count = 0;
+			_Idle.notify_all();
+			}
+		--_Leave_count;
+		}
+
+	void arrive_and_drop()
+		{	// decrement and drop thread
+		unique_lock<mutex> _Lock(_Mtx);
+		ptrdiff_t _New_thread_count = 0;
+
+		_Idle.wait(_Lock, _STD bind(&flex_barrier::_All_done, this));
+		if (--_Thread_count <= 0)
+			_Throw_barrier_error("flex_barrier:: no thread to drop");
+		if (_Wait_count == _Thread_count)
+			{	// no more threads permitted, notify all
+			_Leave_count = _Thread_count;
+			_New_thread_count = _Completer();
+			if (_New_thread_count == 0)
+				_Throw_barrier_error("flex_barrier: bad thread count");
+			if (0 < _New_thread_count)
+				_Thread_count = _New_thread_count;
+			_Ready.notify_all();
+			}
+		}
+
+//private:
+	bool _All_done()
+		{	// test if all done
+		return (_Leave_count == 0);
+		}
+
+	bool _All_waiting()
+		{	// test if all done
+		return (_Wait_count == _Thread_count);
+		}
+
+	mutex _Mtx;
+	condition_variable _Idle;
+	condition_variable _Ready;
+	atomic_int _Leave_count;
+
+	ptrdiff_t _Thread_count;
+	ptrdiff_t _Wait_count;
+
+	function<ptrdiff_t()> _Completer;
+	};
+
+	// CLASS barrier
+class barrier
+	: public flex_barrier
+	{	// multiuse barrier for one or more threads
+public:
+	explicit barrier(ptrdiff_t _Threads)
+		: flex_barrier(_Threads)
+		{	// construct with non-negative count
+		}
+
+	barrier(const barrier&) = delete;
+	barrier& operator=(const barrier&) = delete;
+	};
+		} //namespace concurrency_v1
+	} // namespace experimental
+using namespace experimental::concurrency_v1;
+_STD_END
+#endif /* _BARRIER_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

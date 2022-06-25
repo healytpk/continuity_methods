@@ -1,0 +1,10 @@
+// latch concurrency header
+#ifndef _EXPERIMENTAL_LATCH_
+#define _EXPERIMENTAL_LATCH_
+#include <latch>
+#endif /* _EXPERIMENTAL_LATCH_ */
+
+/*
+ * Copyright (c) by P.J. Plauger.  ALL RIGHTS RESERVED.
+ * Consult your license regarding permissions and restrictions.
+V7.0:0009 */

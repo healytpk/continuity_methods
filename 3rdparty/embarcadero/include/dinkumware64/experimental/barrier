@@ -1,0 +1,10 @@
+// barrier concurrency header
+#ifndef _EXPERIMENTAL_BARRIER_
+#define _EXPERIMENTAL_BARRIER_
+#include <barrier>
+#endif /* _EXPERIMENTAL_BARRIER_ */
+
+/*
+ * Copyright (c) by P.J. Plauger.  ALL RIGHTS RESERVED.
+ * Consult your license regarding permissions and restrictions.
+V7.0:0009 */

@@ -1,0 +1,18 @@
+/*  cstdbool
+
+    Standard C++ header file wrapper for stdbool.h
+*/
+
+/*
+ *      C/C++ Run Time Library - Version 29.0
+ *
+ *      Copyright (c) 2013, 2021 by Embarcadero Technologies, Inc.
+ *      All Rights Reserved.
+ *
+ */
+
+/* $Revision:$ */
+
+#define  __USING_CNAME__
+#include <stdbool.h>
+#undef   __USING_CNAME__

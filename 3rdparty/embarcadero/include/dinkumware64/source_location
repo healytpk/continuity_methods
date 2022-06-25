@@ -1,0 +1,85 @@
+// source_location experimental header
+#ifndef _SOURCE_LOCATION_
+#define _SOURCE_LOCATION_
+#include <cstdint>
+
+_STD_BEGIN
+namespace experimental {
+	inline namespace fundamentals_v2 {
+struct source_location
+	{	// stores a source_location
+	_CONST_FUN source_location()
+		: _Myfilename(""),
+		_Myfunname(""),
+		_Myline(0),
+		_Mycolumn(1)
+		{	// default construct
+		}
+
+	_CONST_FUN uint_least32_t line() const _NOEXCEPT
+		{	// get _Myline
+		return (_Myline);
+		}
+
+	_CONST_FUN uint_least32_t column() const _NOEXCEPT
+		{	// get _Mycolumn
+		return (_Mycolumn);
+		}
+
+	_CONST_FUN const char *file_name() const _NOEXCEPT
+		{	// get _Myfilename
+		return (_Myfilename);
+		}
+
+	_CONST_FUN const char *function_name() const _NOEXCEPT
+		{	// get _Myfunname
+		return (_Myfunname);
+		}
+
+ #if _GCC48
+	static constexpr source_location
+		current(const char* _File = __builtin_FILE(),
+		const char* _Func = __builtin_FUNCTION(),
+		int _Line = __builtin_LINE(),
+		int _Col = 1) noexcept
+		{	// get data for invocation source line
+		source_location _Loc;
+		_Loc._Myfilename = _File;
+		_Loc._Myfunname = _Func;
+		_Loc._Myline = _Line;
+		_Loc._Mycolumn = _Col;
+		return (_Loc);
+		}
+
+ #else /* _GCC48 */
+	static _CONST_FUNX source_location
+		current(const char* _File = "unknown filename",
+		const char* _Func = "unknown function name",
+		int _Line = 1,
+		int _Col = 1) noexcept
+		{	// get data for invocation source line
+		source_location _Loc;
+		_Loc._Myfilename = _File;
+		_Loc._Myfunname = _Func;
+		_Loc._Myline = _Line;
+		_Loc._Mycolumn = _Col;
+		return (_Loc);
+		}
+ #endif /* _GCC48 */
+
+private:
+		const char *_Myfilename;
+		const char *_Myfunname;
+		uint32_t _Myline;
+		uint32_t _Mycolumn = 0;
+	};
+		} // namespace fundamentals_v2
+	} // namespace experimental
+using namespace experimental::fundamentals_v2;
+_STD_END
+#endif /* _SOURCE_LOCATION_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

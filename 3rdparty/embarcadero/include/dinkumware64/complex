@@ -1,0 +1,1714 @@
+// complex standard header
+#ifndef _COMPLEX_
+#define _COMPLEX_
+#include <ccomplex>	/* dummy if not C99 library */
+#include <cmath>
+#include <limits>
+#include <sstream>
+
+ #if _IS_GHS
+#include <limits>
+#include <type_traits>
+
+ #if (defined(__i386) || defined(__x86_64__)) && !defined(__VXWORKS)
+  #include <86_ghs.h>  /* __float__, __double__ */
+ #endif /* defined(__i386, etc. */
+
+// Don't try to wrap the C complex libraries on Windows native,
+// Solaris native, or lnxppc/lnxarm.
+
+ #if (defined(__sparc__) || defined(__windows) \
+	|| (defined(__linux__) && !defined(__i386__))) \
+		&& !defined(__GHS_NO_C99_COMPLEX_LIBS)
+  #define __GHS_NO_C99_COMPLEX_LIBS
+ #endif /* defined(__sparc__), etc. */
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs start_cxx_lib_header
+  #pragma ghs startdata
+ #endif /* defined(__GHS_PRAGMAS) */
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack (push, __ghs_max_pack_value)
+ #endif /* defined(__ghs_max_pack_value) */
+
+#endif /* _IS_GHS */
+
+ #if defined(__GNUC__)	/* compiler test */
+  #define _C99_float_complex	float __complex__
+  #define _C99_double_complex	double __complex__
+  #define _C99_ldouble_complex	long double __complex__
+ #endif /* defined(__GNUC__) */
+
+ #if _IS_GHS
+
+ #if !defined(__GHS_NO_C99_COMPLEX_LIBS)
+  #ifndef _C_COMPLEX_T
+   #define _C_COMPLEX_T
+
+typedef struct _Complex_double
+	{	/* double complex */
+	double _Val[2];
+	} _Complex_double;
+
+typedef struct _Complex_float
+	{	/* float complex */
+	float _Val[2];
+	} _Complex_float;
+
+typedef struct _Complex_long_double
+	{	/* long double complex */
+	long double _Val[2];
+	} _Complex_long_double;
+
+/* Import these structs into the _CSTD namespace,
+ * but only if that namespace is not the global namespace.
+*/
+
+   #if !(_ALT_NS == 1 || (_ALT_NS == 0 && !defined(_STD_USING)))
+_C_STD_BEGIN
+    using ::_Complex_double;
+    using ::_Complex_float;
+    using ::_Complex_long_double;
+_C_STD_END
+   #endif /* !(_ALT_NS == 1, etc.) */
+
+  #endif /* defined(_C_COMPLEX_T) */
+ #endif /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+
+#else /* _IS_GHS */
+_C_STD_BEGIN
+ #ifndef _C_COMPLEX_T
+  #define _C_COMPLEX_T
+
+typedef struct _C_double_complex
+	{	/* double complex */
+	double _Val[2];
+	} _C_double_complex;
+
+typedef struct _C_float_complex
+	{	/* float complex */
+	float _Val[2];
+	} _C_float_complex;
+
+typedef struct _C_ldouble_complex
+	{	/* long double complex */
+	long double _Val[2];
+	} _C_ldouble_complex;
+ #endif /* _C_COMPLEX_T */
+_C_STD_END
+#endif /* _IS_GHS */
+
+	// COMPLEX _Val OFFSETS
+ #define _RE	0
+ #define _IM	1
+
+_STD_BEGIN
+ #if _IS_GHS
+
+ #if !defined(__GHS_NO_C99_COMPLEX_LIBS)
+typedef _CSTD _Complex_double _Dcomplex_value;
+typedef _CSTD _Complex_float _Fcomplex_value;
+typedef _CSTD _Complex_long_double _Lcomplex_value;
+
+ #else /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+typedef _CSTD _C_double_complex _Dcomplex_value;
+typedef _CSTD _C_float_complex _Fcomplex_value;
+typedef _CSTD _C_ldouble_complex _Lcomplex_value;
+ #endif /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+
+#else /* _IS_GHS */
+typedef _CSTD _C_double_complex _Dcomplex_value;
+typedef _CSTD _C_float_complex _Fcomplex_value;
+typedef _CSTD _C_ldouble_complex _Lcomplex_value;
+#endif /* _IS_GHS */
+
+template<class _Ty>
+	class complex;
+template<>
+	class complex<float>;
+template<>
+	class complex<double>;
+template<>
+	class complex<long double>;
+
+		// TEMPLATE CLASS _Ctraits
+template<class _Ty>
+	class _Ctraits
+	{	// complex traits for arbitrary _Ty
+public:
+	static _Ty _Flt_eps()
+		{	// get epsilon
+		return (numeric_limits<_Ty>::epsilon());
+		}
+
+	static _Ty _Flt_max()
+		{	// get max
+		return ((numeric_limits<_Ty>::max)());
+		}
+
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+		return (_CSTD _Cosh((double)_Left, (double)_Right));
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+		double _Tmp = (double)*_Pleft;
+		short _Ans = _CSTD _Exp(&_Tmp, (double)_Right, _Exponent);
+		*_Pleft = (_Ty)_Tmp;
+		return (_Ans);
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (_CSTD _Inf._Double);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		double _Tmp = (double)_Left;
+		return (_CSTD _Dtest(&_Tmp) == _INFCODE);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		double _Tmp = (double)_Left;
+		return (_CSTD _Dtest(&_Tmp) == _NANCODE);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (_CSTD _Nan._Double);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+		return (_CSTD _Sinh((double)_Left, (double)_Right));
+		}
+
+	static _Ty asinh(_Ty _Left)
+		{	// return asinh(_Left)
+		static const _Ty _Ln2 = 0.69314718055994530941723212145817658L;
+
+		bool _Neg = _Left < 0;
+		_Ty _Ans;
+
+		if (_Neg)
+			_Left = -_Left;
+		if (_Left < 2 / _Flt_eps())
+			_Ans = log1p(_Left
+				+ _Left * _Left / (1 + sqrt(_Left * _Left + 1)));
+		else
+			_Ans = log(_Left) + _Ln2;
+		return (_Neg ? -_Ans : _Ans);
+		}
+
+	static _Ty atan2(_Ty _Yval, _Ty _Xval)
+		{	// return atan(_Yval / _Xval)
+		return (_CSTD atan2((double)_Yval, (double)_Xval));
+		}
+
+	static _Ty cos(_Ty _Left)
+		{	// return cos(_Left)
+		return (_CSTD cos((double)_Left));
+		}
+
+	static _Ty exp(_Ty _Left)
+		{	// return exp(_Left)
+		return (_CSTD exp((double)_Left));
+		}
+
+	static _Ty ldexp(_Ty _Left, int _Exponent)
+		{	// return _Left * 2 ^ _Exponent
+		return (_CSTD ldexp((double)_Left, _Exponent));
+		}
+
+	static _Ty log(_Ty _Left)
+		{	// return log(_Left)
+		return (_CSTD log((double)_Left));
+		}
+
+	static _Ty log1p(_Ty _Left)
+		{	// return log(1 + _Left)
+		if (_Left < -1)
+			return (_Nanv(_Left));
+		else if (_Left == 0)
+			return (_Left);
+		else
+			{	// compute log(1 + _Left) with fixup for small _Left
+			_Ty _Leftp1 = 1 + _Left;
+			return (log(_Leftp1) - ((_Leftp1 - 1) - _Left) / _Leftp1);
+			}
+		}
+
+	static _Ty pow(_Ty _Left, _Ty _Right)
+		{	// return _Left ^ _Right
+		return (_CSTD pow((double)_Left, (double)_Right));
+		}
+
+	static _Ty sin(_Ty _Left)
+		{	// return sin(_Left)
+		return (_CSTD sin((double)_Left));
+		}
+
+	static _Ty sqrt(_Ty _Left)
+		{	// return sqrt(_Left)
+		return (_CSTD sqrt((double)_Left));
+		}
+
+	static _Ty tan(_Ty _Left)
+		{	// return tan(_Left)
+		return (_CSTD tan((double)_Left));
+		}
+	};
+
+		// CLASS _Ctraits<double>
+template<>
+	class _Ctraits<double>
+	{	// complex traits for double
+public:
+	typedef double _Ty;
+
+	static _Ty _Flt_eps()
+		{	// get epsilon
+		return (numeric_limits<_Ty>::epsilon());
+		}
+
+	static _Ty _Flt_max()
+		{	// get max
+		return ((numeric_limits<_Ty>::max)());
+		}
+
+ #if _IS_GHS
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+ #if defined(__FloatSingle__)
+		return (_CSTD __ghs_coshf_x_val((float)_Left, (float)_Right));
+
+ #else /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_cosh_x_val(_Left, _Right));
+ #endif /* defined(__FloatSingle__) */
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+ #if /* defined(__FloatSingle__) */
+		*_Pleft = _CSTD expf((float)*_Pleft) * (float)_Right;
+
+ #else /* defined(__FloatSingle__) */
+		*_Pleft = _CSTD exp(*_Pleft) * _Right;
+ #endif /* defined(__FloatSingle__) */
+
+		return (0);
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (__INFINITY__);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		return (isinf(_Left) != 0);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		return (isnan(_Left) != 0);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (__NAN__);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+ #if /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_sinhf_x_val((float)_Left, (float)_Right));
+
+ #else /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_sinh_x_val(_Left, _Right));
+ #endif /* defined(__FloatSingle__) */
+
+		return (0);
+		}
+
+#else /* _IS_GHS */
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+		return (_CSTD _Cosh(_Left, _Right));
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+		return (_CSTD _Exp(_Pleft, _Right, _Exponent));
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (_CSTD _Inf._Double);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		return (_CSTD _Dtest(&_Left) == _INFCODE);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		return (_CSTD _Dtest(&_Left) == _NANCODE);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (_CSTD _Nan._Double);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+		return (_CSTD _Sinh(_Left, _Right));
+		}
+#endif /* _IS_GHS */
+
+	static _Ty asinh(_Ty _Left)
+		{	// return asinh(_Left)
+		static const _Ty _Ln2 = 0.69314718055994530941723212145817658L;
+
+		bool _Neg = _Left < 0;
+		_Ty _Ans;
+
+		if (_Neg)
+			_Left = -_Left;
+		if (_Left < 2 / _Flt_eps())
+			_Ans = log1p(_Left
+				+ _Left * _Left / (1 + sqrt(_Left * _Left + 1)));
+		else
+			_Ans = log(_Left) + _Ln2;
+		return (_Neg ? -_Ans : _Ans);
+		}
+
+	static _Ty atan2(_Ty _Yval, _Ty _Xval)
+		{	// return atan(_Yval / _Xval)
+		return (_CSTD atan2(_Yval, _Xval));
+		}
+
+	static _Ty cos(_Ty _Left)
+		{	// return cos(_Left)
+		return (_CSTD cos(_Left));
+		}
+
+	static _Ty exp(_Ty _Left)
+		{	// return exp(_Left)
+		return (_CSTD exp(_Left));
+		}
+
+	static _Ty ldexp(_Ty _Left, int _Exponent)
+		{	// return _Left * 2 ^ _Exponent
+		return (_CSTD ldexp(_Left, _Exponent));
+		}
+
+	static _Ty log(_Ty _Left)
+		{	// return log(_Left)
+		return (_CSTD log(_Left));
+		}
+
+	static _Ty log1p(_Ty _Left)
+		{	// return log(1 + _Left)
+		if (_Left < -1)
+			return (_Nanv(_Left));
+		else if (_Left == 0)
+			return (_Left);
+		else
+			{	// compute log(1 + _Left) with fixup for small _Left
+			_Ty _Leftp1 = 1 + _Left;
+			return (log(_Leftp1) - ((_Leftp1 - 1) - _Left) / _Leftp1);
+			}
+		}
+
+	static _Ty pow(_Ty _Left, _Ty _Right)
+		{	// return _Left ^ _Right
+		return (_CSTD pow(_Left, _Right));
+		}
+
+	static _Ty sin(_Ty _Left)
+		{	// return sin(_Left)
+		return (_CSTD sin(_Left));
+		}
+
+	static _Ty sqrt(_Ty _Left)
+		{	// return sqrt(_Left)
+		return (_CSTD sqrt(_Left));
+		}
+
+	static _Ty tan(_Ty _Left)
+		{	// return tan(_Left)
+		return (_CSTD tan(_Left));
+		}
+	};
+
+		// CLASS _Ctraits<long double>
+template<>
+	class _Ctraits<long double>
+	{	// complex traits for long double
+public:
+	typedef long double _Ty;
+
+	static _Ty _Flt_eps()
+		{	// get epsilon
+		return (LDBL_EPSILON);
+		}
+
+	static _Ty _Flt_max()
+		{	// get max
+		return (LDBL_MAX);
+		}
+
+ #if _IS_GHS
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+ #if defined(__FloatSingle__)
+		return (_CSTD __ghs_coshf_x_val((float)_Left, (float)_Right));
+
+ #else /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_coshl_x_val(_Left, _Right));
+ #endif /* defined(__FloatSingle__) */
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+ #if /* defined(__FloatSingle__) */
+		*_Pleft = _CSTD expf((float)*_Pleft) * _Right;
+
+ #else /* defined(__FloatSingle__) */
+		*_Pleft = _CSTD expl(*_Pleft) * _Right;
+ #endif /* defined(__FloatSingle__) */
+
+		return (0);
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (__INFINITY__);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		return (isinf(_Left) != 0);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		return (isnan(_Left) != 0);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (__NAN__);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+ #if /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_sinhf_x_val((float)_Left, (float)_Right));
+
+ #else /* defined(__FloatSingle__) */
+		return (_CSTD __ghs_sinhl_x_val(_Left, _Right));
+ #endif /* defined(__FloatSingle__) */
+
+		return (0);
+		}
+
+#else /* _IS_GHS */
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+		return (_CSTD _LCosh(_Left, _Right));
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+		return (_CSTD _LExp(_Pleft, _Right, _Exponent));
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (_CSTD _LInf._Long_double);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		return (_CSTD _LDtest(&_Left) == _INFCODE);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		return (_CSTD _LDtest(&_Left) == _NANCODE);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (_CSTD _LNan._Long_double);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+		return (_CSTD _LSinh(_Left, _Right));
+		}
+#endif /* _IS_GHS */
+
+	static _Ty asinh(_Ty _Left)
+		{	// return asinh(_Left)
+		static const _Ty _Ln2 = 0.69314718055994530941723212145817658L;
+
+		bool _Neg = _Left < 0;
+		_Ty _Ans;
+
+		if (_Neg)
+			_Left = -_Left;
+		if (_Left < 2 / _Flt_eps())
+			_Ans = log1pl(_Left
+				+ _Left * _Left / (1 + sqrtl(_Left * _Left + 1)));
+		else
+			_Ans = logl(_Left) + _Ln2;
+		return (_Neg ? -_Ans : _Ans);
+		}
+
+	static _Ty atan2(_Ty _Yval, _Ty _Xval)
+		{	// return atan(_Yval / _Xval)
+		return (_CSTD atan2l(_Yval, _Xval));
+		}
+
+	static _Ty cos(_Ty _Left)
+		{	// return cos(_Left)
+		return (_CSTD cosl(_Left));
+		}
+
+	static _Ty exp(_Ty _Left)
+		{	// return exp(_Left)
+		return (_CSTD expl(_Left));
+		}
+
+	static _Ty ldexp(_Ty _Left, int _Exponent)
+		{	// return _Left * 2 ^ _Exponent
+		return (_CSTD ldexpl(_Left, _Exponent));
+		}
+
+	static _Ty log(_Ty _Left)
+		{	// return log(_Left)
+		return (_CSTD logl(_Left));
+		}
+
+	static _Ty log1p(_Ty _Left)
+		{	// return log(1 + _Left)
+		if (_Left < -1)
+			return (_Nanv(_Left));
+		else if (_Left == 0)
+			return (_Left);
+		else
+			{	// compute log(1 + _Left) with fixup for small _Left
+			_Ty _Leftp1 = 1 + _Left;
+			return (logl(_Leftp1) - ((_Leftp1 - 1) - _Left) / _Leftp1);
+			}
+		}
+
+	static _Ty pow(_Ty _Left, _Ty _Right)
+		{	// return _Left ^ _Right
+		return (_CSTD powl(_Left, _Right));
+		}
+
+	static _Ty sin(_Ty _Left)
+		{	// return sin(_Left)
+		return (_CSTD sinl(_Left));
+		}
+
+	static _Ty sqrt(_Ty _Left)
+		{	// return sqrt(_Left)
+		return (_CSTD sqrtl(_Left));
+		}
+
+	static _Ty tan(_Ty _Left)
+		{	// return tan(_Left)
+		return (_CSTD tanl(_Left));
+		}
+	};
+
+		// CLASS _Ctraits<float>
+template<>
+	class _Ctraits<float>
+	{	// complex traits for float
+public:
+	typedef float _Ty;
+
+	static _Ty _Flt_eps()
+		{	// get epsilon
+		return (FLT_EPSILON);
+		}
+
+	static _Ty _Flt_max()
+		{	// get max
+		return (FLT_MAX);
+		}
+
+	static _Ty _Cosh(_Ty _Left, _Ty _Right)
+		{	// return cosh(_Left) * _Right
+		return (_CSTD _FCosh(_Left, _Right));
+		}
+
+	static short _Exp(_Ty *_Pleft, _Ty _Right, short _Exponent)
+		{	// compute exp(*_Pleft) * _Right * 2 ^ _Exponent
+		return (_CSTD _FExp(_Pleft, _Right, _Exponent));
+		}
+
+	static _Ty _Infv(_Ty)
+		{	// return infinity
+		return (_CSTD _FInf._Float);
+		}
+
+	static bool _Isinf(_Ty _Left)
+		{	// test for infinity
+		return (_CSTD _FDtest(&_Left) == _INFCODE);
+		}
+
+	static bool _Isnan(_Ty _Left)
+		{	// test for NaN
+		return (_CSTD _FDtest(&_Left) == _NANCODE);
+		}
+
+	static _Ty _Nanv(_Ty)
+		{	// return NaN
+		return (_CSTD _FNan._Float);
+		}
+
+	static _Ty _Sinh(_Ty _Left, _Ty _Right)
+		{	// return sinh(_Left) * _Right
+		return (_CSTD _FSinh(_Left, _Right));
+		}
+
+	static _Ty asinh(_Ty _Left)
+		{	// return asinh(_Left)
+		static const _Ty _Ln2 = 0.69314718055994530941723212145817658F;
+
+		bool _Neg = _Left < 0;
+		_Ty _Ans;
+
+		if (_Neg)
+			_Left = -_Left;
+		if (_Left < 2 / _Flt_eps())
+			_Ans = log1pf(_Left
+				+ _Left * _Left / (1 + sqrtf(_Left * _Left + 1)));
+		else
+			_Ans = logf(_Left) + _Ln2;
+		return (_Neg ? -_Ans : _Ans);
+		}
+
+	static _Ty atan2(_Ty _Yval, _Ty _Xval)
+		{	// return atan(_Yval / _Xval)
+		return (_CSTD atan2f(_Yval, _Xval));
+		}
+
+	static _Ty cos(_Ty _Left)
+		{	// return cos(_Left)
+		return (_CSTD cosf(_Left));
+		}
+
+	static _Ty exp(_Ty _Left)
+		{	// return exp(_Left)
+		return (_CSTD expf(_Left));
+		}
+
+	static _Ty ldexp(_Ty _Left, int _Exponent)
+		{	// return _Left * 2 ^ _Exponent
+		return (_CSTD ldexpf(_Left, _Exponent));
+		}
+
+	static _Ty log(_Ty _Left)
+		{	// return log(_Left)
+		return (_CSTD logf(_Left));
+		}
+
+	static _Ty log1p(_Ty _Left)
+		{	// return log(1 + _Left)
+		if (_Left < -1)
+			return (_Nanv(_Left));
+		else if (_Left == 0)
+			return (_Left);
+		else
+			{	// compute log(1 + _Left) with fixup for small _Left
+			_Ty _Leftp1 = 1 + _Left;
+			return (logf(_Leftp1) - ((_Leftp1 - 1) - _Left) / _Leftp1);
+			}
+		}
+
+	static _Ty pow(_Ty _Left, _Ty _Right)
+		{	// return _Left ^ _Right
+		return (_CSTD powf(_Left, _Right));
+		}
+
+	static _Ty sin(_Ty _Left)
+		{	// return sin(_Left)
+		return (_CSTD sinf(_Left));
+		}
+
+	static _Ty sqrt(_Ty _Left)
+		{	// return sqrt(_Left)
+		return (_CSTD sqrtf(_Left));
+		}
+
+	static _Ty tan(_Ty _Left)
+		{	// return tan(_Left)
+		return (_CSTD tanf(_Left));
+		}
+	};
+
+		// TEMPLATE CLASS _Complex_value
+template<class _Ty>
+	struct _Complex_value
+	{	/* templatized complex value */
+	enum {_Re = 0, _Im = 1};
+	_Ty _Val[2];
+	};
+
+ #if _IS_GHS
+
+ #if !defined(__GHS_NO_C99_COMPLEX_LIBS)
+extern "C" _Complex_float __c99_complex_float_multiply(
+	_Complex_float, _Complex_float);
+extern "C" _Complex_double __c99_complex_double_multiply(
+	_Complex_double, _Complex_double);
+extern "C" _Complex_long_double __c99_complex_long_double_multiply(
+	_Complex_long_double, _Complex_long_double);
+
+extern "C" _Complex_float __c99_complex_float_divide(
+	_Complex_float, _Complex_float);
+extern "C" _Complex_double __c99_complex_double_divide(
+	_Complex_double, _Complex_double);
+extern "C" _Complex_long_double __c99_complex_long_double_divide(
+	_Complex_long_double, _Complex_long_double);
+
+// Wrapper functions so we can use overload resolution to select among the
+// multiply and divide routines above.
+inline _Complex_float _C99_Cmul_wrapper(
+	const _Complex_float& _Left, const _Complex_float& _Right)
+	{	// _Complex_float multiply
+	return (__c99_complex_float_multiply(_Left, _Right));
+	}
+inline _Complex_double _C99_Cmul_wrapper(
+	const _Complex_double& _Left, const _Complex_double& _Right)
+	{	// _Complex_double multiply
+	return (__c99_complex_double_multiply(_Left, _Right));
+}
+inline _Complex_long_double _C99_Cmul_wrapper(
+	const _Complex_long_double& _Left, const _Complex_long_double& _Right)
+	{	// _Complex_long_double multiply
+	return (__c99_complex_long_double_multiply(_Left, _Right));
+	}
+
+inline _Complex_float _C99_Cdiv_wrapper(
+	const _Complex_float& _Left, const _Complex_float& _Right)
+	{	// _Complex_float divide
+	return (__c99_complex_float_divide(_Left, _Right));
+	}
+inline _Complex_double _C99_Cdiv_wrapper(
+	const _Complex_double& _Left, const _Complex_double& _Right)
+	{	// _Complex_double divide
+	return (__c99_complex_double_divide(_Left, _Right));
+	}
+inline _Complex_long_double _C99_Cdiv_wrapper(
+	const _Complex_long_double& _Left, const _Complex_long_double& _Right)
+	{	// _Complex_long_double divide
+	return (__c99_complex_long_double_divide(_Left, _Right));
+	}
+ #endif /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+
+#endif /* _IS_GHS */
+
+		// TEMPLATE CLASS _Complex_base
+template<class _Ty,
+	class _Valbase>
+	class _Complex_base
+		: public _Valbase
+	{	// base for all complex types
+public:
+	typedef _Ctraits<_Ty> _Myctraits;
+	typedef _Complex_base<_Ty, _Valbase> _Myt;
+	typedef _Ty value_type;
+
+ #if _IS_GHS
+
+ #if _HAS_CPP11
+	_CONST_FUN _Complex_base(const _Ty& _Realval, const _Ty& _Imagval)
+		: _Valbase{{_Realval, _Imagval}}
+		{	// construct from components of same type
+		}
+
+ #else /* _HAS_CPP11 */
+	_CONST_FUN _Complex_base(const _Ty& _Realval, const _Ty& _Imagval)
+		{	// construct from components of same type
+		this->_Val[_RE] = _Realval;
+		this->_Val[_IM] = _Imagval;
+		}
+ #endif /* _HAS_CPP11 */
+
+#else /* _IS_GHS */
+	_CONST_FUN _Complex_base(const _Ty& _Realval, const _Ty& _Imagval)
+		: _Valbase{{_Realval, _Imagval}}
+		{	// construct from components of same type
+		}
+#endif /* _IS_GHS */
+
+	_Ty real(const _Ty& _Right)
+		{	// set real component
+		return (this->_Val[_RE] = _Right);
+		}
+
+	_Ty imag(const _Ty& _Right)
+		{	// set imaginary component
+		return (this->_Val[_IM] = _Right);
+		}
+
+	_CONST_FUN _Ty real() const
+		{	// return real component
+		return (this->_Val[_RE]);
+		}
+
+	_CONST_FUN _Ty imag() const
+		{	// return imaginary component
+		return (this->_Val[_IM]);
+		}
+
+protected:
+	template<class _Other> inline
+		void _Add(const complex<_Other>& _Right)
+		{	// add other complex
+		this->_Val[_RE] = this->_Val[_RE] + (_Ty)_Right.real();
+		this->_Val[_IM] = this->_Val[_IM] + (_Ty)_Right.imag();
+		}
+
+	template<class _Other> inline
+		void _Sub(const complex<_Other>& _Right)
+		{	// subtract other complex
+		this->_Val[_RE] = this->_Val[_RE] - (_Ty)_Right.real();
+		this->_Val[_IM] = this->_Val[_IM] - (_Ty)_Right.imag();
+		}
+
+	template<class _Other> inline
+		void _Mul(const complex<_Other>& _Right)
+		{	// multiply by other complex
+		_Ty _Rightreal = (_Ty)_Right.real();
+		_Ty _Rightimag = (_Ty)_Right.imag();
+
+		_Ty _Tmp = this->_Val[_RE] * _Rightreal
+			- this->_Val[_IM] * _Rightimag;
+		this->_Val[_IM] = this->_Val[_RE] * _Rightimag
+			+ this->_Val[_IM] * _Rightreal;
+		this->_Val[_RE] = _Tmp;
+
+ #if _IS_GHS
+
+ #if !defined(__GHS_NO_C99_COMPLEX_LIBS)
+		if (isnan(this->_Val[_RE]) && isnan(this->_Val[_Im]))
+			{	// redo multiply in C
+			_Valbase _RightBase;
+			_RightBase._Val[_RE] = (_Ty)_Right.real();
+			_RightBase._Val[_IM] = (_Ty)_Right.imag();
+			_Valbase _Result = _C99_Cmul_wrapper(*this, _RightBase);
+			this->_Val[_RE] = _Result._Val[_RE];
+			this->_Val[_IM] = _Result._Val[_IM];
+			}
+ #endif /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+
+#endif /* _IS_GHS */
+		}
+
+	template<class _Other> inline
+		void _Div(const complex<_Other>& _Right)
+		{	// divide by other complex
+ #if _IS_GHS
+
+ #if !defined(__GHS_NO_C99_COMPLEX_LIBS)
+		if (isnan(this->_Val[_RE]) && isnan(this->_Val[_Im]))
+			{	// redo multiply in C
+			_Valbase _RightBase;
+			_RightBase._Val[_RE] = (_Ty)_Right.real();
+			_RightBase._Val[_IM] = (_Ty)_Right.imag();
+			_Valbase _Result = _C99_Cdiv_wrapper(*this, _RightBase);
+			this->_Val[_RE] = _Result._Val[_RE];
+			this->_Val[_IM] = _Result._Val[_IM];
+			}
+		return;
+ #endif /* !defined(__GHS_NO_C99_COMPLEX_LIBS) */
+
+#endif /* _IS_GHS */
+
+		typedef _Ctraits<_Ty> _Myctraits;
+		_Ty _Rightreal = (_Ty)_Right.real();
+		_Ty _Rightimag = (_Ty)_Right.imag();
+
+		if (_Myctraits::_Isnan(_Rightreal) || _Myctraits::_Isnan(_Rightimag))
+			{	// set NaN result
+			this->_Val[_RE] = _Myctraits::_Nanv(_Rightreal);
+			this->_Val[_IM] = this->_Val[_RE];
+			}
+		else if ((_Rightimag < 0 ? -_Rightimag : +_Rightimag)
+			< (_Rightreal < 0 ? -_Rightreal : +_Rightreal))
+			{	// |_Right.imag()| < |_Right.real()|
+			_Ty _Wr = _Rightimag / _Rightreal;
+			_Ty _Wd = _Rightreal + _Wr * _Rightimag;
+
+			if (_Myctraits::_Isnan(_Wd) || _Wd == 0)
+				{	// set NaN result
+				this->_Val[_RE] = _Myctraits::_Nanv(_Rightreal);
+				this->_Val[_IM] = this->_Val[_RE];
+				}
+			else
+				{	// compute representable result
+				_Ty _Tmp = (this->_Val[_RE]
+					+ this->_Val[_IM] * _Wr) / _Wd;
+				this->_Val[_IM] = (this->_Val[_IM]
+					- this->_Val[_RE] * _Wr) / _Wd;
+				this->_Val[_RE] = _Tmp;
+				}
+			}
+		else if (_Rightimag == 0)
+			{	// set NaN result
+			this->_Val[_RE] = _Myctraits::_Nanv(_Rightreal);
+			this->_Val[_IM] = this->_Val[_RE];
+			}
+		else
+			{	// 0 < |_Right.real()| <= |_Right.imag()|
+			_Ty _Wr = _Rightreal / _Rightimag;
+			_Ty _Wd = _Rightimag + _Wr * _Rightreal;
+
+			if (_Myctraits::_Isnan(_Wd) || _Wd == 0)
+				{	// set NaN result
+				this->_Val[_RE] = _Myctraits::_Nanv(_Rightreal);
+				this->_Val[_IM] = this->_Val[_RE];
+				}
+			else
+				{	// compute representable result
+				_Ty _Tmp = (this->_Val[_RE] * _Wr + this->_Val[_IM]) / _Wd;
+				this->_Val[_IM] = (this->_Val[_IM] * _Wr
+					- this->_Val[_RE]) / _Wd;
+				this->_Val[_RE] = _Tmp;
+				}
+			}
+		}
+	};
+
+		// CLASS complex<float>
+template<>
+	class complex<float>
+	: public _Complex_base<float, _Fcomplex_value>
+	{	// complex with float components
+public:
+	typedef float _Ty;
+	typedef complex<_Ty> _Myt;
+
+	_CONST_FUN explicit complex(
+		const complex<double>&);	// defined below
+	_CONST_FUN explicit complex(
+		const complex<long double>&);	// defined below
+
+	_CONST_FUN complex(const _Ty& _Realval = 0,
+		const _Ty& _Imagval = 0)
+		: _Complex_base<float, _Fcomplex_value>(_Realval, _Imagval)
+		{	// construct from float components
+		}
+
+	_CONST_FUN complex(const _Fcomplex_value& _Right)
+		: _Complex_base<float, _Fcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from float complex value
+		}
+
+	_CONST_FUN complex(const _Dcomplex_value& _Right)
+		: _Complex_base<float, _Fcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from double complex value
+		}
+
+	_CONST_FUN complex(const _Lcomplex_value& _Right)
+		: _Complex_base<float, _Fcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from long double complex value
+		}
+
+	complex<_Ty>& operator=(const _Ty& _Right)
+		{	// assign real
+		_Val[_RE] = _Right;
+		_Val[_IM] = 0;
+		return (*this);
+		}
+
+ #if defined(_C99_float_complex)
+	complex(const _C99_float_complex& _Right)
+		: _Complex_base<float, _Fcomplex_value>(
+			((float *)&_Right)[0],
+			((float *)&_Right)[1])
+		{	// construct from C99 float complex value
+		}
+
+	operator _C99_float_complex() const
+		{	// extract C99 float complex value
+		return (*(_C99_float_complex *)&_Val[_RE]);
+		}
+ #endif /* defined(_C99_float_complex) */
+
+	_Myt& operator+=(const _Ty& _Right)
+		{	// add real
+		_Val[_RE] = _Val[_RE] + _Right;
+		return (*this);
+		}
+
+	_Myt& operator-=(const _Ty& _Right)
+		{	// subtract real
+		_Val[_RE] = _Val[_RE] - _Right;
+		return (*this);
+		}
+
+	_Myt& operator*=(const _Ty& _Right)
+		{	// multiply by real
+		_Val[_RE] = _Val[_RE] * _Right;
+		_Val[_IM] = _Val[_IM] * _Right;
+		return (*this);
+		}
+
+	_Myt& operator/=(const _Ty& _Right)
+		{	// divide by real
+		_Val[_RE] = _Val[_RE] / _Right;
+		_Val[_IM] = _Val[_IM] / _Right;
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator=(const complex<_Other>& _Right)
+		{	// assign another complex
+		_Val[_RE] = (_Ty)_Right._Val[_RE];
+		_Val[_IM] = (_Ty)_Right._Val[_IM];
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator+=(const complex<_Other>& _Right)
+		{	// add other complex
+		this->_Add(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator-=(const complex<_Other>& _Right)
+		{	// subtract other complex
+		this->_Sub(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator*=(const complex<_Other>& _Right)
+		{	// multiply by other complex
+		this->_Mul(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator/=(const complex<_Other>& _Right)
+		{	// divide by other complex
+		this->_Div(_Right);
+		return (*this);
+		}
+	};
+
+		// CLASS complex<double>
+template<>
+	class complex<double>
+	: public _Complex_base<double, _Dcomplex_value>
+	{	// complex with double components
+public:
+	typedef double _Ty;
+	typedef complex<_Ty> _Myt;
+
+	_CONST_FUN complex(
+		const complex<float>&);	// defined below
+	_CONST_FUN explicit complex(
+		const complex<long double>&);	// defined below
+
+	_CONST_FUN complex(const _Ty& _Realval = 0,
+		const _Ty& _Imagval = 0)
+		: _Complex_base<double, _Dcomplex_value>(_Realval, _Imagval)
+		{	// construct from double components
+		}
+
+	_CONST_FUN complex(const _Dcomplex_value& _Right)
+		: _Complex_base<double, _Dcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from double complex value
+		}
+
+	_CONST_FUN complex(const _Lcomplex_value& _Right)
+		: _Complex_base<double, _Dcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from long double complex value
+		}
+
+ #if defined(_C99_double_complex)
+	_CONST_FUN complex(const _C99_double_complex& _Right)
+		: _Complex_base<double, _Dcomplex_value>(
+			((double *)&_Right)[0],
+			((double *)&_Right)[1])
+		{	// construct from C99 double complex value
+		}
+
+	operator _C99_double_complex() const
+		{	// extract C99 double complex value
+		return (*(_C99_double_complex *)&_Val[_RE]);
+		}
+ #endif /* defined(_C99_double_complex) */
+
+	complex<_Ty>& operator=(const _Ty& _Right)
+		{	// assign real
+		_Val[_RE] = _Right;
+		_Val[_IM] = 0;
+		return (*this);
+		}
+
+	_Myt& operator+=(const _Ty& _Right)
+		{	// add real
+		_Val[_RE] = _Val[_RE] + _Right;
+		return (*this);
+		}
+
+	_Myt& operator-=(const _Ty& _Right)
+		{	// subtract real
+		_Val[_RE] = _Val[_RE] - _Right;
+		return (*this);
+		}
+
+	_Myt& operator*=(const _Ty& _Right)
+		{	// multiply by real
+		_Val[_RE] = _Val[_RE] * _Right;
+		_Val[_IM] = _Val[_IM] * _Right;
+		return (*this);
+		}
+
+	_Myt& operator/=(const _Ty& _Right)
+		{	// divide by real
+		_Val[_RE] = _Val[_RE] / _Right;
+		_Val[_IM] = _Val[_IM] / _Right;
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator=(const complex<_Other>& _Right)
+		{	// assign another complex
+		_Val[_RE] = (_Ty)_Right._Val[_RE];
+		_Val[_IM] = (_Ty)_Right._Val[_IM];
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator+=(const complex<_Other>& _Right)
+		{	// add other complex
+		this->_Add(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator-=(const complex<_Other>& _Right)
+		{	// subtract other complex
+		this->_Sub(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator*=(const complex<_Other>& _Right)
+		{	// multiply by other complex
+		this->_Mul(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator/=(const complex<_Other>& _Right)
+		{	// divide by other complex
+		this->_Div(_Right);
+		return (*this);
+		}
+	};
+
+		// CLASS complex<long double>
+template<>
+	class complex<long double>
+	: public _Complex_base<long double, _Lcomplex_value>
+	{	// complex with long double components
+public:
+	typedef long double _Ty;
+	typedef complex<_Ty> _Myt;
+
+	_CONST_FUN complex(
+		const complex<float>&);	// defined below
+	_CONST_FUN complex(
+		const complex<double>&);	// defined below
+
+	_CONST_FUN complex(const _Ty& _Realval = 0,
+		const _Ty& _Imagval = 0)
+		: _Complex_base<long double, _Lcomplex_value>(_Realval, _Imagval)
+		{	// construct from long double components
+		}
+
+	_CONST_FUN complex(const _Lcomplex_value& _Right)
+		: _Complex_base<long double, _Lcomplex_value>(_Right._Val[_RE],
+			_Right._Val[_IM])
+		{	// construct from long double complex value
+		}
+
+ #if defined(_C99_ldouble_complex)
+	_CONST_FUN complex(const _C99_ldouble_complex& _Right)
+		: _Complex_base<long double, _Lcomplex_value>(
+			((long double *)&_Right)[0],
+			((long double *)&_Right)[1])
+		{	// construct from C99 long double complex value
+		}
+
+	operator _C99_ldouble_complex() const
+		{	// extract C99 long double complex value
+		return (*(_C99_ldouble_complex *)&_Val[_RE]);
+		}
+ #endif /* defined(_C99_ldouble_complex) */
+
+	complex<_Ty>& operator=(const _Ty& _Right)
+		{	// assign real
+		_Val[_RE] = _Right;
+		_Val[_IM] = 0;
+		return (*this);
+		}
+
+	_Myt& operator+=(const _Ty& _Right)
+		{	// add real
+		_Val[_RE] = _Val[_RE] + _Right;
+		return (*this);
+		}
+
+	_Myt& operator-=(const _Ty& _Right)
+		{	// subtract real
+		_Val[_RE] = _Val[_RE] - _Right;
+		return (*this);
+		}
+
+	_Myt& operator*=(const _Ty& _Right)
+		{	// multiply by real
+		_Val[_RE] = _Val[_RE] * _Right;
+		_Val[_IM] = _Val[_IM] * _Right;
+		return (*this);
+		}
+
+	_Myt& operator/=(const _Ty& _Right)
+		{	// divide by real
+		_Val[_RE] = _Val[_RE] / _Right;
+		_Val[_IM] = _Val[_IM] / _Right;
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator=(const complex<_Other>& _Right)
+		{	// assign another complex
+		_Val[_RE] = (_Ty)_Right._Val[_RE];
+		_Val[_IM] = (_Ty)_Right._Val[_IM];
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator+=(const complex<_Other>& _Right)
+		{	// add other complex
+		this->_Add(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator-=(const complex<_Other>& _Right)
+		{	// subtract other complex
+		this->_Sub(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator*=(const complex<_Other>& _Right)
+		{	// multiply by other complex
+		this->_Mul(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator/=(const complex<_Other>& _Right)
+		{	// divide by other complex
+		this->_Div(_Right);
+		return (*this);
+		}
+	};
+
+		// CONSTRUCTORS FOR complex SPECIALIZATIONS
+inline _CONST_FUN complex<float>::complex(
+	const complex<double>& _Right)
+		: _Complex_base<float, _Fcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<float> from complex<double>
+	}
+
+inline _CONST_FUN complex<float>::complex(
+	const complex<long double>& _Right)
+		: _Complex_base<float, _Fcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<float> from complex<long double>
+	}
+
+inline _CONST_FUN complex<double>::complex(
+	const complex<float>& _Right)
+		: _Complex_base<double, _Dcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<double> from complex<float>
+	}
+
+inline _CONST_FUN complex<double>::complex(
+	const complex<long double>& _Right)
+		: _Complex_base<double, _Dcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<double> from complex<long double>
+	}
+
+inline _CONST_FUN complex<long double>::complex(
+	const complex<float>& _Right)
+		: _Complex_base<long double, _Lcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<long double> from complex<float>
+	}
+
+inline _CONST_FUN complex<long double>::complex(
+	const complex<double>& _Right)
+		: _Complex_base<long double, _Lcomplex_value>(
+			(_Ty)_Right.real(), (_Ty)_Right.imag())
+	{	// construct complex<long double> from complex<double>
+	}
+
+ #if _IS_GHS
+
+ #if (defined(__i386) || defined(__x86_64__)) && !defined(__VXWORKS)
+ #define _PREC(X, Y)	_precision(Y)
+
+	// FUNCTION _precision
+inline float _precision(float y)
+	{	// float is __float__
+	return (__float__(y));
+	}
+
+inline double _precision(double y)
+	{	// double is __double__
+	return (__double__(y));
+	}
+
+  #if !defined(__LDBL_SIZE) || __LDBL_SIZE < 12
+inline long double _precision(long double y)
+	{	// long double same as double
+	return (__double__(y));
+	}
+
+  #else /* defined(__LDBL_SIZE), etc. */
+inline long double _precision(long double y)
+	{	// long double not same as double
+	return (y);
+	}
+  #endif /* defined(__LDBL_SIZE), etc. */
+
+ #endif /* defined(__i386), etc. */
+#endif /* _IS_GHS */
+
+		// TEMPLATE CLASS complex
+template<class _Ty>
+	class complex
+		: public _Complex_base<_Ty, _Complex_value<_Ty> >
+	{	// complex with _Ty components
+public:
+	typedef complex<_Ty> _Myt;
+	typedef _Complex_base<_Ty, _Complex_value<_Ty> > _Mybase;
+
+	_CONST_FUN complex(const _Ty& _Realval = _Ty(),
+		const _Ty& _Imagval = _Ty())
+		: _Mybase(_Realval, _Imagval)
+		{	// construct from components of same type
+		}
+
+	_Myt& operator=(const _Ty& _Right)
+		{	// assign real
+		this->_Val[_RE] = _Right;
+		this->_Val[_IM] = _Ty();
+		return (*this);
+		}
+
+	template<class _Other>
+		_CONST_FUN complex(const complex<_Other>& _Right)
+		: _Mybase((_Ty)_Right.real(), (_Ty)_Right.imag())
+		{	// construct from other complex type
+		}
+
+	template<class _Other>
+		_Myt& operator=(const complex<_Other>& _Right)
+		{	// assign other complex type
+		this->_Val[_RE] = (_Ty)_Right.real();
+		this->_Val[_IM] = (_Ty)_Right.imag();
+		return (*this);
+		}
+
+	_Myt& operator+=(const _Ty& _Right)
+		{	// add real
+		this->_Val[_RE] = this->_Val[_RE] + _Right;
+		return (*this);
+		}
+
+	_Myt& operator-=(const _Ty& _Right)
+		{	// subtract real
+		this->_Val[_RE] = this->_Val[_RE] - _Right;
+		return (*this);
+		}
+
+	_Myt& operator*=(const _Ty& _Right)
+		{	// multiply by real
+		this->_Val[_RE] = this->_Val[_RE] * _Right;
+		this->_Val[_IM] = this->_Val[_IM] * _Right;
+		return (*this);
+		}
+
+	_Myt& operator/=(const _Ty& _Right)
+		{	// divide by real
+		this->_Val[_RE] = this->_Val[_RE] / _Right;
+		this->_Val[_IM] = this->_Val[_IM] / _Right;
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator+=(const complex<_Other>& _Right)
+		{	// add other complex
+		this->_Add(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator-=(const complex<_Other>& _Right)
+		{	// subtract other complex
+		this->_Sub(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator*=(const complex<_Other>& _Right)
+		{	// multiply by other complex
+		this->_Mul(_Right);
+		return (*this);
+		}
+
+	template<class _Other> inline
+		_Myt& operator/=(const complex<_Other>& _Right)
+		{	// divide by other complex
+		this->_Div(_Right);
+		return (*this);
+		}
+	};
+
+ #ifndef _PREC
+  #define _PREC(X, Y)	(Y)
+ #endif /* _PREC */
+
+ #define _CMPLX(T)	complex<T>
+ #define _CTR(T)	_Ctraits<T>
+ #define _TMPLT(T)	template<class T>
+
+ #if _IS_GHS
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack(pop)
+ #endif /* defined(__ghs_max_pack_value) */
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs enddata
+ #endif /* defined(__GHS_PRAGMAS) */
+
+#endif /* _IS_GHS */
+
+ #include <xcomplex>	/* define all complex template functions */
+
+ #if _IS_GHS
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs startdata
+ #endif /* defined(__GHS_PRAGMAS) */
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack (push, __ghs_max_pack_value)
+ #endif /* defined(__ghs_max_pack_value) */
+
+#endif /* _IS_GHS */
+
+		// TEMPLATE FUNCTION operator>>
+template<class _Ty,
+	class _Elem,
+	class _Tr> inline
+	basic_istream<_Elem, _Tr>& operator>>(
+		basic_istream<_Elem, _Tr>& _Istr, complex<_Ty>& _Right)
+	{	// extract a complex<_Ty>
+	typedef complex<_Ty> _Myt;
+	const ctype<_Elem>& _Ctype_fac = use_facet< ctype<_Elem> >(_Istr.getloc());
+	_Elem _Ch = 0;
+	long double _Real = 0;
+	long double _Imag = 0;
+
+	if (_Istr >> _Ch && _Ch != _Ctype_fac.widen('('))
+		{	// no leading '(', treat as real only
+		_Istr.putback(_Ch);
+		_Istr >> _Real;
+		_Imag = 0;
+		}
+	else if (_Istr >> _Real >> _Ch && _Ch != _Ctype_fac.widen(','))
+		if (_Ch == _Ctype_fac.widen(')'))
+			_Imag = 0;	// (real)
+		else
+			{	// no trailing ')' after real, treat as bad field
+			_Istr.putback(_Ch);
+			_Istr.setstate(ios_base::failbit);
+			}
+	else if (_Istr >> _Imag >> _Ch && _Ch != _Ctype_fac.widen(')'))
+			{	// no imag or trailing ')', treat as bad field
+			_Istr.putback(_Ch);
+			_Istr.setstate(ios_base::failbit);
+			}
+
+	if (!_Istr.fail())
+		{	// store valid result
+		_Ty _Tyreal((_Ty)_Real), _Tyimag((_Ty)_Imag);
+		_Right = _Myt(_Tyreal, _Tyimag);
+		}
+	return (_Istr);
+	}
+
+		// TEMPLATE FUNCTION operator<<
+template<class _Ty,
+	class _Elem,
+	class _Tr> inline
+	basic_ostream<_Elem, _Tr>& operator<<(
+		basic_ostream<_Elem, _Tr>& _Ostr, const complex<_Ty>& _Right)
+	{	// insert a complex<_Ty>
+	const ctype<_Elem>& _Ctype_fac = use_facet< ctype<_Elem> >(_Ostr.getloc());
+	basic_ostringstream<_Elem, _Tr, allocator<_Elem> > _Sstr;
+
+	_Sstr.flags(_Ostr.flags());
+	_Sstr.imbue(_Ostr.getloc());
+	_Sstr.precision(_Ostr.precision());
+	_Sstr << _Ctype_fac.widen('(') << real(_Right)
+		<< _Ctype_fac.widen(',') << imag(_Right)
+		<< _Ctype_fac.widen(')');
+
+	basic_string<_Elem, _Tr, allocator<_Elem> > _Str = _Sstr.str();
+	return (_Ostr << _Str.c_str());
+	}
+
+ #if _HAS_LITERALS
+	// complex LITERALS
+	inline namespace literals {
+		inline namespace complex_literals {
+inline _CONST_FUN complex<long double> operator""il(long double _Val)
+	_NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<long double>(0.0L, static_cast<long double>(_Val)));
+	}
+
+inline _CONST_FUN complex<long double> operator""il(unsigned long long _Val)
+	_NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<long double>(0.0L, static_cast<long double>(_Val)));
+	}
+
+inline _CONST_FUN complex<double> operator""i(long double _Val) _NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<double>(0.0, static_cast<double>(_Val)));
+	}
+
+inline _CONST_FUN complex<double> operator""i(unsigned long long _Val)
+	_NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<double>(0.0, static_cast<double>(_Val)));
+	}
+
+inline _CONST_FUN complex<float> operator""if(long double _Val) _NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<float>(0.0f, static_cast<float>(_Val)));
+	}
+
+inline _CONST_FUN complex<float> operator""if(unsigned long long _Val)
+	_NOEXCEPT
+	{	// return imaginary _Val
+	return (complex<float>(0.0f, static_cast<float>(_Val)));
+	}
+		}	// inline namespace complex_literals
+	}	// inline namespace literals
+ #endif /* _HAS_LITERALS */
+_STD_END
+
+_C_STD_BEGIN
+		// TEMPLATE CLASS _Rc_type (ADDITIONS TO <math.h>)
+template<class _Ty>
+	struct _Rc_type;
+
+template<>
+	struct _Rc_type<_STD complex<float> >
+	{	// determine if type is real or complex
+	typedef char type;
+	};
+
+template<>
+	struct _Rc_type<_STD complex<double> >
+	{	// determine if type is real or complex
+	typedef char type;
+	};
+
+template<>
+	struct _Rc_type<_STD complex<long double> >
+	{	// determine if type is real or complex
+	typedef char type;
+	};
+
+		// TEMPLATE CLASS _Real_type (ADDITIONS TO <math.h>)
+template<class _Ty>
+	struct _Real_type;
+
+template<>
+	struct _Real_type<_STD complex<float> >
+	{	// determine equivalent real type
+	typedef float type;
+	};
+
+template<>
+	struct _Real_type<_STD complex<double> >
+	{	// determine equivalent real type
+	typedef double type;
+	};
+
+template<>
+	struct _Real_type<_STD complex<long double> >
+	{	// determine equivalent real type
+	typedef long double type;
+	};
+_C_STD_END
+
+ #if _IS_GHS
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack(pop)
+ #endif /* defined(__ghs_max_pack_value) */
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs enddata
+  #pragma ghs end_cxx_lib_header
+ #endif /* defined(__GHS_PRAGMAS) */
+
+#endif /* _IS_GHS */
+#endif /* _COMPLEX_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

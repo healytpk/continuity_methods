@@ -1,0 +1,82 @@
+// latch concurrency header
+#ifndef _LATCH_
+#define _LATCH_
+#include <mutex>
+
+_STD_BEGIN
+namespace experimental {
+	namespace concurrency_v1 {
+_NO_RET(_Throw_latch_error(
+	const char *_Mesg = "latch::bad latch count"))
+	{	// throw a logic error exception
+	_THROW_N(logic_error, _Mesg);
+	}
+
+	// CLASS latch
+class latch
+	{	// one-off barrier for one or more threads
+public:
+	explicit latch(ptrdiff_t _Count)
+		:_Mycount(_Count)
+		{	// construct with non-negative count
+		if (_Count < 0)
+			_Throw_latch_error();
+		}
+
+	latch(const latch&) = delete;
+	latch& operator=(const latch&) = delete;
+
+	~latch() _NOEXCEPT
+		{	// destroy the object
+		wait();
+		}
+
+	void count_down_and_wait()
+		{	// decrement and wait for all to unlatch
+		unique_lock<mutex> _Lock(_Mtx);
+		if (_Mycount <= 0)
+			_Throw_latch_error();
+		if (--_Mycount == 0)
+			_Cond.notify_all();
+		else
+			while (0 < _Mycount)
+				_Cond.wait(_Lock);
+		}
+
+	void count_down(ptrdiff_t _Count)
+		{	// decrement only
+		unique_lock<mutex> _Lock(_Mtx);
+		if (_Mycount <= 0)
+			_Throw_latch_error();
+		if (--_Mycount == 0)
+			_Cond.notify_all();
+		}
+
+	bool is_ready() const _NOEXCEPT
+		{	// test if no latches
+		return (_Mycount == 0);
+		}
+
+	void wait()
+		{	// block until all unlatched
+		unique_lock<mutex> _Lock(_Mtx);
+		while (0 < _Mycount)
+			_Cond.wait(_Lock);
+		}
+
+private:
+	mutex _Mtx;
+	condition_variable _Cond;
+
+	ptrdiff_t _Mycount;
+	};
+		} //namespace concurrency_v1
+	} // namespace experimental
+using namespace experimental::concurrency_v1;
+_STD_END
+#endif /* _LATCH_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

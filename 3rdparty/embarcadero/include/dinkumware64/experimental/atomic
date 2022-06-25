@@ -1,0 +1,10 @@
+// atomic concurrency header
+#ifndef _EXPERIMENTAL_ATOMIC_
+#define _EXPERIMENTAL_ATOMIC_
+#include <atomic>
+#endif /* _EXPERIMENTAL_ATOMIC_ */
+
+/*
+ * Copyright (c) by P.J. Plauger.  ALL RIGHTS RESERVED.
+ * Consult your license regarding permissions and restrictions.
+V7.0:0009 */

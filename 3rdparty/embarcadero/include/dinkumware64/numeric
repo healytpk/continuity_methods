@@ -1,0 +1,1754 @@
+// numeric standard header
+#ifndef _NUMERIC_
+#define _NUMERIC_
+#include <xutility>
+
+ #if _HAS_CPP17
+ #include <xparallel.h>
+ #endif /* _HAS_CPP17 */
+
+_STD_BEGIN
+		// TEMPLATE FUNCTION accumulate WITH BINOP
+template<class _InIt,
+	class _Ty,
+	class _Fn2> inline
+	_Ty _Accumulate(_InIt _First, _InIt _Last, _Ty _Val, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last), using _Func2
+	for (; _First != _Last; ++_First)
+		_Val = _Func2(_Val, *_First);
+	return (_Val);
+	}
+
+template<class _InIt,
+	class _Ty,
+	class _Fn2> inline
+	_Ty accumulate(_InIt _First, _InIt _Last, _Ty _Val, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last), using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Func2);
+	return (_Accumulate(_Unchecked(_First), _Unchecked(_Last),
+		_Val, _Func2));
+	}
+
+		// TEMPLATE FUNCTION accumulate
+template<class _InIt,
+	class _Ty> inline
+	_Ty accumulate(_InIt _First, _InIt _Last, _Ty _Val)
+	{	// return sum of _Val and all in [_First, _Last)
+	return (_STD accumulate(_First, _Last, _Val, _FUNCTOR(plus, _First)));
+	}
+
+		// TEMPLATE FUNCTION inner_product WITH BINOPS
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	for (; _First1 != _Last1; ++_First1, (void)++_First2)
+		_Val = _Func1(_Val, _Func2(*_First1, *_First2));
+	return (_Val);
+	}
+
+ #if _ITERATOR_DEBUG_LEVEL == 0
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_Unchecked(_First1), _Unchecked(_Last1),
+		_First2, _Val,
+		_Func1, _Func2));
+	}
+
+ #else /* _ITERATOR_DEBUG_LEVEL == 0 */
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Inner_product2(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2, true_type)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_First1, _Last1,
+		_First2, _Val,
+		_Func1, _Func2));
+	}
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Inner_product2(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2, false_type)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_First1, _Last1,
+		_First2, _Val,
+		_Func1, _Func2));
+	}
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func1);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Inner_product2(_Unchecked(_First1), _Unchecked(_Last1),
+		_First2, _Val,
+			_Func1, _Func2, _Is_checked(_First2)));
+	}
+
+template<class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_STD inner_product(_First1, _Last1,
+		_Array_iterator<_InTy, _InSize>(_First2), _Val,
+			_Func1, _Func2));
+	}
+ #endif /* _ITERATOR_DEBUG_LEVEL == 0 */
+
+		// TEMPLATE FUNCTION inner_product
+template<class _InIt1,
+	class _InIt2,
+	class _Ty> inline
+	_Ty inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val)
+	{	// return inner product of sequences
+	return (_STD inner_product(_First1, _Last1, _First2, _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+template<class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty> inline
+	_Ty inner_product(_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val)
+	{	// return inner product of sequences
+	return (_STD inner_product(_First1, _Last1, _First2, _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+		// TEMPLATE FUNCTION partial_sum WITH BINOP
+template<class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt _Partial_sum(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, _Ty *)
+	{	// compute partial sums into _Dest, using _Func2
+	_Ty _Val = *_First;
+	for (*_Dest = _Val; ++_First != _Last; *++_Dest = _Val)
+		_Val = _Func2(_Val, *_First);
+	return (++_Dest);
+	}
+
+ #if _ITERATOR_DEBUG_LEVEL == 0
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt partial_sum(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2)
+	{	// compute partial sums into _Dest, using _Func2
+	return (_First == _Last ? _Dest
+		: _Partial_sum(_Unchecked(_First), _Unchecked(_Last),
+			_Dest, _Func2, _Val_type(_First)));
+	}
+
+ #else /* _ITERATOR_DEBUG_LEVEL == 0 */
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Partial_sum2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func,
+			input_iterator_tag, _Mutable_iterator_tag)
+	{	// compute partial sums into _Dest, arbitrary iterators
+	return (_Partial_sum(_First, _Last,
+		_Dest, _Func, _Val_type(_First)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Partial_sum2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func,
+			random_access_iterator_tag, random_access_iterator_tag)
+	{	// compute partial sums into _Dest, random-access iterators
+	_OutIt _Ans = _Dest + (_Last - _First);	// also checks range
+	_Partial_sum(_First, _Last,
+		_Unchecked(_Dest), _Func, _Val_type(_First));
+	return (_Ans);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Partial_sum2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, true_type)
+	{	// compute partial sums into _Dest, using _Func2
+	return (_Partial_sum2(_First, _Last,
+		_Dest, _Func2, _Iter_cat(_First), _Iter_cat(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Partial_sum2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, false_type)
+	{	// compute partial sums into _Dest, using _Func2
+	return (_Partial_sum2(_First, _Last,
+		_Dest, _Func2, _Iter_cat(_First), _Iter_cat(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt partial_sum(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2)
+	{	// compute partial sums into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_First == _Last ? _Dest
+		: _Partial_sum2(_Unchecked(_First), _Unchecked(_Last),
+			_Dest, _Func2, _Is_checked(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutTy,
+	size_t _OutSize,
+	class _Fn2> inline
+	_OutTy *partial_sum(_InIt _First, _InIt _Last,
+		_OutTy (&_Dest)[_OutSize], _Fn2 _Func2)
+	{	// compute partial sums into _Dest, using _Func2
+	return (_Unchecked(
+		_STD partial_sum(_First, _Last,
+			_Array_iterator<_OutTy, _OutSize>(_Dest), _Func2)));
+	}
+ #endif /* _ITERATOR_DEBUG_LEVEL == 0 */
+
+		// TEMPLATE FUNCTION partial_sum
+template<class _InIt,
+	class _OutIt> inline
+	_OutIt partial_sum(_InIt _First, _InIt _Last,
+		_OutIt _Dest)
+	{	// compute partial sums into _Dest
+	return (_STD partial_sum(_First, _Last, _Dest, _FUNCTOR(plus, _First)));
+	}
+
+template<class _InIt,
+	class _OutTy,
+	size_t _OutSize> inline
+	_OutTy *partial_sum(_InIt _First, _InIt _Last,
+		_OutTy (&_Dest)[_OutSize])
+	{	// compute partial sums into _Dest
+	return (_STD partial_sum(_First, _Last, _Dest, _FUNCTOR(plus, _First)));
+	}
+
+		// TEMPLATE FUNCTION adjacent_difference WITH BINOP
+template<class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt _Adjacent_difference(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, _Ty *)
+	{	// compute adjacent differences into _Dest, using _Func2
+	_Ty _Acc = *_First;
+	for (*_Dest = _Acc; ++_First != _Last; )
+		{	// compute another difference
+		_Ty _Val = *_First;
+		*++_Dest = _Func2(_Val, _Acc);
+		_Acc = _Val;
+		}
+	return (++_Dest);
+	}
+
+ #if _ITERATOR_DEBUG_LEVEL == 0
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt adjacent_difference(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2)
+	{	// compute adjacent differences into _Dest, using _Func2
+	return (_First == _Last ? _Dest
+		: _Adjacent_difference(_Unchecked(_First), _Unchecked(_Last),
+			_Dest, _Func2, _Val_type(_First)));
+	}
+
+ #else /* _ITERATOR_DEBUG_LEVEL == 0 */
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Adjacent_difference2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func,
+			input_iterator_tag, _Mutable_iterator_tag)
+	{	// compute adjacent differences into _Dest, arbitrary iterators
+	return (_Adjacent_difference(_First, _Last,
+		_Dest, _Func, _Val_type(_First)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Adjacent_difference2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func,
+			random_access_iterator_tag, random_access_iterator_tag)
+	{	// compute adjacent differences into _Dest, random-access iterators
+	_OutIt _Ans = _Dest + (_Last - _First);	// also checks range
+	_Adjacent_difference(_First, _Last,
+		_Unchecked(_Dest), _Func, _Val_type(_First));
+	return (_Ans);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Adjacent_difference2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, true_type)
+	{	// compute adjacent differences into _Dest, using _Func2
+	return (_Adjacent_difference2(_First, _Last,
+		_Dest, _Func2, _Iter_cat(_First), _Iter_cat(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Adjacent_difference2(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2, false_type)
+	{	// compute adjacent differences into _Dest, using _Func2
+	return (_Adjacent_difference2(_First, _Last,
+		_Dest, _Func2, _Iter_cat(_First), _Iter_cat(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt adjacent_difference(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn2 _Func2)
+	{	// compute adjacent differences into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_First == _Last ? _Dest
+		: _Adjacent_difference2(_Unchecked(_First), _Unchecked(_Last),
+			_Dest, _Func2, _Is_checked(_Dest)));
+	}
+
+template<class _InIt,
+	class _OutTy,
+	size_t _OutSize,
+	class _Fn2> inline
+	_OutTy *adjacent_difference(_InIt _First, _InIt _Last,
+		_OutTy (&_Dest)[_OutSize], _Fn2 _Func2)
+	{	// compute adjacent differences into _Dest, using _Func2
+	return (_Unchecked(
+		_STD adjacent_difference(_First, _Last,
+			_Array_iterator<_OutTy, _OutSize>(_Dest), _Func2)));
+	}
+ #endif /* _ITERATOR_DEBUG_LEVEL == 0 */
+
+		// TEMPLATE FUNCTION adjacent_difference
+template<class _InIt,
+	class _OutIt> inline
+	_OutIt adjacent_difference(_InIt _First, _InIt _Last,
+		_OutIt _Dest)
+	{	// compute adjacent differences into _Dest
+	return (_STD adjacent_difference(_First, _Last, _Dest,
+		_FUNCTOR(minus, _First)));
+	}
+
+template<class _InIt,
+	class _OutTy,
+	size_t _OutSize> inline
+	_OutTy *adjacent_difference(_InIt _First, _InIt _Last,
+		_OutTy (&_Dest)[_OutSize])
+	{	// compute adjacent differences into _Dest
+	return (_STD adjacent_difference(_First, _Last, _Dest,
+		_FUNCTOR(minus, _First)));
+	}
+
+ #if _HAS_CPP17
+		// TEMPLATE CLASS _Adjacent_difference_copy_payload
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2>
+struct _Adjacent_difference_copy_payload
+	: _Payload_base_dual_range<_Overlapping_tiled_range<_FwdIt1>,
+		_Overlapping_tiled_range<_FwdIt2> >
+	{	// payload for parallel adjacent_difference with distinct target
+	typedef _FwdIt2 _Result_type;
+	typedef _Result_type _Tile_result_type;
+	typedef _Payload_base_dual_range<
+		_Overlapping_tiled_range<_FwdIt1>,
+		_Overlapping_tiled_range<_FwdIt2> > _Mybase;
+	typedef typename _Mybase::_Range_type _Range_type;
+
+	_Adjacent_difference_copy_payload(
+		_FwdIt1 _First1, _FwdIt1 _Last1,
+		_FwdIt2 _First2, _Fn2 _Fun,
+		execution::_Parallel_policy& _Exec)
+		: _Mybase(_First1, _Last1, _First2, 1, _Exec),
+		_Func2(_Fun)
+		{	// construct with iterator pair, iterator, function, and policy
+		}
+
+	void _Apply(_Range_type _Range)
+		{	// perform function for each element in subrange
+		_FwdIt1 _Acc = _Range._First1++;
+		++_Range._First2;
+		while (_Range._First1 != _Range._Last1)
+			{	// compute difference for a pair of elements
+			_FwdIt1 _Val = _Range._First1;
+			*_Range._First2++ = _Func2(*_Val, *_Acc);
+			_Acc = _Val;
+			++_Range._First1;
+			}
+		}
+
+	_Fn2 _Func2;
+	};
+
+		// TEMPLATE CLASS _Adjacent_difference_payload
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2>
+struct _Adjacent_difference_payload
+	: public _Payload_base<
+		typename std::iterator_traits<_FwdIt2>::difference_type>
+	{	// payload for parallel adjacent_difference overwriting input
+	typedef _FwdIt1 _Iter1;
+	typedef _FwdIt2 _Iter2;
+	typedef _FwdIt2 _Result_type;
+	typedef typename std::iterator_traits<_Iter2>::value_type _Ty;
+	typedef std::pair<_Iter2, _Ty> _Item;
+	typedef _Item _Tile_result_type;
+	typedef _Payload_base<
+		typename std::iterator_traits<_FwdIt2>::difference_type> _Mybase;
+	typedef _Single_range<_Item> _Range_type;
+
+	_Adjacent_difference_payload(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn2 _F,
+			execution::_Parallel_policy& _Exec)
+		: _Mybase(_Exec, std::distance(_First1, _Last1)),
+		_In_tiles(_Mybase::_Ntiles + 1, _Item()),
+		_Func2(_F)
+		{	// construct with iterator pair, function, and policy
+		_Make_tiles(_First2, _Mybase::_Count);
+		}
+
+	void _Apply(_Range_type _Range)
+		{	// perform function for each element in subrange
+		_Ty _Acc = _Range._First.second;
+		_Iter2 _First = _Range._First.first;
+		while (_First != _Range._Last.first)
+			{	// perform function for current element
+			_Ty _Val = *_First;
+			*_First = _Func2(_Val, _Acc);
+			_Acc = _Val;
+			++_First;
+			}
+		}
+
+	_Range_type _Get_next_tile() const
+		{	// return next tile
+		int _Index = _Mybase::_Next_index();
+		if (_Mybase::_Ntiles <= _Index)
+			return (_Make_single_range(
+				_In_tiles[_Mybase::_Ntiles],
+				_In_tiles[_Mybase::_Ntiles],
+				_Mybase::_Ntiles));
+		else
+			return (_Make_single_range(
+				_In_tiles[_Index], _In_tiles[_Index + 1], _Index));
+		}
+
+	_Result_type _End() const
+		{	// return end of output range iterator
+		return _In_tiles[_Mybase::_Ntiles].first;
+		}
+private:
+	template<class _Diff>
+	void _Make_tiles(_FwdIt2 _First, _Diff _Count)
+			{	// create tiles
+			const std::size_t _Block_size =
+				_Count / _Mybase::_Ntiles;
+			_In_tiles[0].second = *_First;
+			std::advance(_First, 1);
+			_In_tiles[0].first = _First;
+			--_Count;
+			int _I = 1;
+			for ( ; _I <= _Mybase::_Ntiles; ++_I)
+				{	// create tile
+				_Diff _Adv = (_Block_size <= _Count
+					? _Block_size : _Count) - 1;
+				std::advance(_First, _Adv);
+				_In_tiles[_I].second = *_First;
+				std::advance(_First, 1);
+				_In_tiles[_I].first = _First;
+				_Count -= _Block_size;
+				}
+			_Item _Fill(_In_tiles[_I - 1].first, _In_tiles[_I - 1].second);
+			std::fill(_In_tiles.begin() + _I, _In_tiles.end(), _Fill);
+			}
+
+	_Dyn_array<_Item> _In_tiles;
+	_Fn2 _Func2;
+	};
+
+		// TEMPLATE FUNCTION _Do_adjacent_difference_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2> inline
+	_FwdIt2 _Do_adjacent_difference_copy_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Adjacent_difference_copy_payload<_FwdIt1, _FwdIt2, _Fn2> _MyPy;
+	*_First2 = *_First1;
+	_MyPy _Payload(_First1, _Last1, _First2, _Func2, _Exec);
+	_Master_task<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Master._Get());
+	}
+
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2> inline
+	_FwdIt2 _Do_adjacent_difference_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Adjacent_difference_payload<_FwdIt1, _FwdIt2, _Fn2> _MyPy;
+	_MyPy _Payload(_First1, _Last1, _First2, _Func2, _Exec);
+	_Master_task<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Master._Get());
+	}
+
+		// TEMPLATE FUNCTION _Adjacent_difference_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2> inline
+	_FwdIt2 _Adjacent_difference_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn2 _Func,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func);
+	if (&*_First1 == &*_First2)
+		return _Rechecked(_First2,
+		_Do_adjacent_difference_par(_Unchecked(_First1), _Unchecked(_Last1),
+			_Unchecked(_First2), _Func, _Exec));
+	else
+		return _Rechecked(_First2,
+		_Do_adjacent_difference_copy_par(
+			_Unchecked(_First1), _Unchecked(_Last1),
+			_Unchecked(_First2), _Func, _Exec));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt _Adjacent_difference_par(
+		_InIt _First, _InIt _Last, _OutIt _Dest, _Fn2 _Func,
+		execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+	return (_STD adjacent_difference(_First, _Last, _Dest, _Func));
+	_CATCH_PAR_END
+	return (_Dest);	// to quiet diagnostics
+	}
+
+		// TEMPLATE FUNCTION PARALLEL adjacent_difference
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt adjacent_difference(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest, _Fn2 _Func)
+	{	// compute adjacent differences into _Dest
+	return (_Adjacent_difference_par(_First, _Last, _Dest, _Func,
+		_GET_POLICY(_First, _Exec)));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt adjacent_difference(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest)
+	{	// compute adjacent differences into _Dest
+	return (_STD adjacent_difference(_Exec, _First, _Last, _Dest,
+		_FUNCTOR(minus, _First)));
+	}
+
+		// TEMPLATE FUNCTION exclusive_scan
+template<class _InIt,
+	class _OutIt,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt _Exclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest,
+		_Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another sum
+		*_Dest++ = _Val;
+		_Val = _Func2(_Val, *_First);
+		}
+	return (_Dest);
+	}
+
+template<class _BidIt,
+	class _Ty,
+	class _Fn2> inline
+	_BidIt _Exclusive_scan(_BidIt _First, _BidIt _Last,
+		_Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into input range, using _Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another sum
+		_Ty _Elt = *_First;
+		*_First = _Val;
+		_Val = _Func2(_Val, _Elt);
+		}
+	return (_Last);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt exclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest,
+		_Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_Rechecked(_Dest,
+		_Exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+			_Unchecked(_Dest), _Val, _Func2)));
+	}
+
+template<class _BidIt,
+	class _Ty,
+	class _Fn2> inline
+	_BidIt exclusive_scan(_BidIt _First, _BidIt _Last, _BidIt _Dest,
+		_Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_Rechecked(_Dest,
+		_Unchecked(_First) == _Unchecked(_Dest)
+			? _Exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+				_Val, _Func2)
+			: _Exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+				_Unchecked(_Dest), _Val, _Func2)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Ty> inline
+	_OutIt exclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest,
+		_Ty _Val)
+	{	// compute _Val, then partial sums into _Dest, using plus
+	return (_STD exclusive_scan(_First, _Last, _Dest,
+		_Val, _FUNCTOR(plus, _First)));
+	}
+
+		// TEMPLATE FUNCTION _Do_exclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2,
+	class _Ty>
+	_FwdIt2 _Do_exclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2,
+			_Ty _Val, _Fn2 _Func2,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Identity_transform<_Ty> _Ident;
+	typedef _Scan_payload<_FwdIt1, _FwdIt2, _Ident, _Fn2, _Ty, false> _MyPy;
+	_MyPy _Payload(_First1, _Last1, _First2, _Ident(), _Func2, _Val, _Exec);
+	_Master_task<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Master._Get());
+	}
+
+		// TEMPLATE FUNCTION _Exclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2,
+	class _Ty> inline
+	_FwdIt2 _Exclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1,
+			_FwdIt2 _First2, _Ty _Val, _Fn2 _Func2,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Rechecked(_First2,
+		_Do_exclusive_scan_par(_Unchecked(_First1), _Unchecked(_Last1),
+		_Unchecked(_First2), _Val, _Func2, _Exec)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt _Exclusive_scan_par(
+		_InIt _First, _InIt _Last, _OutIt _Dest, _Ty _Val, _Fn2 _Func2,
+			execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD exclusive_scan(_First, _Last, _Dest, _Val, _Func2));
+	_CATCH_PAR_END
+	return (_Dest);	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Ty,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt exclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	return (_Exclusive_scan_par(_First, _Last, _Dest, _Val, _Func2,
+		_GET_POLICY2(_First, _Dest, _Exec)));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Ty,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt exclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest, _Ty _Val)
+	{	// compute _Val, then partial sums into _Dest, using plusS
+	return (_Exclusive_scan_par(_First, _Last, _Dest, _Val,
+		_FUNCTOR(plus, _First),
+		_GET_POLICY2(_First, _Dest, _Exec)));
+	}
+
+		// TEMPLATE FUNCTION inclusive_scan
+template<class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt inclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest,
+		_Fn2 _Func2, _Ty _Val)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another term
+		_Val = _Func2(_Val, *_First);
+		*_Dest++ = _Val;
+		}
+	return (_Dest);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2> inline
+	_OutIt inclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest,
+		_Fn2 _Func2)
+	{	// compute partial sums into _Dest, using _Func2
+	typedef typename iterator_traits<_InIt>::value_type _Ty;
+	if (_First != _Last)
+		{
+		_Ty _Val = *_First++;
+		*_Dest++ = _Val;
+		_Dest = inclusive_scan(_First, _Last, _Dest, _Func2, _Val);
+		}
+	return (_Dest);
+	}
+
+template<class _InIt,
+	class _OutIt> inline
+	_OutIt inclusive_scan(_InIt _First, _InIt _Last, _OutIt _Dest)
+	{	// compute partial sums into _Dest, using plus
+	return (inclusive_scan(_First, _Last,
+		_Dest, _FUNCTOR(plus, _First)));
+	}
+
+		// TEMPLATE FUNCTION _Inclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn2,
+	class _Ty> inline
+	_FwdIt2 _Inclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1,
+			_FwdIt2 _First2, _Fn2 _Func2, _Ty _Val,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Rechecked(_First2,
+		_Do_inclusive_scan_par(_Unchecked(_First1), _Unchecked(_Last1),
+			_Unchecked(_First2), _Func2, _Val, _Exec)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt _Inclusive_scan_par(
+	_InIt _First, _InIt _Last, _OutIt _Dest, _Fn2 _Func2, _Ty _Val,
+	execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD inclusive_scan(_First, _Last, _Dest, _Func2, _Val));
+	_CATCH_PAR_END
+	return (_Dest);	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class _Ty,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt inclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Fn2 _Func2, _Ty _Val)
+	{	// compute partial sums into _Dest, using _Func2
+	return (_STD _Inclusive_scan_par(_First, _Last, _Dest, _Func2, _Val,
+		_GET_POLICY2(_First, _Dest, _Exec)));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt inclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest, _Fn2 _Func2)
+	{	// compute partial sums into _Dest, using _Func2
+	typedef typename std::iterator_traits<_InIt>::value_type _Ty;
+	_Ty _Val = *_First++;
+	*_Dest++ = _Val;
+	return (_STD inclusive_scan(_Exec, _First, _Last, _Dest, _Func2, _Val));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt inclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest)
+	{	// compute partial sums into _Dest, using plus
+	return (_STD inclusive_scan(_Exec, _First, _Last, _Dest, _FUNCTOR(plus, _First1)));
+	}
+
+		// TEMPLATE FUNCTION reduce
+template<class _InIt,
+	class _Ty,
+	class _Fun> inline
+	_Ty reduce(_InIt _First, _InIt _Last, _Ty _Val, _Fun _Func)
+	{	// return sum of _Val and all in [_First, _Last)
+	return (_STD accumulate(_First, _Last, _Val, _Func));
+	}
+
+template<class _InIt,
+	class _Ty> inline
+	_Ty reduce(_InIt _First, _InIt _Last, _Ty _Val)
+	{	// return sum of _Val and all in [_First, _Last)
+	return (_STD reduce(_First, _Last, _Val, _FUNCTOR(plus, _First)));
+	}
+
+template<class _InIt> inline
+	typename iterator_traits<_InIt>::value_type
+		reduce(_InIt _First, _InIt _Last)
+	{	// return sum of _Val and all in [_First, _Last)
+	typename iterator_traits<_InIt>::value_type _Val{};
+	return (_STD reduce(_First, _Last, _Val));
+	}
+
+		// TEMPLATE CLASS _Reduce_payload
+template<class _Ty>
+struct _Reduce_result
+	{	// internal data for parallel reduce
+	_Reduce_result(_Ty _Val, bool _V)
+		: _Value(_Val), _Valid(_V)
+		{
+		}
+	_Ty _Value;
+	bool _Valid;
+	};
+
+template<class _FwdIt,
+	class _Ty,
+	class _Fn2>
+struct _Reduce_payload
+	: _Payload_base_single_range<_Tiled_range<_FwdIt> >,
+		_Init_value_helper<_Reduce_result<_Ty> >
+	{
+	typedef _Ty _Result_type;
+	typedef _Reduce_result<_Ty> _Tile_result_type;
+	typedef _Payload_base_single_range< _Tiled_range<_FwdIt> > _Mybase;
+	typedef typename _Mybase::_Range_type _Range_type;
+
+	_Reduce_payload(_FwdIt _First, _FwdIt _Last, _Ty _Val, _Fn2 _F2,
+		execution::_Parallel_policy& _Exec)
+		: _Mybase(_First, _Last, _Exec),
+		_Init_value_helper<_Reduce_result<_Ty> >(_Tile_result_type(_Val, false)),
+		_Func2(_F2)
+		{	// construct from single range
+		}
+
+	_Tile_result_type _Apply(_Range_type _Range, _Tile_result_type _Previous)
+		{	// perform function for each element in subrange
+		_Ty _Ans =
+			_Previous._Valid
+				? reduce(_Range._First, _Range._Last, _Previous._Value, _Func2)
+				: reduce(std::next(_Range._First), _Range._Last,
+					*_Range._First, _Func2);
+		_Tile_result_type _Res(_Ans, true);
+		return (_Res);
+		}
+
+	_Tile_result_type _Reduce(_Tile_result_type _Lhs, _Tile_result_type _Rhs)
+		{	// combine values from subranges
+		if (!_Lhs._Valid)
+			return _Rhs;
+		else if (!_Rhs._Valid)
+			return _Lhs;
+		_Ty _Ans = _Func2(_Lhs._Value, _Rhs._Value);
+		_Tile_result_type _Res(_Ans, true);
+		return (_Res);
+		}
+
+	_Result_type _Get(_Tile_result_type _Res) const
+		{	// extract result
+		return _Res._Value;
+		}
+
+	_Fn2 _Func2;
+	};
+
+		// TEMPLATE FUNCTION _Do_reduce_par
+template<class _FwdIt,
+	class _Ty,
+	class _Fn2> inline
+	_Ty _Do_reduce_par(
+		_FwdIt _First, _FwdIt _Last, _Ty _Val, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Reduce_payload<_FwdIt, _Ty, _Fn2> _MyPy;
+	_MyPy _Payload(_First, _Last, _Val, _Func2, _Exec);
+	_Master_task_with_result<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Func2(_Master._Get(), _Val));
+	}
+
+		// TEMPLATE FUNCTION _Reduce_par
+template<class _FwdIt,
+	class _Ty,
+	class _Fn2> inline
+	_Ty _Reduce_par(
+		_FwdIt _First, _FwdIt _Last, _Ty _Val, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First, _Last, _Func2);
+	return (_Do_reduce_par(
+		_Unchecked(_First), _Unchecked(_Last), _Val, _Func2, _Exec));
+	}
+
+template<class _InIt,
+	class _Ty,
+	class _Fn2> inline
+	_Ty _Reduce_par(
+		_InIt _First, _InIt _Last, _Ty _Val, _Fn2 _Func2,
+			execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD reduce(_First, _Last, _Val, _Func2));
+	_CATCH_PAR_END
+	return (_Ty());	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _Ty,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty reduce(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _Ty _Val, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last)
+	return (_Reduce_par(_First, _Last, _Val, _Func2,
+		_GET_POLICY(_First, _Exec)));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _Ty,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty reduce(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _Ty _Val)
+	{	// return sum of _Val and all in [_First, _Last)
+	return (_STD reduce(_Exec, _First, _Last, _Val, _FUNCTOR(plus, _First)));
+	}
+
+template<class _Policy,
+	class _InIt,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	typename iterator_traits<_InIt>::value_type
+		reduce(_Policy&& _Exec,
+			_InIt _First, _InIt _Last)
+	{	// return sum of _Val and all in [_First, _Last)
+	typename iterator_traits<_InIt>::value_type _Val{};
+	return (_STD reduce(_Exec, _First, _Last, _Val));
+	}
+
+		// TEMPLATE FUNCTION transform_exclusive_scan
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt _Transform_exclusive_scan(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn1 _Func1, _Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another term
+		*_Dest++ = _Val;
+		_Val = _Func2(_Val, _Func1(*_First));
+		}
+	return (_Dest);
+	}
+
+template<class _BidIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_BidIt _Transform_exclusive_scan(_BidIt _First, _BidIt _Last,
+		_Fn1 _Func1, _Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into input range, using _Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another term
+		_Ty _Elt = *_First;
+		*_First = _Val;
+		_Val = _Func2(_Val, _Func1(_Elt));
+		}
+	return (_Last);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt transform_exclusive_scan(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn1 _Func1, _Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_Rechecked(_Dest,
+		_Transform_exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+		_Unchecked(_Dest), _Func1, _Val, _Func2)));
+	}
+
+template<class _BidIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_BidIt transform_exclusive_scan(_BidIt _First, _BidIt _Last,
+		_BidIt _Dest, _Fn1 _Func1, _Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	_DEBUG_RANGE_PTR(_First, _Last, _Dest);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return _Rechecked(_Dest,
+		_Unchecked(_First) == _Unchecked(_Dest)
+			? _Transform_exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+				_Func1, _Val, _Func2)
+			: _Transform_exclusive_scan(_Unchecked(_First), _Unchecked(_Last),
+				_Unchecked(_Dest), _Func1, _Val, _Func2));
+	}
+
+		// TEMPLATE FUNCTION _Do_transform_exclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn1,
+	class _Ty,
+	class _Fn2>
+	_FwdIt2 _Do_transform_exclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2,
+			_Fn1 _Func1, _Ty _Val, _Fn2 _Func2,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Scan_payload<_FwdIt1, _FwdIt2, _Fn1, _Fn2, _Ty, false> _MyPy;
+	_MyPy _Payload(_First1, _Last1, _First2, _Func1, _Func2, _Val, _Exec);
+	_Master_task<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Master._Get());
+	}
+
+		// TEMPLATE FUNCTION _Transform_exclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_FwdIt2 _Transform_exclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn1 _Func1,
+			_Ty _Val, _Fn2 _Func2,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Rechecked(_First2,
+		_Do_transform_exclusive_scan_par(_Unchecked(_First1), _Unchecked(_Last1),
+		_Unchecked(_First2), _Func1, _Val, _Func2, _Exec)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt _Transform_exclusive_scan_par(
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Fn1 _Func1, _Ty _Val, _Fn2 _Func2,
+				execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD transform_exclusive_scan(_First, _Last,
+			_Dest, _Func1, _Val, _Func2));
+	_CATCH_PAR_END
+	return (_Dest);	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt transform_exclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last,
+			_OutIt _Dest, _Fn1 _Func1, _Ty _Val, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func2
+	return (_Transform_exclusive_scan_par(_First, _Last, _Dest,
+		_Func1, _Val, _Func2,
+			_GET_POLICY2(_First, _Dest, _Exec)));
+	}
+
+		// TEMPLATE FUNCTION transform_inclusive_scan
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Fn2,
+	class _Ty> inline
+	_OutIt transform_inclusive_scan(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn1 _Func1, _Fn2 _Func2, _Ty _Val)
+	{	// compute _Val, then partial sums into _Dest, using _Func1/_Func2
+	for (; _First != _Last; ++_First)
+		{	// compute another term
+		_Val = _Func2(_Val, _Func1(*_First));
+		*_Dest++ = _Val;
+		}
+	return (_Dest);
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Fn2> inline
+	_OutIt transform_inclusive_scan(_InIt _First, _InIt _Last,
+		_OutIt _Dest, _Fn1 _Func1, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func1/_Func2
+	typedef typename iterator_traits<_InIt>::value_type _Ty;
+	if (_First != _Last)
+		{
+		_Ty _Val = _Func1(*_First++);
+		*_Dest++ = _Val;
+		_Dest = transform_inclusive_scan(_First, _Last,
+			_Dest, _Func1, _Func2, _Val);
+		}
+	return (_Dest);
+	}
+
+		// TEMPLATE FUNCTION _Transform_inclusive_scan_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_FwdIt2 _Transform_inclusive_scan_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1, _FwdIt2 _First2, _Fn1 _Func1,
+			_Fn2 _Func2, _Ty _Val,
+				execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Rechecked(_First2,
+		_Do_transform_inclusive_scan_par(
+		_Unchecked(_First1), _Unchecked(_Last1),
+		_Unchecked(_First2), _Func1, _Func2, _Val, _Exec)));
+	}
+
+template<class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Ty,
+	class _Fn2> inline
+	_OutIt _Transform_inclusive_scan_par(
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Fn1 _Func1, _Fn2 _Func2, _Ty _Val,
+				execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD transform_inclusive_scan(_First, _Last,
+			_Dest, _Func1, _Func2, _Val));
+	_CATCH_PAR_END
+	return (_Dest);	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt transform_inclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// compute _Val, then partial sums into _Dest, using _Func1/_Func2
+	typedef typename iterator_traits<_InIt>::value_type _Ty;
+	if (_First != _Last)
+		{
+		_Ty _Val = _Func1(*_First++);
+		*_Dest++ = _Val;
+		_Dest = _Transform_inclusive_scan_par(_First, _Last, _Dest,
+			_Func1, _Func2, _Val,
+			_GET_POLICY2(_First, _Dest, _Exec));
+		}
+	return (_Dest);
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _OutIt,
+	class _Fn1,
+	class _Fn2,
+	class _Ty,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_OutIt transform_inclusive_scan(_Policy&& _Exec,
+		_InIt _First, _InIt _Last, _OutIt _Dest,
+			_Fn1 _Func1, _Fn2 _Func2, _Ty _Val)
+	{	// compute _Val, then partial sums into _Dest, using _Func1/_Func2
+	return (_Transform_inclusive_scan_par(_First, _Last, _Dest,
+		_Func1, _Func2, _Val,
+		_GET_POLICY2(_First, _Dest, _Exec)));
+	}
+
+		// TEMPLATE FUNCTION transform_reduce WITH ONE INPUT RANGE
+template<class _InIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Transform_reduce(_InIt _First, _InIt _Last,
+		_Ty _Val, _Fn1 _Func1, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last), using _Func1/_Func2
+	for (; _First != _Last; ++_First)
+		_Val = _Func2(_Val, _Func1(*_First));
+	return (_Val);
+	}
+
+template<class _InIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty transform_reduce(_InIt _First, _InIt _Last,
+		_Ty _Val, _Fn1 _Func1, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last), using _Func1/_Func2
+	_DEBUG_RANGE(_First, _Last);
+	_DEBUG_POINTER_IF(_First != _Last, _Func1);
+	_DEBUG_POINTER_IF(_First != _Last, _Func2);
+	return (_Transform_reduce(_Unchecked(_First), _Unchecked(_Last),
+		_Val, _Func1, _Func2));
+	}
+
+		// TEMPLATE CLASS _Transform_reduce_payload
+template<class _FwdIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2>
+struct _Transform_reduce_payload
+	: _Payload_base_single_range<_Tiled_range<_FwdIt> >,
+	_Init_value_helper<_Reduce_result<_Ty> >
+	{
+	typedef _Ty _Result_type;
+	typedef _Reduce_result<_Ty> _Tile_result_type;
+	typedef _Payload_base_single_range< _Tiled_range<_FwdIt> > _Mybase;
+	typedef typename _Mybase::_Range_type _Range_type;
+
+	_Transform_reduce_payload(_FwdIt _First, _FwdIt _Last,
+		_Ty _Val, _Fn1 _F1, _Fn2 _F2,
+			execution::_Parallel_policy& _Exec)
+		: _Mybase(_First, _Last, _Exec),
+		_Init_value_helper<_Reduce_result<_Ty> >(_Tile_result_type(_Val, false)),
+		_Func1(_F1), _Func2(_F2)
+		{	// construct with iterator pair, function, value, function, and policy
+		}
+
+	_Tile_result_type _Apply(_Range_type _Range, _Tile_result_type _Previous)
+		{	// perform function for each element in subrange
+		_Ty _Ans =
+			_Previous._Valid
+				? transform_reduce(_Range._First, _Range._Last,
+					_Previous._Value, _Func1, _Func2)
+				: transform_reduce(std::next(_Range._First), _Range._Last,
+					*_Range._First, _Func1, _Func2);
+		_Tile_result_type _Res(_Ans, true);
+		return (_Res);
+		}
+
+	_Tile_result_type _Reduce(_Tile_result_type _Lhs, _Tile_result_type _Rhs)
+		{	// combine values from subranges
+		if (!_Lhs._Valid)
+			return _Rhs;
+		else if (!_Rhs._Valid)
+			return _Lhs;
+		_Ty _Ans = _Func2(_Lhs._Value, _Rhs._Value);
+		_Tile_result_type _Res(_Ans, true);
+		return (_Res);
+		}
+
+	_Result_type _Get(_Tile_result_type _Res) const
+		{	// extract result
+		return _Res._Value;
+		}
+
+	_Fn1 _Func1;
+	_Fn2 _Func2;
+	};
+
+		// TEMPLATE FUNCTION _Do_transform_reduce_par
+template<class _FwdIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Do_transform_reduce_par(
+		_FwdIt _First, _FwdIt _Last, _Ty _Val, _Fn1 _Func1, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Transform_reduce_payload<_FwdIt, _Ty, _Fn1, _Fn2> _MyPy;
+	_MyPy _Payload(_First, _Last, _Val, _Func1, _Func2, _Exec);
+	_Master_task_with_result<_MyPy> _Master(_Payload);
+	_Master._Launch();
+	return (_Func2(_Master._Get(), _Val));
+	}
+
+		// TEMPLATE FUNCTION _Transform_reduce_par
+template<class _FwdIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Transform_reduce_par(
+		_FwdIt _First, _FwdIt _Last, _Ty _Val, _Fn1 _Func1, _Fn2 _Func2,
+			execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE(_First, _Last);
+	_DEBUG_RANGE_PTR(_First, _Last, _Func1);
+	_DEBUG_RANGE_PTR(_First, _Last, _Func2);
+	return (_Do_transform_reduce_par(_Unchecked(_First), _Unchecked(_Last),
+		_Val, _Func1, _Func2, _Exec));
+	}
+
+template<class _InIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Transform_reduce_par(
+		_InIt _First, _InIt _Last, _Ty _Val, _Fn1 _Func1, _Fn2 _Func2,
+			execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD transform_reduce(_First, _Last, _Val, _Func1, _Func2));
+	_CATCH_PAR_END
+	return (_Ty());	// to quiet diagnostics
+	}
+
+template<class _Policy,
+	class _InIt,
+	class _Ty,
+	class _Fn1,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty transform_reduce(_Policy&& _Exec,
+		_InIt _First, _InIt _Last,
+			_Ty _Val, _Fn1 _Func1, _Fn2 _Func2)
+	{	// return sum of _Val and all in [_First, _Last), using _Func1/_Func2
+	return (_Transform_reduce_par(_First, _Last, _Val, _Func1, _Func2,
+		_GET_POLICY(_First, _Exec)));
+	}
+
+		// TEMPLATE FUNCTION transform_reduce WITH TWO INPUT RANGES
+
+ #if _ITERATOR_DEBUG_LEVEL == 0
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty transform_reduce(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+			_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_Unchecked(_First1), _Unchecked(_Last1),
+		_Unchecked(_First2), _Val,
+		_Func1, _Func2));
+	}
+
+ #else /* _ITERATOR_DEBUG_LEVEL == 0 */
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Transform_reduce2(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2, true_type)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_First1, _Last1,
+		_First2, _Val,
+		_Func1, _Func2));
+	}
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty _Transform_reduce2(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2, false_type)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Inner_product(_First1, _Last1,
+		_First2, _Val,
+		_Func1, _Func2));
+	}
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty transform_reduce(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func1);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Transform_reduce2(_Unchecked(_First1), _Unchecked(_Last1),
+		_First2, _Val,
+		_Func1, _Func2, _Is_checked(_First2)));
+	}
+
+template<class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty,
+	class _Fn1,
+	class _Fn2> inline
+	_Ty transform_reduce(_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_STD transform_reduce(_First1, _Last1,
+		_Array_iterator<_InTy, _InSize>(_First2), _Val,
+			_Func1, _Func2));
+	}
+ #endif /* _ITERATOR_DEBUG_LEVEL == 0 */
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty> inline
+	_Ty transform_reduce(_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val)
+	{	// return inner product of sequences
+	return (_STD transform_reduce(_First1, _Last1, _First2, _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+template<class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty> inline
+	_Ty transform_reduce(_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val)
+	{	// return inner product of sequences
+	return (_STD transform_reduce(_First1, _Last1, _First2, _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+		// TEMPLATE CLASS _Tranform_reduce2_payload
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2>
+struct _Transform_reduce2_payload
+	: _Payload_base_dual_range<_Tiled_range<_FwdIt1>, _Tiled_range<_FwdIt2> >
+	{	// payload for parallel transform_reduce with two input ranges
+	typedef _Ty _Result_type;
+	typedef _Result_type _Tile_result_type;
+	typedef _Payload_base_dual_range<
+		_Tiled_range<_FwdIt1>, _Tiled_range<_FwdIt2> > _Mybase;
+	typedef typename _Mybase::_Range_type _Range_type;
+
+	_Transform_reduce2_payload(_FwdIt1 _First1, _FwdIt1 _Last1,
+		_FwdIt2 _First2, _Ty _Val,
+			_Fn1 _F1, _Fn2 _F2,
+		execution::_Parallel_policy& _Exec)
+		: _Mybase(_First1, _Last1, _First2, _Exec),
+			_Func1(_F1), _Func2(_F2), _Init_value(_Val)
+		{	// construct from two ranges, initial value, and two functions
+		}
+
+	_Tile_result_type _Apply(_Range_type _Range, _Tile_result_type _Val)
+		{	// accumulate value for subranges
+		return (_STD transform_reduce(_Range._First1, _Range._Last1,
+			_Range._First2, _Val,
+				_Func1, _Func2));
+		}
+
+	_Tile_result_type _Reduce(_Tile_result_type _Lhs, _Tile_result_type _Rhs)
+		{	// accumulate result from subranges
+		return _Func1(_Lhs, _Rhs);
+		}
+
+	_Result_type _Get(_Tile_result_type _Res) const
+		{	// extract result
+		return (_Res);
+		}
+
+	_Tile_result_type _Initialize_thread(_Range_type& _Range)
+		{	// compute initial value and adjust ranges
+		return (_Func2(*_Range._First1++, *_Range._First2++));
+		}
+
+	const _Ty _Init_value;
+
+private:
+	_Fn1 _Func1;
+	_Fn2 _Func2;
+	};
+
+		// TEMPLATE FUNCTION _Do_transform_reduce2_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2>
+	_Ty _Do_transform_reduce2_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1,
+		_FwdIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2,
+		execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	typedef _Transform_reduce2_payload<_FwdIt1, _FwdIt2, _Ty, _Fn1, _Fn2> _Payl;
+	_Payl _Payload(_First1, _Last1, _First2, _Val, _Func1, _Func2, _Exec);
+	_Master_task_with_result<_Payl> _Master(_Payload);
+	_Master._Launch();
+	return (_Master._Get());
+	}
+
+		// TEMPLATE FUNCTION _Transform_reduce2_par
+template<class _FwdIt1,
+	class _FwdIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2>
+	_Ty _Transform_reduce2_par(
+		_FwdIt1 _First1, _FwdIt1 _Last1,
+		_FwdIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2,
+		execution::_Parallel_policy _Exec)
+	{	// perform function in parallel
+	_DEBUG_RANGE_PTR(_First1, _Last1, _First2);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func1);
+	_DEBUG_POINTER_IF(_First1 != _Last1, _Func2);
+	return (_Do_transform_reduce2_par(_Unchecked(_First1), _Unchecked(_Last1),
+			_Unchecked(_First2), _Val, _Func1, _Func2, _Exec));
+	}
+
+template<class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2>
+	_Ty _Transform_reduce2_par(
+		_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2,
+		execution::sequenced_policy)
+	{	// perform function sequentially
+	_TRY_BEGIN
+		return (_STD transform_reduce(_First1, _Last1,
+			_First2, _Val, _Func1, _Func2));
+	_CATCH_PAR_END
+	return (_Ty());	// to quiet diagnostics
+	}
+
+		// TEMPLATE FUNCTION PARALLEL transform_reduce WITH TWO INPUT RANGES
+template<class _Policy,
+	class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class _Fn1,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty transform_reduce(_Policy&& _Exec,
+		_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_Transform_reduce2_par(_First1, _Last1, _First2, _Val,
+		_Func1, _Func2,
+		_GET_POLICY2(_First1, _First2, _Exec)));
+	}
+
+template<class _Policy,
+	class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty,
+	class _Fn1,
+	class _Fn2,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty transform_reduce(_Policy&& _Exec,
+		_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val,
+		_Fn1 _Func1, _Fn2 _Func2)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_STD transform_reduce(_Exec, _First1, _Last1,
+		_Array_iterator<_InTy, _InSize>(_First2), _Val,
+			_Func1, _Func2));
+	}
+
+template<class _Policy,
+	class _InIt1,
+	class _InIt2,
+	class _Ty,
+	class = enable_if<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty transform_reduce(_Policy&& _Exec,
+		_InIt1 _First1, _InIt1 _Last1,
+		_InIt2 _First2, _Ty _Val)
+	{	// return inner product of sequences
+	return (_STD transform_reduce(_Exec, _First1, _Last1, _First2, _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+template<class _Policy,
+	class _InIt1,
+	class _InTy,
+	size_t _InSize,
+	class _Ty,
+	class = enable_if_t<is_execution_policy<decay_t<_Policy> >::value,
+		void> > inline
+	_Ty transform_reduce(_Policy&& _Exec,
+		_InIt1 _First1, _InIt1 _Last1,
+		_InTy (&_First2)[_InSize], _Ty _Val)
+	{	// return inner product of sequences, using _Func1 and _Func2
+	return (_STD transform_reduce(_Exec, _First1, _Last1,
+		_Array_iterator<_InTy, _InSize>(_First2), _Val,
+		_FUNCTOR(plus, _First1), _FUNCTOR(multiplies, _First1)));
+	}
+
+		// TEMPLATE FUNCTION gcd
+template<class _N1,
+	class _N2> inline
+_CONST_FUNX common_type_t<_N1, _N2> gcd(_N1 _V1, _N2 _V2)
+	{	// compute greatest common denominator
+	typedef common_type_t<_N1, _N2> _Myt;
+	if (_V1 == 0 && _V2 == 0)
+		return (_Myt(0));
+	_Myt _Val2 = _V2;
+	for (_Myt _Val1 = _V1; _Val1 != 0; )
+		{	// iterate until _Val1 is zero
+		_Myt _Val3 = _Val1;
+		_Val1 = _Val2 % _Val1;
+		_Val2 = _Val3;
+		}
+	return (_Val2 < 0 ? -_Val2 : _Val2);
+	}
+
+		// TEMPLATE FUNCTION lcm
+template<class _N1,
+	class _N2> inline
+_CONST_FUNX common_type_t<_N1, _N2> lcm(_N1 _V1, _N2 _V2)
+	{	// compute least common multiple
+	typedef common_type_t<_N1, _N2> _Myt;
+	if (_V1 == 0 || _V2 == 0)
+		return (_Myt(0));
+	_Myt _Val1 = 0 < _V1 ? -_V1 : _V1;	// avoid 2's complement overflow
+	_Myt _Val2 = 0 < _V2 ? -_V2 : _V2;
+	return ((_Val1 / gcd(_Val1, _Val2)) * _Val2);
+	}
+ #endif /* _HAS_CPP17 */
+
+ #if _HAS_CPP11
+		// TEMPLATE FUNCTION iota
+template<class _FwdIt,
+	class _Ty> inline
+	void _Iota(_FwdIt _First, _FwdIt _Last, _Ty _Val)
+	{	// compute increasing sequence into [_First, _Last)
+	for (; _First != _Last; ++_First, (void)++_Val)
+		*_First = _Val;
+	}
+
+template<class _FwdIt,
+	class _Ty> inline
+	void iota(_FwdIt _First, _FwdIt _Last, _Ty _Val)
+	{	// compute increasing sequence into [_First, _Last)
+	_DEBUG_RANGE(_First, _Last);
+	_Iota(_Unchecked(_First), _Unchecked(_Last), _Val);
+	}
+ #endif /* _HAS_CPP11 */
+_STD_END
+#endif /* _NUMERIC_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

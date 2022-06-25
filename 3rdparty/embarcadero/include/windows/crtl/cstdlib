@@ -1,0 +1,22 @@
+#if !defined(__CSTDLIB__)
+#define __CSTDLIB__
+/*  cstdlib.h
+
+    Standard C header file wrapper for stdlib.h
+*/
+
+/*
+ *      C/C++ Run Time Library - Version 29.0
+ *
+ *      Copyright (c) 1997, 2021 by Embarcadero Technologies, Inc.
+ *      All Rights Reserved.
+ *
+ */
+
+/* $Revision: 35422 $ */
+#include <yvals.h>
+
+#define  __USING_CNAME__
+#include <stdlib.h>
+#undef   __USING_CNAME__
+#endif // __CSTDLIB__

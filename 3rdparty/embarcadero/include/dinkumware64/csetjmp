@@ -1,0 +1,60 @@
+// csetjmp standard header
+#ifndef _CSETJMP_
+#define _CSETJMP_
+#include <yvals.h>
+#include <setjmp.h>
+
+ #if _IS_GHS
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs start_cxx_lib_header
+  #pragma ghs startdata
+ #endif /* defined(__GHS_PRAGMAS) */
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack (push, __ghs_max_pack_value)
+ #endif /* defined(__ghs_max_pack_value) */
+
+ #if defined(__NAMESPACES) && !defined(__EMBEDDED_CXX_HEADERS)
+namespace std {
+	using ::jmp_buf;
+	using ::longjmp;
+ #ifndef setjmp
+	using ::setjmp;
+ #endif /* defined(setjmp) */
+}	// namespace std
+ #endif /* defined(__NAMESPACES), etc. */
+
+ #if defined(__ghs_max_pack_value)
+  #pragma pack(pop)
+ #endif /* defined(__ghs_max_pack_value) */
+
+ #if defined(__GHS_PRAGMAS)
+  #pragma ghs enddata
+  #pragma ghs end_cxx_lib_header
+ #endif /* defined(__GHS_PRAGMAS) */
+
+#else /* _IS_GHS */
+
+ #ifdef _GLOBAL_USING
+_STD_BEGIN
+using ::jmp_buf; using ::longjmp;
+
+  #ifndef setjmp
+using ::setjmp;
+  #endif /* setjmp */
+_STD_END
+ #endif /* _GLOBAL_USING */
+
+#endif /* _IS_GHS */
+
+ #ifndef setjmp
+  #define setjmp	setjmp
+ #endif /* setjmp */
+
+#endif /* _CSETJMP_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

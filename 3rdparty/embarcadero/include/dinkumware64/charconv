@@ -1,0 +1,245 @@
+// charconv header
+#ifndef _CHARCONV_
+#define _CHARCONV_
+
+#include <system_error>
+
+_STD_BEGIN
+	//	FUNCTION to_chars
+struct to_chars_result
+	{	// specifies text output
+	char *ptr;
+	errc ec;
+	};
+
+	// INTEGER to_chars
+char _Base_digit(int _Val)
+	{	// convert [2, 36) to extended hex
+	return (_Val < 10 ? '0' + _Val : 'a' + (_Val - 10));
+	}
+
+template<class _Type,
+	class = enable_if_t<is_integral<_Type>::value,
+		void> >
+	to_chars_result to_chars(char *_First, char *_Last,
+		_Type _Val, int _Base = 10)
+	{	// convert integral value to text
+	if (_Base < 2 || 36 < _Base
+		|| _Last <= _First || _Val < 0 && _Last <= _First + 2)
+		return (to_chars_result{_Last, errc::invalid_argument});
+	char *_Next = _First;
+	char *_Next0 = _Next;
+	if (_Val < 0)
+		{	// convert negative to positive
+		*_Next++ = '-';
+		_Next0 = _Next;
+		*_Next++ = _Base_digit(-_Val % _Base);
+		_Val = -_Val / _Base;
+		}
+	for (; 0 < _Val && _Next < _Last; ++_Next)
+		{	// convert a digit
+		*_Next = _Base_digit(_Val % _Base);
+		_Val /= _Base;
+		}
+
+	if (0 < _Val)
+		return (to_chars_result{_Last, errc::value_too_large});
+	else
+		{	// reverse digits and report success
+		char *_Next1 = _Next - 1;
+		for (size_t _Nswap = (_Next - _Next0) / 2; 0 < _Nswap; --_Nswap)
+			_STD swap(*_Next0++, *_Next1--);
+		return (to_chars_result{_Next, (errc)0});
+		}
+	}
+
+	// FLOATING to_chars
+enum class chars_format
+	{	// specifies display format
+	scientific = 1,
+	fixed = 2,
+	hex = 4,
+	general = fixed | scientific
+	};
+
+template<class _Ftype>
+	to_chars_result _Flt_to_chars(char *_First, char *_Last,
+		_Ftype _Val,
+		const char *_Fmt_spec[],
+		chars_format _Fmt,
+		int _Prec)
+	{	// convert floating-point
+	if (_Last <= _First || _Val < 0 && _Last <= _First + 2
+		|| (int)_Fmt < 1 || 4 < (int)_Fmt
+		|| _Prec < 0 || 40 < _Prec)
+		return (to_chars_result{_Last, errc::invalid_argument});
+	char _Format[50];
+	sprintf_s(_Format, sizeof (_Format) - 1, "%%.%d%s", _Prec,
+		_Fmt_spec[(int)_Fmt]);
+
+	size_t _Len = _CSTD sprintf_s(_First, _Last - _First + 1,
+		_Format, _Val);
+	if (_Len == 0)
+		return (to_chars_result{_Last, errc::value_too_large});
+	else
+		return (to_chars_result{_First + _Len, (errc)0});
+	}
+
+to_chars_result to_chars(char *_First, char *_Last, double _Val,
+	chars_format _Fmt = chars_format::general,
+	int _Prec = 16)
+	{	// convert float/double
+	static const char *_Flt_spec[] =
+		{0, "e", "f", "g", "a", 0, 0, 0};
+	return (_Flt_to_chars(_First, _Last, _Val, _Flt_spec, _Fmt, _Prec));
+	}
+
+to_chars_result to_chars(char *_First, char *_Last, long double _Val,
+	chars_format _Fmt = chars_format::general,
+	int _Prec = 16)
+	{	// convert long double
+	static const char *_Flt_spec[] =
+		{0, "Le", "Lf", "Lg", "La", 0, 0, 0};
+	return (_Flt_to_chars(_First, _Last, _Val,_Flt_spec,  _Fmt, _Prec));
+	}
+
+	//	FUNCTION from_chars
+struct from_chars_result
+	{	// specifies text input
+	const char *ptr;
+	errc ec;
+	};
+
+	// INTEGER from_chars
+template<class _Type,
+	class = enable_if_t<is_integral<_Type>::value,
+		void> >
+	from_chars_result from_chars(const char *_First, const char *_Last,
+		_Type& _Value, int _Base = 10)
+	{	// convert text to integral value
+	if (_Base < 2 || 36 < _Base || _Last <= _First)
+		return (from_chars_result{_Last, errc::invalid_argument});
+	bool _Neg = false;
+	if (_First == _Last)
+		;
+	else if (*_First == '+')
+		++_First;
+	else if (*_First == '-')
+		{	// remember negative sign
+		_Neg = true;
+		++_First;
+		} 
+	if (_First == _Last)
+		return (from_chars_result{_Last, errc::illegal_byte_sequence});
+	
+	unsigned long long _Val = 0, _Val0 = 0;
+	for (; _First != _Last; ++_First)
+		{	// convert another digit
+		const char *_Digits = "0123456789"
+			"abcdefghijklmnopqrstuvwxyz"
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		const char *_Match = _CSTD strchr(_Digits, *_First);
+		if (_Match == nullptr)
+			break;
+		int _Dig = _Match - _Digits;
+		if (36 <= _Dig)
+			_Dig -= 26;
+		_Val0 = _Val * _Base + _Dig;
+		if (_Base <= _Dig || _Val0 < _Val)
+			return (from_chars_result{_Last, errc::value_too_large});
+		_Val = _Val0;
+		}
+
+	if (_Neg)
+		{	// negate and check for signed overflow
+		_Val = -_Val;
+		if (_Type(-1) < 0 && 0 < _Val)
+			return (from_chars_result{_Last, errc::value_too_large});
+		}
+	_Value = _Val;
+	return (from_chars_result{_First, (errc)0});
+	}
+
+	// FLOATING from_chars
+template<class _Ftype>
+	from_chars_result _Flt_from_chars(const char *_First, const char *_Last,
+		_Ftype& _Val,
+		const char *_Fmt_spec[],
+		chars_format _Fmt = chars_format::general)
+	{	// convert text to floating-point
+	if (_Last <= _First
+		|| (int)_Fmt < 1 || 4 < (int)_Fmt
+		|| *_First == '+')
+		return (from_chars_result{_Last, errc::invalid_argument});
+	size_t _Len = _Last - _First + 1;
+	if (_Fmt == chars_format::hex)
+		_Len += 2;
+	char *_Buf = (char *)::operator new(_Len);
+	if (_Buf == nullptr)
+		return (from_chars_result{_Last, errc::not_enough_memory});
+	char *_Next = _Buf;
+	if (_Fmt == chars_format::hex)
+		{	// add "0x" prefix for hex
+		_CSTD memcpy(_Next, "0x", 2);
+		_Next += 2;
+		}
+	_CSTD memcpy(_Next, _First, _Last - _First);
+	_Next[_Last - _First] = '\0';
+
+	bool _Hasexp = strchr(_Next, 'e') || strchr(_Next, 'E');
+	if ((_Fmt == chars_format::fixed) && _Hasexp
+		|| (_Fmt == chars_format::scientific) && !_Hasexp)
+		return (from_chars_result{_Last, errc::invalid_argument});
+#if defined(__CODEGEARC__)
+	// FIXME: Shouldn't use locale aware format
+#endif
+	int _Nused = sscanf(_Buf, _Fmt_spec[(int)_Fmt], &_Val);
+	::operator delete((void *)_Buf);
+	if (_Nused == 1)
+		return (from_chars_result{_First, (errc)0});
+	else
+		return (from_chars_result{_Last, errc::invalid_argument});
+	}
+
+from_chars_result from_chars(const char *_First, const char *_Last,
+	float& _Value, chars_format _Fmt = chars_format::general)
+	{	// convert float
+	static const char *_Flt_spec[] =
+#if defined(__CODEGEARC__)
+		{0, "%e", "%f", "%g", "%a", 0, 0, 0};
+#else
+		{0, "e", "f", "g", "a", 0, 0, 0};
+#endif
+	return (_Flt_from_chars(_First, _Last, _Value, _Flt_spec, _Fmt));
+	}
+
+from_chars_result from_chars(const char *_First, const char *_Last,
+	double& _Value, chars_format _Fmt = chars_format::general)
+	{	// convert float
+	static const char *_Flt_spec[] =
+#if defined(__CODEGEARC__)
+		{0, "%le", "%lf", "%lg", "%la", 0, 0, 0};
+#else
+		{0, "e", "f", "g", "a", 0, 0, 0};
+#endif
+	return (_Flt_from_chars(_First, _Last, _Value, _Flt_spec, _Fmt));
+	}
+
+from_chars_result from_chars(const char *_First, const char *_Last,
+	long double& _Value, chars_format _Fmt = chars_format::general)
+	{	// convert float
+	static const char *_Flt_spec[] =
+#if defined(__CODEGEARC__)
+		{0, "%Le", "%Lf", "%Lg", "%La", 0, 0, 0};
+#else
+		{0, "e", "f", "g", "a", 0, 0, 0};
+#endif
+	return (_Flt_from_chars(_First, _Last, _Value, _Flt_spec, _Fmt));
+	}
+_STD_END
+#endif /* _CHARCONV_ */
+
+/*
+ * Copyright (c) by P.J. Plauger. All rights reserved.
+ * Consult your license regarding permissions and restrictions.
+ * V8.05/17:1422 */

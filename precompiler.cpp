@@ -92,6 +92,10 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <algorithm>   // all_of
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
 
+// The next two are just for the C++11 implementation of 'to_address'
+#include <type_traits>  // enable_if, is_pointer
+#include <utility>      // declval
+
 class StringAlgorithms {
 
     typedef std_or_gnu_debug::string string;
@@ -366,35 +370,33 @@ public:
         return b == a.substr(sa - sb);
     }
 
+    template <typename T, typename std::enable_if<std::is_pointer<T>::value, bool>::type = true>
+    static T cxx11_to_address(T arg)  // Pass pointers by value
+    {
+        return arg;
+    }
+
+    template <typename T,
+              typename std::enable_if<false == std::is_pointer<T>::value, bool>::type = false,
+              typename std::enable_if<std::is_pointer< decltype(std::declval<T>().operator->()) >::value, bool>::type = true>
+    static decltype(std::declval<T>().operator->()) cxx11_to_address(T arg)  // Pass iterators by value
+    {
+        return arg.operator->();
+    }
+
     // The following function is to support C++17 which is lacking the
     // constructor for 'string_view' which takes two iterators. Also we want
     // to be able to mix and match different iterator types.
     template<typename A, typename B>
     static string_view Sv(A a, B b)  // Pass iterators by value
     {
-        using std::is_same_v;
-        using std::string_view;
-        using std_or_gnu_debug::string;
+        assert( cxx11_to_address(b) >= cxx11_to_address(a) );
 
-        typedef std::remove_cv_t< std::remove_reference_t<A> > X;  // C++17 doesn't have remove_cvref_t
-        typedef std::remove_cv_t< std::remove_reference_t<B> > Y;
-
-        static_assert(    is_same_v< X, char *                      >
-                       || is_same_v< X, char const *                >
-                       || is_same_v< X, string::iterator            >
-                       || is_same_v< X, string::const_iterator      >
-                       || is_same_v< X, string_view::iterator       >
-                       || is_same_v< X, string_view::const_iterator >, "First argument is wrong type" );
-
-        static_assert(    is_same_v< Y, char *                      >
-                       || is_same_v< Y, char const *                >
-                       || is_same_v< Y, string::iterator            >
-                       || is_same_v< Y, string::const_iterator      >
-                       || is_same_v< Y, string_view::iterator       >
-                       || is_same_v< Y, string_view::const_iterator >, "Second argument is wrong type" );
-
-        // Now we use the constructor which takes a pointer and an integer length
-        return std::string_view( static_cast<char const *>( &*a ), static_cast<string_view::size_type>( &*b - &*a ) );
+        // Now we use the 'string_view::string_view' constructor which takes a pointer and an integer length.
+        // Wise to use static_cast's here to be extra verbose as the class 'string_view' has several constructors.
+        return std::string_view(
+            static_cast<char const *>( cxx11_to_address(a) ),
+            static_cast<std::string_view::size_type>(cxx11_to_address(b) - cxx11_to_address(a)) );
     }
 };
 

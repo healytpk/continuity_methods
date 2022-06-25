@@ -1,4 +1,4 @@
-name: microsoft
+name: mswin_msvc
 
 on:
   push:

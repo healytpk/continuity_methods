@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install and run cppcheck
       run: apt install -y python-pygments; \
-           (cd ./3rdparty/cppcheck/ && exec ./cppcheck --cppcheck-build-dir=../../dir_cppcheck_work/ --inline-suppr --force --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' ../../precompiler.cpp 2> ../../err.xml); \
+           ./3rdparty/cppcheck/cppcheck --cppcheck-build-dir=./dir_cppcheck_work/ --inline-suppr --force --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' precompiler.cpp 2> err.xml; \
            ./3rdparty/cppcheck/cppcheck-htmlreport --file=err.xml --report-dir=./dir_cppcheck_html/ --source-dir=./
     - uses: actions/upload-artifact@v2
       with:

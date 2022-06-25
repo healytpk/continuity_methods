@@ -24,7 +24,7 @@ jobs:
     - name: Prepare to use the Intel compiler
       run: source /opt/intel/oneapi/setvars.sh; printenv >> $GITHUB_ENV
     - name: Compiler pre-compiler
-      icpc -o precompiler precompiler.cpp -std=c++17 > build_log.txt 2>&1
+      run: icpc -o precompiler precompiler.cpp -std=c++17 > build_log.txt 2>&1
     - uses: actions/upload-artifact@v2
       with:
         name: build_log.txt

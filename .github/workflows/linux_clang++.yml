@@ -9,11 +9,11 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: build
+    - name: Compiler pre-compiler
       run: clang++ -o precompiler precompiler.cpp -std=c++20 > build_log.txt 2>&1
     - uses: actions/upload-artifact@v2
       with:
@@ -26,11 +26,11 @@ jobs:
     - name: create simple translation unit
       run: clang++ -std=c++20 -E -P sample_simple.cpp | ./precompiler > trans_simple.cpp
     - name: build binary for lasers sample
-      run:  clang++ -o bin_lasers trans_lasers.cpp -std=c++20
+      run: clang++ -o bin_lasers trans_lasers.cpp -std=c++20
     - name: build binary for simple sample
-      run:  clang++ -o bin_simple trans_simple.cpp -std=c++20
+      run: clang++ -o bin_simple trans_simple.cpp -std=c++20
     - name: build the separate program for comparing text files
-      run:  clang++ -o comparetxt comparetxt.cpp -std=c++20
+      run: clang++ -o comparetxt comparetxt.cpp -std=c++20
     - name: compare expected output for lasers sample
       run:  ./bin_lasers | ./comparetxt expected_output_lasers.txt
     - name: compare expected output for simple sample

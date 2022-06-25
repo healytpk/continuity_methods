@@ -2,33 +2,46 @@ name: linux_intel
 
 on:
   push:
-    branches: [notemp]
+    branches: '*'
   pull_request:
-    branches: [notemp]
+    branches: '*'
+
 jobs:
-  build_intel_champ_fparser:
-    runs-on: ubuntu-20.04
-    defaults:
-      run:
-        shell: bash --noprofile --norc {0}
+  build:
+
+    runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v2
-    - name: setup repo
+    - name: Set up apt-get to access Intel repo
       run: |
         wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null; \
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list; \
         sudo apt update
-    - name: install
+    - name: Install the Intel Classic C++ compiler
       run: |
         sudo apt install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.1.0
-    - name: Compile pre-compiler
-      run: |
-        source /opt/intel/oneapi/setvars.sh; \
-        printenv >> $GITHUB_ENV; \
-        icpc -o precompiler ./precompiler.cpp -std=c++17
-    - name: Test pre-compiler
-      run: |
-        icpc -E -P sample_lasers.cpp | ./precompiler > final_lasers.cpp; \
-        icpc -o bin_lasers final_lasers.cpp -std=c++17; \
-        icpc -E -P sample_simple.cpp | ./precompiler > final_simple.cpp; \
-        icpc -o bin_simple final_simple.cpp -std=c++17
+    - name: Prepare to use the Intel compiler
+      run: source /opt/intel/oneapi/setvars.sh; printenv >> $GITHUB_ENV
+    - name: Compiler pre-compiler
+      icpc -o precompiler precompiler.cpp -std=c++17 > build_log.txt 2>&1
+    - uses: actions/upload-artifact@v2
+      with:
+        name: build_log.txt
+        path: build_log.txt
+    - name: Check binary file
+      run: ls -alh precompiler; file precompiler; readelf -a precompiler | grep NEEDED; ldd precompiler
+    - name: create lasers translation unit
+      run: icpc -std=c++17 -E -P sample_lasers.cpp | ./precompiler > trans_lasers.cpp
+    - name: create simple translation unit
+      run: icpc -std=c++17 -E -P sample_simple.cpp | ./precompiler > trans_simple.cpp
+    - name: build binary for lasers sample
+      run: icpc -o bin_lasers trans_lasers.cpp -std=c++17
+    - name: build binary for simple sample
+      run: icpc -o bin_simple trans_simple.cpp -std=c++17
+    - name: build the separate program for comparing text files
+      run: icpc -o comparetxt comparetxt.cpp -std=c++17
+    - name: compare expected output for lasers sample
+      run:  ./bin_lasers | ./comparetxt expected_output_lasers.txt
+    - name: compare expected output for simple sample
+      run:  ./bin_simple | ./comparetxt expected_output_simple.txt

@@ -11,7 +11,7 @@
 #endif
 
 // =================================================================
-// Section 1 of 9 : Override global 'new' and 'delete' for max speed
+// Section 1 of 10 : Override global 'new' and 'delete' for max speed
 // =================================================================
 
 decltype(sizeof(1)) g_total_allocation = 0u;
@@ -73,8 +73,103 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 
 #endif // if override global 'new' and 'delete' for max speed is enabled
 
+// ===========================================================================
+// Section 2 of 10 : GradedOstream for selective control over output from clog
+// ===========================================================================
+
+#include <ostream>   // ostream
+#include <iostream>  // clog
+
+enum Grade : unsigned int {  // unsigned int is at least 16-Bit
+
+/*
+        00000001 Warnings for classes not found
+        00000010 Classes containing a continuity marker
+        00000100 Processing of continuity markings
+        00001000 Summary banners at start and finish
+        00010000 Replacement of preprocessor directives
+        00100000 Replacement of string literals
+        01000000 Location of every curly pair {}
+        10000000 Intermediary Level 1 and Level 2 failures to find classes
+       100000000 All scope names
+      1000000000 All pseudonyms (typedef & using)
+     10000000000 All namespaces
+    100000000000 All classes that have base classes
+*/
+
+    eGradeWarnings             = 0b00000001u,
+    eGradeClassesWithContMarks = 0b00000010u,
+    eGradeProcessContMarks     = 0b00000100u,
+
+    eGradeBanners    = 0b00001000u,
+
+    eGradePreproDirs = 0b00010000u,
+    eGradeStringLits = 0b00100000u,
+    eGradeCurlyPair  = 0b01000000u,
+    eGradeFindFails  = 0b10000000u,
+
+    eGradeAllScopes         =     0b100000000u,
+    eGradeAllPseudonyms     =    0b1000000000u,
+    eGradeAllNamespaces     =   0b10000000000u,
+    eGradeAllDerivedClasses =  0b100000000000u,
+};
+
+class GradedOstream {
+
+protected:
+
+    bool is_on = false;
+    std::ostream &os;
+    unsigned grade_config = 0b1011u;
+    unsigned most_recent_arg = 0u;
+
+    void DetermineOnOrOff(void) noexcept
+    {
+        is_on = ( most_recent_arg == (most_recent_arg & grade_config) );
+    }
+
+    void SetConfig(unsigned const arg) noexcept
+    {
+        grade_config = arg;
+        this->DetermineOnOrOff();
+    }
+
+public:
+
+    GradedOstream(std::ostream &arg_os) : os(arg_os) {}
+    GradedOstream(std::ostream &arg_os, unsigned const arg_grade_config) : os(arg_os), grade_config(arg_grade_config) {}
+
+    template<typename ArgType>
+    GradedOstream &operator<<(ArgType const &arg)
+    {
+        if ( is_on ) os << arg;
+
+        return *this;
+    }
+
+    GradedOstream &operator<<(Grade const arg)
+    {
+        most_recent_arg = arg;
+
+        this->DetermineOnOrOff();
+
+        return *this;
+    }
+
+    GradedOstream &operator<<(std::ostream &(*funcptr)(std::ostream&))  // needed for "<< std::endl"
+    {
+        if ( is_on ) os << funcptr;
+
+        return *this;
+    }
+
+    operator bool(void) const noexcept { return is_on; }
+};
+
+GradedOstream clogg(std::clog);
+
 // ==========================================================================
-// Section 2 of 9 : Implementations of functions from Boost
+// Section 3 of 10 : Implementations of functions from Boost
 // ==========================================================================
 
 #include <cassert>     // assert
@@ -415,7 +510,7 @@ static std::string_view Sv(A a, B b)  // Pass iterators by value
 }
 
 // ==========================================================================
-// Section 3 of 9 : Implementation of container type : FIFO map
+// Section 4 of 10 : Implementation of container type : FIFO map
 // ==========================================================================
 
 #include <cstddef>  // Just to get __GLIBCXX__ defined
@@ -508,7 +603,7 @@ public:
 };
 
 // =========================================================================
-// Section 4 of 9 : Include standard header files, and define global objects
+// Section 5 of 10 : Include standard header files, and define global objects
 // =========================================================================
 
 bool constexpr verbose = false;
@@ -520,7 +615,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <cctype>         // isspace, isalpha, isdigit
 #include <cstring>        // memset, memcpy
 #include <cstdio>         // freopen, stdin
-#include <iostream>       // cout, clog, endl
+#include <iostream>       // cout, endl
 #include <algorithm>      // copy, replace, count, all_of, any_of
 #include <iterator>       // next, distance, back_inserter, istream_iterator, iterator_traits
 #include <ios>            // ios::binary
@@ -554,7 +649,6 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 
 using std::cin;
 using std::cout;
-using std::clog;
 using std::endl;
 using std::to_string;
 using std::string_view;
@@ -585,7 +679,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 5 of 9 : regex_top_level_token_iterator
+// Section 6 of 10 : regex_top_level_token_iterator
 // ==========================================================================
 
 template<
@@ -849,7 +943,7 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 6 of 9 : Process keywords and identifiers
+// Section 7 of 10 : Process keywords and identifiers
 // ==========================================================================
 
 struct ShortStr {
@@ -959,7 +1053,7 @@ void Find_And_Erase_All_Keywords(string &s)
 }
 
 // ==========================================================================
-// Section 7 of 9 : Parse function signatures
+// Section 8 of 10 : Parse function signatures
 // ==========================================================================
 
 class Function_Signature {
@@ -1362,10 +1456,10 @@ string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the te
 #if 1
     if ( StringAlgorithms::starts_with(retval, "template") ) return {};
 #else
-    //if ( retval.contains("allocator_traits") ) clog << "1: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("allocator_traits") ) clogg << "1: ===================" << retval << "===================" << endl;
     retval = regex_replace(retval, regex("(template<.*>) (class|struct) (.*)"), "$2 $3");
     retval = regex_replace(retval, regex("\\s*,\\s*"), ",");
-    //if ( retval.contains("allocator_traits") ) clog << "2: ===================" << retval << "===================" << endl;
+    //if ( retval.contains("allocator_traits") ) clogg << "2: ===================" << retval << "===================" << endl;
 #endif
 
     return retval;
@@ -1432,7 +1526,7 @@ protected:
 
     void Print_CurlyPair(CurlyPair const &cp, size_t const indentation = 0u) const
     {
-        verbose && clog << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
+        verbose && clogg << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
 
         string str;
 
@@ -1447,28 +1541,28 @@ protected:
         {
             for ( size_t i = 0u; i != indentation; ++i )
             {
-                clog << "    ";
+                clogg << "    ";
             }
 
-            clog << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
+            clogg << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
-            verbose && clog << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
+            verbose && clogg << "  [Full line: " << TextBeforeOpenCurlyBracket(cp.First()) << "]";
 
             if ( false == only_print_numbers )
             {
                 extern string GetNames(CurlyBracketManager::CurlyPair const &);
 
-                //clog << "    " << GetNames(cp);
+                //clogg << "    " << GetNames(cp);
 
-                clog << "  [" << GetNames(cp) << "]";
+                clogg << "  [" << GetNames(cp) << "]";
             }
 
-            clog << endl;
+            clogg << endl;
         }
 
         for ( CurlyPair const &e : cp.Nested() )
         {
-            verbose && clog << "    - - - About to recurse" << endl;
+            verbose && clogg << "    - - - About to recurse" << endl;
             Print_CurlyPair(e, indentation + 1u);
         }
     }
@@ -1479,7 +1573,7 @@ public:
 
     void Process(void)
     {
-        verbose && clog << "========= STARTING PROCESSING ===========" << endl;
+        verbose && clogg << "========= STARTING PROCESSING ===========" << endl;
 
         _root_pair.clear();
 
@@ -1499,14 +1593,14 @@ public:
             }
         }
 
-        verbose && clog << "========= ENDING PROCESSING ===========" << endl;
+        verbose && clogg << "========= ENDING PROCESSING ===========" << endl;
     }
 
     void Print(void) const
     {
         for ( CurlyPair const &e : _root_pair.Nested() )
         {
-            verbose && clog << "    - - - About to recurse" << endl;
+            verbose && clogg << "    - - - About to recurse" << endl;
             Print_CurlyPair(e);
         }
     }
@@ -1572,7 +1666,7 @@ string_view Indentation_For_CurlyPair(CurlyBracketManager::CurlyPair const &cp)
 }
 
 // ==========================================================================
-// Section 8 of 9 : Generate the auxillary code needed for Continuity Methods
+// Section 9 of 10 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname)
@@ -1708,7 +1802,7 @@ void Print_Helper_Classes_For_Class(string classname)
 }
 
 // =============================================================
-// Section 9 of 9 : Parse all the class definitions in the input
+// Section 10 of 10 : Parse all the class definitions in the input
 // =============================================================
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)
@@ -1772,7 +1866,7 @@ void Replace_All_String_Literals_With_Spaces(bool undo = false)
 
                 strlits[i] = g_intact.substr(i, k - i);
 
-                clog << "Replacing string literal at index " << i << " : [" << strlits[i] << "]" << endl;
+                clogg << "Replacing string literal at index " << i << " : [" << strlits[i] << "]" << endl;
 
                 std::memset(&g_intact[i], ' ', k - i);
 
@@ -1784,12 +1878,12 @@ void Replace_All_String_Literals_With_Spaces(bool undo = false)
         }
     }
 
-    clog << "String Literal Replacements:\n"
+    clogg << "String Literal Replacements:\n"
             "============================\n";
 
     for ( auto const &e : strlits )
     {
-        clog << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
+        clogg << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
     }
 }
 
@@ -1837,12 +1931,12 @@ void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
         }
     }
 
-    clog << "Preprocessor Replacements:\n"
+    clogg << "Preprocessor Replacements:\n"
             "==========================\n";
 
     for ( auto const &e : directives )
     {
-        clog << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
+        clogg << "Index " << e.first << ", Len = " << e.second.size() << ", [" << e.second << "]" << endl;
     }
 }
 
@@ -1912,7 +2006,7 @@ list< array<string,3u> > Parse_Bases_Of_Class(string str)
             }
         }
 
-        //clog << "[ADD RECORD : " << std::get<0u>(tmp) << " : " << std::get<1u>(tmp) << " : " << std::get<2u>(tmp) << "]";
+        //clogg << "[ADD RECORD : " << std::get<0u>(tmp) << " : " << std::get<1u>(tmp) << " : " << std::get<2u>(tmp) << "]";
         retval.push_back(tmp);
     }
 
@@ -1990,11 +2084,11 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     {
         for ( CurlyBracketManager::CurlyPair const *p = &cp; (p = p->Parent()); /* no post-processing */ )  // will throw exception when root pair is reached
         {
-            //clog << "Iteration No. " << iteration << endl;
+            //clogg << "Iteration No. " << iteration << endl;
 
-            verbose && clog << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
+            verbose && clogg << " / / / / / / About to call Word_For_Curly_Pair(" << p->First() << ", " << p->Last() << ")" << endl;
             string const tmp = std::get<1u>( Intro_For_Curly_Pair(*p) );
-            verbose && clog << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
+            verbose && clogg << " / / / / / / Finished calling Word_For_Curly_Pair" << endl;
 
             if ( tmp.empty() ) continue;
 
@@ -2003,7 +2097,7 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     }
     catch(CurlyBracketManager::ParentError const &)
     {
-        //clog << "********** ParentError ************";
+        //clogg << "********** ParentError ************";
     }
 
     retval.insert(0u, "::");
@@ -2157,7 +2251,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
             tmp += ")\n";
 
             cout << tmp;
-            clog << tmp;
+            clogg << tmp;
             std::cerr << tmp;
             std::abort();
         }
@@ -2173,7 +2267,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         }
         catch (std::out_of_range const &)
         {
-            clog << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
+            clogg << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
 
             string class_name_without_template_specialisation = regex_replace( string(classname), regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
 
@@ -2192,7 +2286,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
                 }
                 catch (std::out_of_range const &)
                 {
-                    clog << " - - - SECOND FAILED - - - Prefix='" << prefix << "', Classname='" << class_name_without_template_specialisation << "' - Fullname='" << full_name << "'" << endl;
+                    clogg << " - - - SECOND FAILED - - - Prefix='" << prefix << "', Classname='" << class_name_without_template_specialisation << "' - Fullname='" << full_name << "'" << endl;
 
                     full_name = std::move(duplicate_original_full_name);
                 }
@@ -2201,7 +2295,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
         if ( nullptr != p )
         {
-            //clog << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
+            //clogg << "Success: found '" << string(classname) << "') as ('" << full_name << "')";
             break;  // If we already have found the class then no need to keep searching
         }
 
@@ -2213,7 +2307,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     {
         //throw std::out_of_range("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
 
-        clog << "WARNING: Cannot find base class '" + string(classname) + "' referenced inside '" + string(intact_prefix) + "'" << endl;
+        clogg << "WARNING: Cannot find base class '" + string(classname) + "' referenced inside '" + string(intact_prefix) + "'" << endl;
 
         return {};
     }
@@ -2251,10 +2345,10 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<strin
 
         if constexpr ( verbose )
         {
-            clog << " [ALREADY_SEEN=";
-            for ( auto const &e_already : already_recorded ) clog << e_already << ", ";
-            clog << "] ";
-            clog << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+            clogg << " [ALREADY_SEEN=";
+            for ( auto const &e_already : already_recorded ) clogg << e_already << ", ";
+            clogg << "] ";
+            clogg << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
         size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
@@ -2335,7 +2429,7 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
         if ( begin_from >= g_intact.size() )
         {
             cout << "About to abort because begin_from >= g_intact.size()\n" << endl;
-            clog << "About to abort because begin_from >= g_intact.size()\n" << endl;
+            clogg << "About to abort because begin_from >= g_intact.size()\n" << endl;
             std::cerr << "About to abort because begin_from >= g_intact.size()\n" << endl;
             std::abort();
         }
@@ -2383,7 +2477,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         }
         catch (std::out_of_range const &e)
         {
-            clog << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            clogg << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
             return;
         }
     }
@@ -2394,7 +2488,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
                              i != std::sregex_iterator();
                              ++i )
     {
-        //clog << "Iterating in typedef loop" << endl;
+        //clogg << "Iterating in typedef loop" << endl;
 
         string impersonator = regex_replace( i->str(), r, "$2" );
         string original     = regex_replace( i->str(), r, "$1" );
@@ -2416,7 +2510,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         }
         catch (std::out_of_range const &e)
         {
-            clog << "====== WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            clogg << "====== WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
             return;
         }
     }
@@ -2505,7 +2599,7 @@ public:
 
                 //strcpy(buf, "[]");
 
-                //clog << "\nPutting in stream [" << buf << "]" << endl;
+                //clogg << "\nPutting in stream [" << buf << "]" << endl;
 
                 os << buf << endl;
 
@@ -2515,7 +2609,7 @@ public:
             }
         }
 
-        //clog << "\nPutting in stream [" << p << "]" << endl;
+        //clogg << "\nPutting in stream [" << p << "]" << endl;
         os << p;
 
         return *this;
@@ -2558,7 +2652,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
     {
         bool is_destructor_order = false;
 
-        clog << "At least one continue method found" << endl;
+        clogg << "At least one continue method found" << endl;
 
         retval = true;
 
@@ -2682,14 +2776,14 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 
         if ( -1 == i ) continue;
 
-        clog << "Level " << i << ": " << Sv(str.cbegin(), iter->second);
+        clogg << "Level " << i << ": " << Sv(str.cbegin(), iter->second);
 
         if ( -1 != Sv(iter->first,iter->second).find('<') )  // check if right-most is a template class
         {
-            clog << "    <---- template class";
+            clogg << "    <---- template class";
         }
 
-        clog << endl;
+        clogg << endl;
     }
 }
 
@@ -2833,11 +2927,11 @@ void my_terminate_handler(void)
     }
     catch(const std::exception& e)
     {
-        clog << "=====================================================================================================" << endl;
-        clog << "Exception: " << e.what() << endl;
-        clog << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
-        clog << "Milliseconds taken: " << GetTickCount() - g_timestamp_program_start << endl;
-        clog << "=====================================================================================================" << endl;
+        clogg << "=====================================================================================================" << endl;
+        clogg << "Exception: " << e.what() << endl;
+        clogg << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
+        clogg << "Milliseconds taken: " << GetTickCount() - g_timestamp_program_start << endl;
+        clogg << "=====================================================================================================" << endl;
     }
 
     std::abort();
@@ -2891,8 +2985,8 @@ int main(int const argc, char **const argv)
 
     std::copy( istream_iterator<char>(cin), istream_iterator<char>(), back_inserter(g_intact) );
 
-    clog << "Bytes: " << g_intact.size() << endl;
-    clog << "Lines: " << Lines() << endl;
+    clogg << "Bytes: " << g_intact.size() << endl;
+    clogg << "Lines: " << Lines() << endl;
 
     std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');  // null chars will screw up functions that parse null as end of string
 
@@ -2903,21 +2997,21 @@ int main(int const argc, char **const argv)
     Replace_All_Preprocessor_Directives_With_Spaces();
     Replace_All_String_Literals_With_Spaces();
 
-    //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(clog) );
+    //std::copy( g_intact.begin(), g_intact.end(), std::ostream_iterator<char>(clogg) );
     
     g_curly_manager.Process();
 
-    clog << "====================================== ALL PROCESSING DONE ===========================================" << endl;
+    clogg << "====================================== ALL PROCESSING DONE ===========================================" << endl;
 
     only_print_numbers = false;
     g_curly_manager.Print();
 
     //fifo_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 
-    clog << "====================================== All scope names ==============================================" << endl;
+    clogg << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
-        clog << e.first << " [" << std::get<1u>(e.second) << "] ";
+        clogg << e.first << " [" << std::get<1u>(e.second) << "] ";
 
         for ( CurlyBracketManager::CurlyPair const *const  &my_curly_pair_pointer : std::get<0u>(e.second) )  // For classes, just one iteration. For namespaces, many iterations.
         {
@@ -2925,29 +3019,29 @@ int main(int const argc, char **const argv)
 
             for ( auto const my_pair : my_list )
             {
-                clog << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
+                clogg << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
                 Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first + "::");
             }
 
-            clog << endl;
+            clogg << endl;
         }
     }
 
-    clog << "====================================== Now the pseudonyms (using X = Y;) ==============================================" << endl;
+    clogg << "====================================== Now the pseudonyms (using X = Y;) ==============================================" << endl;
     for ( auto const &e : g_psuedonyms )
     {
-        clog << e.first << " == " << e.second << endl;
+        clogg << e.first << " == " << e.second << endl;
     }
 
-    clog << "====================================== Now the namespaces ==============================================" << endl;
+    clogg << "====================================== Now the namespaces ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
         if ( "namespace" != std::get<1u>(e.second) ) continue;
 
-        clog << e.first << endl;
+        clogg << e.first << endl;
     }
 
-    clog << "====================================== Now the classes that have base classes ==============================================" << endl;
+    clogg << "====================================== Now the classes that have base classes ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
         if ( "struct" != std::get<1u>(e.second) && "class" != std::get<1u>(e.second) ) continue;
@@ -2956,18 +3050,18 @@ int main(int const argc, char **const argv)
 
         if ( bases.empty() ) continue;
 
-        clog << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
-             << " | Bases = ";
+        clogg << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
+              << " | Bases = ";
 
         for ( auto const &b : bases )
         {
-            clog << b << ", ";
+            clogg << b << ", ";
         }
 
-        clog << endl;
+        clogg << endl;
     }
 
-    clog << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
+    clogg << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
         if ( "struct" != std::get<1u>(e.second) && "class" != std::get<1u>(e.second) ) continue;
@@ -2980,7 +3074,7 @@ int main(int const argc, char **const argv)
             {
                 if ( Find_All_Methods_Marked_Continue_In_Class(e.first, *p_curly_pair_pointer, my_pair.first, my_pair.second) )
                 {
-                    clog << e.first << endl << endl;
+                    clogg << e.first << endl << endl;
 
                     Print_Helper_Classes_For_Class(e.first);
                 }

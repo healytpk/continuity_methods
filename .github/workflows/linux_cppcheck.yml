@@ -16,7 +16,7 @@ jobs:
     - name: Install Python Pygments
       run: sudo apt update; sudo apt install -y python-pygments
     - name: Run cppcheck
-      run: ./3rdparty/cppcheck/cppcheck --cppcheck-build-dir=./dir_cppcheck_work/ --inline-suppr --force --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' precompiler.cpp
+      run: ./3rdparty/cppcheck/cppcheck --cppcheck-build-dir=./dir_cppcheck_work/ --inline-suppr --force --xml -v --std=c++20 --enable=all '--suppress=*:/usr/include/*' precompiler.cpp 2> err.xml
     - name: Run cppcheck-htmlreport
       run: ./3rdparty/cppcheck/cppcheck-htmlreport --file=err.xml --report-dir=./dir_cppcheck_html/ --source-dir=./
     - uses: actions/upload-artifact@v2

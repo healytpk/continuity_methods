@@ -2734,7 +2734,17 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             s << ";\n";
         }
 
-        s << "static MethodInvokerT::MI< " << svclass << " > mi_" << derived_replaced << ";\n";
+        s << "static MethodInvokerT::MI< " << svclass;
+
+        assert( longest_name_colons >= svclass.size() );
+        for ( size_t i = 0u; i != (longest_name_colons - svclass.size()); ++i ) s << ' ';
+
+        s << " > mi_" << derived_replaced;
+
+        assert( longest_name_scopes >= derived_replaced.size() );
+        for ( size_t i = 0u; i != (longest_name_scopes - derived_replaced.size()); ++i ) s << ' ';
+
+        s << ";\n";
 
         s << "\nInvoker methods[" << bases.size() + 1u << "u] = {";
         s << Indent();
@@ -2743,27 +2753,32 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
             s << "\nInvoker(mi_" << e;
 
             assert( longest_name_scopes >= e.size() );
-
             for ( size_t i = 0u; i != (longest_name_scopes - e.size()); ++i ) s << ' ';
 
             s << ", " << "this),";
         }
 
-        s << "\nInvoker(mi_" << derived_replaced << ", " << "this),";
+        s << "\nInvoker(mi_" << derived_replaced;
+
+        assert( longest_name_scopes >= derived_replaced.size() );
+        for ( size_t i = 0u; i != (longest_name_scopes - derived_replaced.size()); ++i ) s << ' ';
+
+        s << ", " << "this),";
 
         s << Unindent();
 
         s << "\n};\n\n";
 
-        s << "for ( auto &e : methods | Continuity_Methods::" << ( is_destructor_order ? "de" : "con" ) << "structor_order )\n"
+        s << "for ( size_t i = " << ( is_destructor_order ? bases.size() : 0u  )
+          << "u; /* true */; " << ( is_destructor_order ? "--" : "++" ) << "i )\n"
              "{\n"
-             "    if ( &e == &methods[" << ( is_destructor_order ? 0u : bases.size() ) << "u] ) return e.";
+             "    if ( " << ( is_destructor_order ? 0u : bases.size() ) << "u == i ) return methods[" << ( is_destructor_order ? 0u : bases.size() ) << "u].";
 
         g_func_alterations[index].fsig.Invocation(s);
 
         s << ";\n"
           << "\n"
-             "    e.";
+             "    methods[i].";
 
         g_func_alterations[index].fsig.Invocation(s);
 
@@ -2871,80 +2886,6 @@ void Print_Header(void)
             "        static constexpr bool value = decltype(check<T>(0))::value;\n"
             "    };\n"
             "\n"
-            "    template<typename T>\n"
-            "    class reverse_iterator {\n"
-            "    protected:\n"
-            "\n"
-            "        T *p;\n"
-            "\n"
-            "    public:\n"
-            "\n"
-            "        constexpr bool operator!=(reverse_iterator const &rhs) const\n"
-            "        {\n"
-            "            return p != rhs.p;\n"
-            "        }\n"
-            "\n"
-            "        constexpr reverse_iterator(T *arg) : p(arg) {}\n"
-            "\n"
-            "        constexpr T &operator*(void) const\n"
-            "        {\n"
-            "            T *tmp = p;\n"
-            "            return *--tmp;\n"
-            "        }\n"
-            "\n"
-            "        constexpr reverse_iterator &operator++(void)\n"
-            "        {\n"
-            "            --p;\n"
-            "            return *this;\n"
-            "        }\n"
-            "\n"
-            "        constexpr reverse_iterator &operator--(void)\n"
-            "        {\n"
-            "            ++p;\n"
-            "            return *this;\n"
-            "        }\n"
-            "\n"
-            "        constexpr T &operator[](ptrdiff_t const arg) const\n"
-            "        {\n"
-            "            return p[static_cast<ptrdiff_t>(-arg - 1)];\n"
-            "        }\n"
-            "    };\n"
-            "\n"
-            "    template<typename T,size_t N>\n"
-            "    struct reversion_wrapper {\n"
-            "        \n"
-            "        T (&t)[N];\n"
-            "\n"
-            "        constexpr reverse_iterator<T> begin(void)\n"
-            "        {\n"
-            "            return reverse_iterator<T>(t + N);\n"
-            "        }\n"
-            "\n"
-            "        constexpr reverse_iterator<T> end(void)\n"
-            "        {\n"
-            "            return reverse_iterator<T>(t + 0u);\n"
-            "        }\n"
-            "\n"
-            "    };\n"
-            "\n"
-            "    class reversed_order_t {};\n"
-            "\n"
-            "    template<typename T, size_t N>\n"
-            "    constexpr reversion_wrapper<T,N> operator|(T (&arg)[N], reversed_order_t)\n"
-            "    {\n"
-            "        return { arg };\n"
-            "    }\n"
-            "\n"
-            "    class intact_order_t {};\n"
-            "\n"
-            "    template<typename T, size_t N>\n"
-            "    constexpr T (&operator|(T (&arg)[N], intact_order_t))[N]\n"
-            "    {\n"
-            "        return arg;\n"
-            "    }\n"
-            "\n"
-            "      intact_order_t constexpr constructor_order;\n"
-            "    reversed_order_t constexpr  destructor_order;\n"
             "}\n\n";
 }
 

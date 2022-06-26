@@ -2681,8 +2681,21 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         if ( bases.empty() ) throw runtime_error("Method marked continue inside a class that has no base classes");
 
+        size_t longest_name_colons = svclass.size();
+
         string derived_replaced(svclass);
         StringAlgorithms::replace_all(derived_replaced, "::", "_scope_");
+
+        size_t longest_name_scopes = derived_replaced.size();
+
+        for ( auto &e : bases )
+        {
+            if ( e.size() > longest_name_colons ) longest_name_colons = e.size();
+
+            StringAlgorithms::replace_all(e, "::", "_scope_");
+
+            if ( e.size() > longest_name_scopes ) longest_name_scopes = e.size();
+        }
 
         IndentedOstream s( g_func_alterations[index].replacement_body, Indentation_For_CurlyPair(cp_body) );
 
@@ -2700,11 +2713,25 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
 
         for ( auto &e : bases )
         {
-            s << "static MethodInvokerT::MI< " << e << " > mi_";
+            StringAlgorithms::replace_all(e, "_scope_", "::");
+
+            s << "static MethodInvokerT::MI< " << e;
+
+            assert( longest_name_colons >= e.size() );
+
+            for ( size_t i = 0u; i != (longest_name_colons - e.size()); ++i ) s << ' ';
+
+            s << " > mi_";
 
             StringAlgorithms::replace_all(e, "::", "_scope_");
 
-            s << e << ";\n";
+            s << e;
+
+            assert( longest_name_scopes >= e.size() );
+
+            for ( size_t i = 0u; i != (longest_name_scopes - e.size()); ++i ) s << ' ';
+
+            s << ";\n";
         }
 
         s << "static MethodInvokerT::MI< " << svclass << " > mi_" << derived_replaced << ";\n";
@@ -2713,9 +2740,13 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
         s << Indent();
         for ( auto &e : bases )
         {
-            StringAlgorithms::replace_all(e, "::", "_scope_");
+            s << "\nInvoker(mi_" << e;
 
-            s << "\nInvoker(mi_" << e << ", " << "this),";
+            assert( longest_name_scopes >= e.size() );
+
+            for ( size_t i = 0u; i != (longest_name_scopes - e.size()); ++i ) s << ' ';
+
+            s << ", " << "this),";
         }
 
         s << "\nInvoker(mi_" << derived_replaced << ", " << "this),";

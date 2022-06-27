@@ -80,7 +80,7 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #include <ostream>   // ostream
 #include <iostream>  // clog
 
-enum Grade : unsigned int {  // unsigned int is at least 16-Bit
+enum eGrade : unsigned int {  // unsigned int is at least 16-Bit
 
 /*
         00000001 Warnings for classes not found
@@ -95,6 +95,7 @@ enum Grade : unsigned int {  // unsigned int is at least 16-Bit
       1000000000 All pseudonyms (typedef & using)
      10000000000 All namespaces
     100000000000 All classes that have base classes
+   1000000000000 Open spaces inside namespace and class bodies
 */
 
     eGradeWarnings             = 0b00000001u,
@@ -112,9 +113,14 @@ enum Grade : unsigned int {  // unsigned int is at least 16-Bit
     eGradeAllPseudonyms     =    0b1000000000u,
     eGradeAllNamespaces     =   0b10000000000u,
     eGradeAllDerivedClasses =  0b100000000000u,
+    eGradeOpenSpaces        = 0b1000000000000u,
 };
 
+class Grade;
+
 class GradedOstream {
+
+    friend class Grade;
 
 protected:
 
@@ -134,6 +140,17 @@ protected:
         this->DetermineOnOrOff();
     }
 
+    eGrade SetGrade(eGrade const arg) noexcept
+    {
+        eGrade const tmp = static_cast<eGrade>(most_recent_arg);
+
+        most_recent_arg = arg;
+
+        this->DetermineOnOrOff();
+
+        return tmp;
+    }
+
 public:
 
     GradedOstream(std::ostream &arg_os) : os(arg_os) {}
@@ -142,16 +159,9 @@ public:
     template<typename ArgType>
     GradedOstream &operator<<(ArgType const &arg)
     {
+        static_assert( false == std::is_same_v<ArgType,eGrade>, "You must create a local object of type Grade" );
+
         if ( is_on ) os << arg;
-
-        return *this;
-    }
-
-    GradedOstream &operator<<(Grade const arg)
-    {
-        most_recent_arg = arg;
-
-        this->DetermineOnOrOff();
 
         return *this;
     }
@@ -164,9 +174,45 @@ public:
     }
 
     operator bool(void) const noexcept { return is_on; }
+
+    GradedOstream(GradedOstream const & ) = delete;
+    GradedOstream(GradedOstream       &&) = delete;
+    GradedOstream &operator=(GradedOstream const & ) = delete;
+    GradedOstream &operator=(GradedOstream       &&) = delete;
+    GradedOstream const *operator&(void) const = delete;
+    GradedOstream       *operator&(void)       = delete;
 };
 
 GradedOstream clogg(std::clog);
+
+struct Grade {
+
+protected:
+
+    eGrade previous;
+    GradedOstream &os;
+
+public:
+
+    Grade(GradedOstream &arg_os, eGrade const arg) : os(arg_os)
+    {
+        //std::cout << "Applying grade: " << (unsigned)arg << std::endl;
+        previous = os.SetGrade(arg);
+    }
+
+    ~Grade(void)
+    {
+        //std::cout << "Restoring grade: " << (unsigned)previous << std::endl;
+        os.SetGrade(previous);
+    }
+
+    Grade(Grade const & ) = delete;
+    Grade(Grade       &&) = delete;
+    Grade &operator=(Grade const & ) = delete;
+    Grade &operator=(Grade       &&) = delete;
+    Grade const *operator&(void) const = delete;
+    Grade       *operator&(void)       = delete;
+};
 
 // ==========================================================================
 // Section 3 of 10 : Implementations of functions from Boost
@@ -1526,6 +1572,8 @@ protected:
 
     void Print_CurlyPair(CurlyPair const &cp, size_t const indentation = 0u) const
     {
+        Grade g(clogg, eGradeCurlyPair);
+
         verbose && clogg << "- - - - - Print_CurlyPair( *(" << &cp << "), " << indentation << ") - - - - -" << endl;
 
         string str;
@@ -1573,6 +1621,8 @@ public:
 
     void Process(void)
     {
+        Grade g(clogg, eGradeBanners);
+
         verbose && clogg << "========= STARTING PROCESSING ===========" << endl;
 
         _root_pair.clear();
@@ -1807,6 +1857,8 @@ void Print_Helper_Classes_For_Class(string classname)
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)
 {
+    Grade g(clogg, eGradeStringLits);
+
     static fifo_map<size_t, string> strlits;
 
     if ( undo )
@@ -1889,6 +1941,8 @@ void Replace_All_String_Literals_With_Spaces(bool undo = false)
 
 void Replace_All_Preprocessor_Directives_With_Spaces(bool undo = false)
 {
+    Grade g(clogg, eGradePreproDirs);
+
     static fifo_map<size_t, string> directives;
 
     if ( undo )
@@ -2267,6 +2321,8 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
         }
         catch (std::out_of_range const &)
         {
+            Grade g(clogg, eGradeFindFails);
+
             clogg << " - - - FIRST FAILED - - - Prefix='" << prefix << "', Classname='" << classname << "' - Fullname='" << full_name << "'" << endl;
 
             string class_name_without_template_specialisation = regex_replace( string(classname), regex("<.*>"), "");  // REVISIT FIX -- gratuitous memory allocations
@@ -2286,6 +2342,8 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
                 }
                 catch (std::out_of_range const &)
                 {
+                    Grade g(clogg, eGradeFindFails);
+
                     clogg << " - - - SECOND FAILED - - - Prefix='" << prefix << "', Classname='" << class_name_without_template_specialisation << "' - Fullname='" << full_name << "'" << endl;
 
                     full_name = std::move(duplicate_original_full_name);
@@ -2307,6 +2365,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     {
         //throw std::out_of_range("Encountered a class name that hasn't been defined ('" + string(classname) + "') referenced inside ('" + string(intact_prefix) + "')");
 
+        Grade g(clogg, eGradeWarnings);
         clogg << "WARNING: Cannot find base class '" + string(classname) + "' referenced inside '" + string(intact_prefix) + "'" << endl;
 
         return {};
@@ -2477,7 +2536,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         }
         catch (std::out_of_range const &e)
         {
-            clogg << "====== WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            Grade g(clogg, eGradeWarnings);
+            clogg << "WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'" << endl;
             return;
         }
     }
@@ -2510,7 +2570,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         }
         catch (std::out_of_range const &e)
         {
-            clogg << "====== WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'";
+            Grade g(clogg, eGradeWarnings);
+            clogg << "WARNING: When parsing 'typedef' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'" << endl;
             return;
         }
     }
@@ -2637,6 +2698,8 @@ public:
 
 bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyBracketManager::CurlyPair const &cp, size_t const first, size_t const last)
 {
+    Grade g(clogg, eGradeProcessContMarks);
+
     using Indent   = IndentedOstream::Indent;
     using Unindent = IndentedOstream::Unindent;
 
@@ -2793,6 +2856,7 @@ bool Find_All_Methods_Marked_Continue_In_Class(string_view const svclass, CurlyB
     return retval;
 }
 
+#if 0
 void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
 {
     assert( false == str.empty() );
@@ -2832,6 +2896,7 @@ void Instantiate_Scope_By_Scope_Where_Necessary(string_view str)
         clogg << endl;
     }
 }
+#endif
 
 void Print_Final_Output(void)
 {
@@ -2899,6 +2964,7 @@ void my_terminate_handler(void)
     }
     catch(const std::exception& e)
     {
+        Grade g(clogg, eGradeBanners);
         clogg << "=====================================================================================================" << endl;
         clogg << "Exception: " << e.what() << endl;
         clogg << "Total memory allocation: " << (g_total_allocation / 1024u / 1024u) << " megabytes" << endl;
@@ -2916,8 +2982,10 @@ void my_terminate_handler(void)
      '_setmode' or 'setmode' to change it to binary mode. The Microsoft
      compiler calls it '_setmode', while the Embarcadero (formerly known
      as Borland) compiler calls it 'setmode'. */
+
+#include <cstdio>  // stdin freopen (for Linux), FILE (for MS-Windows)
+
 #if defined(_WIN32) || defined(_WIN64)
-#    include <cstdio>  // FILE
      extern "C" int _fileno(std::FILE *);
 #    ifdef __BORLANDC__
          extern "C" int setmode(int,int);
@@ -2928,7 +2996,20 @@ void my_terminate_handler(void)
 #    else
          extern "C" int _setmode(int,int);
 #    endif  // ifdef __BORLANDC__
-#endif  // if defined(_WIN32) || defined(_WIN64)
+#endif
+
+template<class T>
+static void SetCinToBinary(char const *const runtime_error_text)
+{
+
+#if defined(_WIN32) || defined(_WIN64)
+    bool const b = (0x4000 == ::_setmode( ::_fileno(stdin), /* O_BINARY */ 0x8000));
+#else
+    bool const b = (nullptr != std::freopen(NULL, "rb", stdin));
+#endif
+
+    if ( false == b ) throw T(runtime_error_text);
+}
 /* ==================================================================
    ==================================================================
    ================================================================== */
@@ -2939,17 +3020,11 @@ int main(int const argc, char **const argv)
 
     std::set_terminate(my_terminate_handler);
 
-    // The standard input stream, cin, is set to text mode
+    Grade g(clogg, eGradeBanners);
+
+    // The standard input stream, cin, is set to text mode,
     // and so we need to set it to binary mode:
-    bool cin_is_now_in_binary_mode = false;
-
-#   if defined(_WIN32) || defined(_WIN64)
-        cin_is_now_in_binary_mode = ( /* _O_TEXT */ 0x4000 == ::_setmode( ::_fileno(stdin), /* O_BINARY */ 0x8000) );
-#   else
-        cin_is_now_in_binary_mode = (nullptr != std::freopen(NULL, "rb", stdin));
-#   endif
-
-    if ( false == cin_is_now_in_binary_mode ) throw std::runtime_error("Could not set standard input to binary mode (it defaults to text mode)");
+    SetCinToBinary<std::runtime_error>("Could not set standard input to binary mode (it defaults to text mode)");
 
     cin >> std::noskipws;
 
@@ -2980,6 +3055,9 @@ int main(int const argc, char **const argv)
 
     //fifo_map< string, tuple< list<CurlyBracketManager::CurlyPair*>, string, list< array<string,3u> > > > g_scope_names;  // see next lines for explanation
 
+    {
+    Grade g(clogg, eGradeAllScopes);
+
     clogg << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
@@ -2991,20 +3069,29 @@ int main(int const argc, char **const argv)
 
             for ( auto const my_pair : my_list )
             {
+                {
+                Grade g(clogg, eGradeOpenSpaces);
                 clogg << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
+                }
                 Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first + "::");
             }
 
             clogg << endl;
         }
     }
+    }
 
+    {
+    Grade g(clogg, eGradeAllPseudonyms);
     clogg << "====================================== Now the pseudonyms (using X = Y;) ==============================================" << endl;
     for ( auto const &e : g_psuedonyms )
     {
         clogg << e.first << " == " << e.second << endl;
     }
+    }
 
+    {
+    Grade g(clogg, eGradeAllNamespaces);
     clogg << "====================================== Now the namespaces ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
@@ -3012,7 +3099,10 @@ int main(int const argc, char **const argv)
 
         clogg << e.first << endl;
     }
+    }
 
+    {
+    Grade g(clogg, eGradeAllDerivedClasses);
     clogg << "====================================== Now the classes that have base classes ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
@@ -3032,7 +3122,10 @@ int main(int const argc, char **const argv)
 
         clogg << endl;
     }
+    }
 
+    {
+    Grade g(clogg, eGradeClassesWithContMarks);
     clogg << "====================================== Classes containing methods marked 'continue' ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
@@ -3052,6 +3145,7 @@ int main(int const argc, char **const argv)
                 }
             }
         }
+    }
     }
 
     // In reverse order

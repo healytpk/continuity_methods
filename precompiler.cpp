@@ -2504,6 +2504,35 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
     return retval;
 }
 
+bool Query_Should_Disregard_Type(string_view const sv)
+{
+    assert( false == sv.empty() );
+
+    string str(sv);
+
+    StringAlgorithms::Minimise_Whitespace(str);
+
+    assert( false == str.empty() );
+
+    // Disregard types beginning with double underscores like __uint128_t
+    if ( (sv.size() >= 2u) && ('_' == sv[0u]) && ('_' == sv[1u]) ) return true;
+
+    if ( (str.size() >= 9u) && ("decltype(" == str.substr(0u,9u)) )
+    {
+        Grade g(clogg, eGradeWarnings);
+        clogg << "WARNING: When parsing 'typedef' or 'using' declarations, cannot process a 'decltype' expression: " << str << endl;
+        return true;
+    }
+
+    Find_And_Erase_All_Keywords(str);
+
+    if ( str.empty() ) return true;
+
+    StringAlgorithms::Minimise_Whitespace(str);
+
+    return str.empty();
+}
+
 void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string scope_name)
 {
     assert( last >= first );  // It's okay for them to be equal if we have "{ }"
@@ -2527,6 +2556,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         StringAlgorithms::Minimise_Whitespace(impersonator);
         StringAlgorithms::Minimise_Whitespace(original    );
 
+        if ( Query_Should_Disregard_Type(original) ) continue;
+
         try
         {
             string full_name_of_original = Find_Class_Relative_To_Scope(scope_name, original);  // might throw out_of_range
@@ -2537,7 +2568,7 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
         catch (std::out_of_range const &e)
         {
             Grade g(clogg, eGradeWarnings);
-            clogg << "WARNING: When parsing 'using' declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'" << endl;
+            clogg << "WARNING: When parsing 'using'   declaration, cannot find class '" << original << "' relative to scope '" << scope_name << "'" << endl;
             return;
         }
     }
@@ -2560,6 +2591,8 @@ void Find_All_Usings_In_Open_Space(size_t const first, size_t const last, string
 
         StringAlgorithms::Minimise_Whitespace(impersonator);
         StringAlgorithms::Minimise_Whitespace(original    );
+
+        if ( Query_Should_Disregard_Type(original) ) continue;
 
         try
         {

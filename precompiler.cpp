@@ -126,7 +126,7 @@ protected:
 
     bool is_on = false;
     std::ostream &os;
-    unsigned grade_config = 0b1011u;
+    unsigned grade_config = 0b1111111111111u;
     unsigned most_recent_arg = 0u;
 
     void DetermineOnOrOff(void) noexcept
@@ -685,7 +685,7 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #endif
 #include <array>          // array
 #include <tuple>          // tuple
-#include <utility>        // pair, move
+#include <utility>        // pair, std::move()
 #include <string_view>    // string_view
 #include <regex>          // regex, regex_replace, smatch, match_results
 #include <exception>      // exception
@@ -2277,7 +2277,10 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
 
     auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
-        string const what_we_looked_up{ arg_prefix + arg_classname };
+        string const what_we_looked_up{
+            StringAlgorithms::starts_with(arg_classname, "::")
+            ? arg_classname
+            : arg_prefix + arg_classname };
 
         try
         {
@@ -2374,33 +2377,67 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
+string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
 {
+    bool constexpr debugthisfunc = false;
+
+    debugthisfunc && clogg << "231 : Recursive_Print_All_Bases_PROPER entered with arguments '" << prefix << "' + '" << classname << "'" << endl;
+
+    if ( prefix.empty() ) std::abort();
+
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
     auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
     {
+        debugthisfunc && clogg << "232 : Entered lambda function Adjust_Class_Name_PROPER ========= "
+                               << "Inputs = '" << arg_prefix << "' + '" << arg_classname << "', ";
+
+        string const what_we_looked_up{
+            StringAlgorithms::starts_with(arg_classname, "::")
+            ? arg_classname
+            : arg_prefix + arg_classname };
+
         try
         {
-            arg_classname = g_psuedonyms.at(arg_prefix + arg_classname);
+            arg_classname = g_psuedonyms.at(what_we_looked_up);  // If this throws then the next line isn't executed
             arg_prefix.clear();
         }
         catch(std::out_of_range const &e) {}
+
+        size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg_classname);
+        if ( -1 != index_of_last_colon )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+        {
+            arg_prefix    += arg_classname.substr(0u, index_of_last_colon + 2u);
+            arg_classname  = arg_classname.substr(index_of_last_colon + 2u);
+        }
+
+        debugthisfunc && clogg << "Outputs = '" << arg_prefix << "' + '" << arg_classname << "', " << endl;
     };
 
     Adjust_Class_Name(prefix, classname);
 
     string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
 
-    if ( full_name.empty() ) return false;  // not a fatal error if we can't find a base class that's a template class
+    debugthisfunc && clogg << "233 : full_name = '" << full_name << "' was gotten from '" << prefix << "' + '" << classname << "'" << endl;
+
+    if ( full_name.empty() )
+    {
+        debugthisfunc && clogg << "234 : Recursive is returning false because full_name is empty" << endl;
+        return {};  // not a fatal error if we can't find a base class that's a template class
+    }
 
     bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
-    if ( false == is_new_entry && true == is_virtual ) return false;  // if it's not a new entry and if it's virtual
+    if ( (false == is_new_entry) && is_virtual )
+    {
+        debugthisfunc && clogg << "235 : Recursive is returning false because it's NOT a new entry and it's virtual" << endl;
+        return {};  // if it's not a new entry and if it's virtual - REVISIT FIX all virtuals are common, and all non-virtuals are unique
+    }
 
     for ( auto const &e : std::get<2u>( g_scope_names.at(full_name) ) )
     {
-        string const &base_name = std::get<2u>(e);
+        string const &base_name = std::get<2u>(e);  // Note that this is a simple name, i.e. "Laser" instead of "::MyNamespace::Laser"
+        debugthisfunc && clogg << "236 : full_name '" << full_name << "' has base: '" << base_name << "'" << endl;
 
         if constexpr ( verbose )
         {
@@ -2413,22 +2450,34 @@ bool Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<strin
         size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
         if ( -1 != index_of_last_colon && (false == StringAlgorithms::starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
+            debugthisfunc && clogg << "237 : Changing '" << prefix << "' and '" << classname << "' to '";
             // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
             prefix += classname.substr(0u, index_of_last_colon);
             prefix += "::";
+
+            debugthisfunc && clogg << prefix << "' and '" << classname << endl;
         }
         else if ( StringAlgorithms::starts_with(classname, "::") )
         {
+            debugthisfunc && clogg << "238 : Wiping out the prefix because classname is '" << classname << "'" << endl;
             prefix.clear();  // In case the base class begins with two colons: "class MyClass : public ::SomeClass {};"
         }
 
-        if ( Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) )
+        debugthisfunc && clogg << "============= 239 : Out to call recursively" << endl;
+        string str{ Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) };
+
+        if ( false == str.empty() )
         {
-            retval.push_back(prefix + base_name);
+            debugthisfunc && clogg << "240 : Adding base class to list of base classes retval.push_back(\" " << str << "\")" << endl;
+            retval.push_back( std::move(str) );
+        }
+        else
+        {
+            debugthisfunc && clogg << "241 : The return value from the recursive call was an empty string" << endl;
         }
     }
 
-    return true;
+    return full_name;
 }
 
 list<string> Get_All_Bases(string_view arg)

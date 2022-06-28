@@ -18,7 +18,9 @@ public:
     }
 };
 
-class Laser_PicoSecond : virtual public Laser {
+using Laser_Generic = Laser;
+
+class Laser_PicoSecond : virtual public Laser_Generic {
 public:
     void Trigger(void) continue
     {
@@ -26,7 +28,9 @@ public:
     }
 };
 
-class Laser_NitrogenPicoSecond : public Laser_Nitrogen, public Laser_PicoSecond {
+typedef Laser_Nitrogen Laser_Pentavalent;
+
+class Laser_NitrogenPicoSecond : public Lase_Pentavalent, public Laser_PicoSecond {
 public:
     void Trigger(void) continue
     {

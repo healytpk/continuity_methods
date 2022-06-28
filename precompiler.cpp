@@ -1,9 +1,21 @@
 /*
  * This program is one file of C++ code, and has no dependencies other
- * than the C++ 2020 standard library, and Boost 1.76.
+ * than the C++ standard library (minimum C++17).
  *
  * The purpose of this program is to implement the C++ proposal entitled
  * 'Continuity Methods'.
+ *
+ * This C++ source file is separated into 10 sections:
+ * (Section  1) Override global 'new' and 'delete' for max speed          : Line #  25 - #  87 : (Total =   63 lines)
+ * (Section  2) GradedOstream for selective control over output from clog : Line #  88 - # 228 : (Total =  141 lines)
+ * (Section  3) Implementations of functions from Boost                   : Line # 229 - # 569 : (Total =  341 lines)
+ * (Section  4) Implementation of container type : FIFO map               : Line # 570 - # 662 : (Total =   93 lines)
+ * (Section  5) Include standard header files, and define global objects  : Line # 663 - # 738 : (Total =   76 lines)
+ * (Section  6) regex_top_level_token_iterator                            : Line # 739 - #1002 : (Total =  264 lines)
+ * (Section  7) Process keywords and identifiers                          : Line #1003 - #1112 : (Total =  110 lines)
+ * (Section  8) Parse function signatures                                 : Line #1113 - #1731 : (Total =  619 lines)
+ * (Section  9) Generate the auxillary code needed for Continuity Methods : Line #1732 - #1867 : (Total =  136 lines)
+ * (Section 10) Parse all the class definitions in the input              : Line #1868 - #3267 : (Total = 1401 lines)
 */
 
 #if defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX) && defined(NDEBUG)
@@ -126,7 +138,7 @@ protected:
 
     bool is_on = false;
     std::ostream &os;
-    unsigned grade_config = 0b1111111111111u;
+    unsigned grade_config = 0b1011u;
     unsigned most_recent_arg = 0u;
 
     void DetermineOnOrOff(void) noexcept
@@ -1655,6 +1667,8 @@ public:
         }
     }
 
+    CurlyPair const &Root(void) const noexcept { return _root_pair; };
+
 } g_curly_manager;
 
 struct Method_Info {
@@ -2500,15 +2514,28 @@ list<string> Get_All_Bases(string_view arg)
 
 list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketManager::CurlyPair const &cp)
 {
-    assert( cp.Last() > cp.First() );
+    size_t first, last;
+
+    if ( &g_curly_manager.Root() == &cp )
+    {
+        first = -1;               // This will have 1    added    to  it to make it sane
+        last  = g_intact.size();  // This will have 1 subtracted from it to make it sane
+    }
+    else
+    {
+        assert( cp.Last() > cp.First() );
+
+        first = cp.First();
+        last  = cp.Last ();
+    }
 
     // Check 1: To see if there's nothing between the curly brackets
-    if ( cp.Last() == (cp.First() + 1u) ) return {};   // e.g. if we have "class Monkey {};"
+    if ( last == (first + 1u) ) return {};   // e.g. if we have "class Monkey {};"
 
     // Check 2: To see if there's no inner curly brackets
     if ( cp.Nested().empty() )
     {
-        return { { cp.First() + 1u, cp.Last() - 1u }  }; // e.g. if we have "class Monkey { int i; };"
+        return { { first + 1u, last - 1u }  }; // e.g. if we have "class Monkey { int i; };"
     }
 
     // If control reaches here, we have nested curly brackets
@@ -2517,7 +2544,7 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
 
     list<CurlyBracketManager::CurlyPair>::const_iterator iter = cp.Nested().cbegin();
 
-    size_t begin_from = cp.First() + 1u;
+    size_t begin_from = first + 1u;
 
     for ( auto const &e : cp.Nested() )
     {
@@ -2543,11 +2570,11 @@ list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketM
         }
     }
 
-    assert( cp.Last() >= begin_from );
+    assert( last >= begin_from );
 
-    if ( cp.Last() > begin_from ) // must rule out "namespace Dog { namespace Cat { int i; }}"
+    if ( last > begin_from ) // must rule out "namespace Dog { namespace Cat { int i; }}"
     {
-        retval.push_back( { begin_from, cp.Last() - 1u } );
+        retval.push_back( { begin_from, last - 1u } );
     }
 
     return retval;
@@ -3140,6 +3167,11 @@ int main(int const argc, char **const argv)
     {
     Grade g(clogg, eGradeAllScopes);
 
+    for ( auto const e : GetOpenSpacesBetweenInnerCurlyBrackets(g_curly_manager.Root()) )
+    {
+        Find_All_Usings_In_Open_Space(e.first, e.second, "::");
+    }
+
     clogg << "====================================== All scope names ==============================================" << endl;
     for ( auto const &e : g_scope_names )
     {
@@ -3221,7 +3253,7 @@ int main(int const argc, char **const argv)
             {
                 if ( Find_All_Methods_Marked_Continue_In_Class(e.first, *p_curly_pair_pointer, my_pair.first, my_pair.second) )
                 {
-                    clogg << e.first << endl << endl;
+                    clogg << e.first << endl;
 
                     Print_Helper_Classes_For_Class(e.first);
                 }

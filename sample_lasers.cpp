@@ -30,7 +30,7 @@ public:
 
 typedef Laser_Nitrogen Laser_Pentavalent;
 
-class Laser_NitrogenPicoSecond : public Lase_Pentavalent, public Laser_PicoSecond {
+class Laser_NitrogenPicoSecond : public Laser_Pentavalent, public Laser_PicoSecond {
 public:
     void Trigger(void) continue
     {

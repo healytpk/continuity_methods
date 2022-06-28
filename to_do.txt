@@ -1,5 +1,13 @@
+2022-06-28: There are two lambda functions called "Adjust_Class_Name".
+            Reduce them to one function and make it a normal global function.
+            
+2022-06-28: Deal with ambiguity introduced by "using namespace", perhaps
+            have a boolean to say it's ambiguous. Or maybe keep a separate
+            list of "using namespace"'s that can be consulted inside the
+            funciton Adjust_Class_Name.
 
 2022-06-19: Don't allow "class logic_error : public ::frog::exception" to become
             "class logic_error : public::frog::exception" because then the class
             is thought to be "::public::frog::exception"
+
 2022-05-17: A class is ignored if it's right at the beginning of the file

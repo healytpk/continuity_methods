@@ -2275,6 +2275,38 @@ bool Strip_Last_Scope(string &str)
 
 fifo_map<string,string> g_psuedonyms;
 
+void Adjust_Class_Name(string &arg_prefix, string &arg_classname)
+{
+    bool constexpr debugthisfunc = false;
+
+    debugthisfunc && clogg << "Entered function Adjust_Class_Name ========= "
+                           << "Inputs = '" << arg_prefix << "' + '" << arg_classname << "', ";
+
+    string const what_we_looked_up{
+        StringAlgorithms::starts_with(arg_classname, "::")
+        ? arg_classname
+        : arg_prefix + arg_classname };
+
+    try
+    {
+        arg_classname = g_psuedonyms.at(what_we_looked_up);  // If this throws then the next line isn't executed
+        arg_prefix.clear();
+    }
+    catch(std::out_of_range const &e) {}
+
+    size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg_classname);
+    if ( -1 != index_of_last_colon )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+    {
+        arg_prefix    += arg_classname.substr(0u, index_of_last_colon + 2u);
+        arg_classname  = arg_classname.substr(index_of_last_colon + 2u);
+    }
+
+    debugthisfunc && clogg << "Outputs = '" << arg_prefix << "' + '" << arg_classname << "', " << endl;
+
+    assert( false == (arg_prefix.empty() && arg_classname.empty()) );
+};
+
+
 string Find_Class_Relative_To_Scope(string &prefix, string classname)
 {
     assert( false == (prefix.empty() && classname.empty()) );
@@ -2288,26 +2320,6 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     }
 
     if ( -1 != prefix.find("<") || -1 != classname.find("<") ) return {};  // Don't tolerate any templates
-
-    auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
-    {
-        string const what_we_looked_up{
-            StringAlgorithms::starts_with(arg_classname, "::")
-            ? arg_classname
-            : arg_prefix + arg_classname };
-
-        try
-        {
-            arg_classname = g_psuedonyms.at(what_we_looked_up);
-            arg_prefix.clear();
-        }
-        catch(std::out_of_range const &e) {}
-
-        if ( arg_prefix.empty() && arg_classname.empty() )
-        {
-            throw runtime_error("Look-up of '" + what_we_looked_up + "' came back blank");
-        }
-    };
 
     string const intact_prefix{ prefix };
 
@@ -2400,33 +2412,6 @@ string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<str
     if ( prefix.empty() ) std::abort();
 
     decltype(g_scope_names)::mapped_type const *p = nullptr;
-
-    auto Adjust_Class_Name = [](string &arg_prefix, string &arg_classname) -> void
-    {
-        debugthisfunc && clogg << "232 : Entered lambda function Adjust_Class_Name_PROPER ========= "
-                               << "Inputs = '" << arg_prefix << "' + '" << arg_classname << "', ";
-
-        string const what_we_looked_up{
-            StringAlgorithms::starts_with(arg_classname, "::")
-            ? arg_classname
-            : arg_prefix + arg_classname };
-
-        try
-        {
-            arg_classname = g_psuedonyms.at(what_we_looked_up);  // If this throws then the next line isn't executed
-            arg_prefix.clear();
-        }
-        catch(std::out_of_range const &e) {}
-
-        size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg_classname);
-        if ( -1 != index_of_last_colon )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
-        {
-            arg_prefix    += arg_classname.substr(0u, index_of_last_colon + 2u);
-            arg_classname  = arg_classname.substr(index_of_last_colon + 2u);
-        }
-
-        debugthisfunc && clogg << "Outputs = '" << arg_prefix << "' + '" << arg_classname << "', " << endl;
-    };
 
     Adjust_Class_Name(prefix, classname);
 

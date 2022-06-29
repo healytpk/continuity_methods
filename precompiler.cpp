@@ -244,13 +244,18 @@ public:
 #include <string_view> // string_view
 #include <algorithm>   // all_of
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
+#include <regex>       // regex, match_results - REVISIT FIX - This is overkill!
+#include <stdexcept>   // runtime_error - Maybe this shouldn't be used here
 
 // The next two are just for the C++11 implementation of 'to_address'
 #include <type_traits>  // enable_if, is_pointer
 #include <utility>      // declval
 
+std::string g_intact;
+
 class StringAlgorithms {
 
+    typedef std::size_t size_t;
     typedef std_or_gnu_debug::string string;
     typedef std::string_view string_view;
 
@@ -260,7 +265,7 @@ private:
     {
         if ( s.empty() ) return;
 
-        std::size_t i;
+        size_t i;
         for( i = s.size() - 1u; 0u != i; --i )
         {
             if ( std::isspace(static_cast<char unsigned>(s[i])) )  // Replace any whitespace character with a space
@@ -291,7 +296,7 @@ public:
     {
         if ( s.empty() || sv.empty() ) return;
 
-        std::size_t i = 0u;
+        size_t i = 0u;
         while ( (s.size() != i) && (-1 != (i = s.find(sv, i))) )  // deliberate single '='
         {
             s.erase(i, sv.size());
@@ -302,7 +307,7 @@ public:
     {
         if ( s.empty() || sv_old.empty() ) return;
 
-        std::size_t i = 0u;
+        size_t i = 0u;
         while ( (s.size() != i) && (-1 != (i = s.find(sv_old, i))) )  // deliberate single '='
         {
             s.erase(i, sv_old.size());
@@ -322,7 +327,7 @@ public:
 
 private:
 
-    static bool Is_Space_Necessary(string_view const s, std::size_t const i)
+    static bool Is_Space_Necessary(string_view const s, size_t const i)
     {
         // Input string has already had all white
         // space reduced to one space, and it
@@ -379,7 +384,7 @@ private:
 
     static void Remove_Unnecessary_Spaces(string &s)
     {
-        for ( std::size_t i = 0u;
+        for ( size_t i = 0u;
                   i != s.size()
               && -1 != (i = s.find(' ',i));
               ++i )
@@ -419,13 +424,13 @@ public:
         }
     }
 
-    static std::size_t FindFirstId(string_view const haystack, string_view const needle)
+    static size_t FindFirstId(string_view const haystack, string_view const needle)
     {
         assert( false == haystack.empty() );
         assert( false ==   needle.empty() );
         assert( Is_Entire_String_Valid_Identifier(needle) );
 
-        std::size_t i = 0u;
+        size_t i = 0u;
 
         for (;; ++i)
         {
@@ -454,7 +459,6 @@ public:
     template<typename A, typename B>
     static bool starts_with(A const &a, B const &b)
     {
-        using std::size_t;
         using std::is_same_v;
 
         typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
@@ -490,7 +494,6 @@ public:
     template<typename A, typename B>
     static bool ends_with(A const &a, B const &b)
     {
-        using std::size_t;
         using std::is_same_v;
 
         typedef std::decay_t< std::remove_cv_t< std::remove_reference_t<A> > > X;  // C++17 doesn't have remove_cvref_t
@@ -523,6 +526,8 @@ public:
         return b == a.substr(sa - sb);
     }
 
+private:
+
     template <typename T, typename std::enable_if<std::is_pointer<T>::value, bool>::type = true>
     static T cxx11_to_address(T arg)  // Pass pointers by value
     {
@@ -536,6 +541,8 @@ public:
     {
         return arg.operator->();
     }
+
+public:
 
     // The following function is to support C++17 which is lacking the
     // constructor for 'string_view' which takes two iterators. Also we want
@@ -558,6 +565,73 @@ public:
         return std::string_view(
             static_cast<char const *>( cxx11_to_address(a) ),
             static_cast<std::string_view::size_type>(cxx11_to_address(b) - cxx11_to_address(a)) );
+    }
+
+    static size_t Find_Last_Double_Colon(std::string_view const s)  // REVISIT FIX - Don't use regex here, it's overkill
+    {
+        static std::regex const r("[:](?=[^\\<]*?(?:\\>|$))");  // matches a semi-colon so long as it's not enclosed in angle brackets
+
+        std::match_results<std::string_view::const_reverse_iterator> my_match;
+
+        if ( std::regex_search(s.crbegin(), s.crend(), my_match, r) )  // returns true if there is at least one match
+        {
+            size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &s.front(); // REVISIT FIX - consider using my_match.position() here
+            assert( ':' == s[index_of_second_colon_in_last_double_colon] );
+
+            size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
+            if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw std::runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
+
+            //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
+
+            return index_of_first_colon_in_last_double_colon;
+        }
+
+        return -1;
+    }
+
+    static void ThrowIfBadIndex(size_t const char_index)
+    {
+        if ( char_index >= g_intact.size() )
+            throw std::runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");
+    }
+
+    static size_t LastChar(void)
+    {
+        assert(false == g_intact.empty());
+        return g_intact.size() - 1u;
+    }
+
+    static size_t Lines(void) { return std::count( g_intact.begin(), g_intact.end(), '\n' ); }
+
+    static size_t LineOf(size_t const char_index)
+    {
+        ThrowIfBadIndex(char_index);
+
+        return std::count( g_intact.begin(), std::next(g_intact.begin(), char_index), '\n' );
+    }
+
+    static size_t StartLine(size_t char_index)
+    {
+        ThrowIfBadIndex(char_index);
+
+        while ( (0u != char_index) && ('\n' != g_intact[char_index]) )
+        {
+            --char_index;
+        }
+
+        return char_index;
+    }
+
+    static size_t EndLine(size_t char_index)
+    {
+        ThrowIfBadIndex(char_index);
+
+        while ( (LastChar() != char_index) && ('\n' != g_intact[char_index]) )
+        {
+            ++char_index;
+        }
+
+        return char_index;
     }
 };
 
@@ -1424,52 +1498,9 @@ public:
 // Curly Bracket Manager
 // ==========================================================================
 
-string g_intact;
-
-inline void ThrowIfBadIndex(size_t const char_index)
-{
-    if ( char_index >= g_intact.size() )
-        throw runtime_error("Cannot access *(p + " + std::to_string(char_index) + ") inside type char[" + std::to_string(g_intact.size()) + "]");
-}
-
-inline size_t LastChar(void) { return g_intact.size() - 1u; }
-
-inline size_t Lines(void) { return std::count( g_intact.begin(), g_intact.end(), '\n' ); }
-
-inline size_t LineOf(size_t const char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    return std::count( g_intact.begin(), std::next(g_intact.begin(), char_index), '\n' );
-}
-
-inline size_t StartLine(size_t char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    while ( (0u != char_index) && ('\n' != g_intact[char_index]) )
-    {
-        --char_index;
-    }
-
-    return char_index;
-}
-
-inline size_t EndLine(size_t char_index)
-{
-    ThrowIfBadIndex(char_index);
-
-    while ( (LastChar() != char_index) && ('\n' != g_intact[char_index]) )
-    {
-        ++char_index;
-    }
-
-    return char_index;
-}
-
 string TextBeforeOpenCurlyBracket(size_t const char_index)  // strips off the template part at the start, e.g. "template<class T>"
 {
-    ThrowIfBadIndex(char_index);
+    StringAlgorithms::ThrowIfBadIndex(char_index);
 
     if ( 0u == char_index ) return {};
 
@@ -1603,6 +1634,8 @@ protected:
             {
                 clogg << "    ";
             }
+
+            auto &LineOf = StringAlgorithms::LineOf;
 
             clogg << cp.First() << " (Line #" << LineOf(cp.First())+1u << "), " << cp.Last() << " (Line #" << LineOf(cp.Last())+1u << ")";
 
@@ -2181,28 +2214,6 @@ string GetNames(CurlyBracketManager::CurlyPair const &cp)
     return retval;
 }
 
-size_t Find_Last_Double_Colon_In_String(string_view const s)
-{
-    static regex const r("[:](?=[^\\<]*?(?:\\>|$))");  // matches a semi-colon so long as it's not enclosed in angle brackets
-
-    match_results<string_view::const_reverse_iterator> my_match;
-
-    if ( regex_search(s.crbegin(), s.crend(), my_match, r) )  // returns true if there is at least one match
-    {
-        size_t const index_of_second_colon_in_last_double_colon = &*(my_match[0u].first) - &s.front(); // REVISIT FIX - consider using my_match.position() here
-        assert( ':' == s[index_of_second_colon_in_last_double_colon] );
-
-        size_t const index_of_first_colon_in_last_double_colon  = index_of_second_colon_in_last_double_colon - 1u;
-        if ( ':' != s[index_of_first_colon_in_last_double_colon] ) throw runtime_error("String should only contain a double-colon pair, but it contains a lone colon");
-
-        //cout << "============ POSITION = " << index_of_first_colon_in_last_double_colon << " =================" << endl;
-
-        return index_of_first_colon_in_last_double_colon;
-    }
-
-    return -1;
-}
-
 size_t Find_Second_Last_Double_Colon_In_String(string_view const s)
 {
     static regex const r("(\\<.*\\>)|::");  // matches a double semi-colon so long as it's not enclosed in angle brackets
@@ -2275,11 +2286,11 @@ bool Strip_Last_Scope(string &str)
 
 fifo_map<string,string> g_psuedonyms;
 
-void Adjust_Class_Name(string &arg_prefix, string &arg_classname)
+void Expose_Pseudonym(string &arg_prefix, string &arg_classname)
 {
     bool constexpr debugthisfunc = false;
 
-    debugthisfunc && clogg << "Entered function Adjust_Class_Name ========= "
+    debugthisfunc && clogg << "Entered function Expose_Pseudonym ========= "
                            << "Inputs = '" << arg_prefix << "' + '" << arg_classname << "', ";
 
     string const what_we_looked_up{
@@ -2294,7 +2305,7 @@ void Adjust_Class_Name(string &arg_prefix, string &arg_classname)
     }
     catch(std::out_of_range const &e) {}
 
-    size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg_classname);
+    size_t const index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(arg_classname);
     if ( -1 != index_of_last_colon )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
     {
         arg_prefix    += arg_classname.substr(0u, index_of_last_colon + 2u);
@@ -2339,7 +2350,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
             std::abort();
         }
 
-        Adjust_Class_Name(prefix, classname);
+        Expose_Pseudonym(prefix, classname);
 
         full_name  = prefix;
         full_name += classname;
@@ -2360,7 +2371,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
             {
                 string duplicate_original_full_name{ full_name };  // not const because we std::move() from it later
 
-                Adjust_Class_Name(prefix, class_name_without_template_specialisation);
+                Expose_Pseudonym(prefix, class_name_without_template_specialisation);
 
                 full_name  = prefix;
                 full_name += class_name_without_template_specialisation;
@@ -2403,7 +2414,7 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
+string Get_All_Bases_Recursively(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
 {
     bool constexpr debugthisfunc = false;
 
@@ -2413,7 +2424,7 @@ string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<str
 
     decltype(g_scope_names)::mapped_type const *p = nullptr;
 
-    Adjust_Class_Name(prefix, classname);
+    Expose_Pseudonym(prefix, classname);
 
     string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
 
@@ -2446,7 +2457,7 @@ string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<str
             clogg << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
         }
 
-        size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(classname);
+        size_t const index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(classname);
         if ( -1 != index_of_last_colon && (false == StringAlgorithms::starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
             debugthisfunc && clogg << "237 : Changing '" << prefix << "' and '" << classname << "' to '";
@@ -2463,7 +2474,7 @@ string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<str
         }
 
         debugthisfunc && clogg << "============= 239 : Out to call recursively" << endl;
-        string str{ Recursive_Print_All_Bases_PROPER(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) };
+        string str{ Get_All_Bases_Recursively(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) };
 
         if ( false == str.empty() )
         {
@@ -2481,7 +2492,7 @@ string Recursive_Print_All_Bases_PROPER(string prefix, string classname, set<str
 
 list<string> Get_All_Bases(string_view arg)
 {
-    size_t const index_of_last_colon = Find_Last_Double_Colon_In_String(arg);
+    size_t const index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(arg);
 
     if ( -1 == index_of_last_colon ) throw runtime_error("There's no double-colon in the argument to Get_All_Bases");
 
@@ -2492,7 +2503,7 @@ list<string> Get_All_Bases(string_view arg)
 
     list<string> retval;
 
-    Recursive_Print_All_Bases_PROPER(string(prefix), string(classname), already_recorded, false, retval);
+    Get_All_Bases_Recursively(string(prefix), string(classname), already_recorded, false, retval);
 
     return retval;
 }
@@ -3127,7 +3138,7 @@ int main(int const argc, char **const argv)
     std::copy( istream_iterator<char>(cin), istream_iterator<char>(), back_inserter(g_intact) );
 
     clogg << "Bytes: " << g_intact.size() << endl;
-    clogg << "Lines: " << Lines() << endl;
+    clogg << "Lines: " << StringAlgorithms::Lines() << endl;
 
     std::replace(g_intact.begin(), g_intact.end(), '\0', ' ');  // null chars will screw up functions that parse null as end of string
 
@@ -3168,10 +3179,13 @@ int main(int const argc, char **const argv)
 
             for ( auto const my_pair : my_list )
             {
+                auto &LineOf = StringAlgorithms::LineOf;
+
                 {
                 Grade g(clogg, eGradeOpenSpaces);
                 clogg << " Open[" << LineOf(my_pair.first)+1u << "-" << LineOf(my_pair.second)+1u << "]";
                 }
+
                 Find_All_Usings_In_Open_Space(my_pair.first, my_pair.second, e.first + "::");
             }
 
@@ -3210,6 +3224,8 @@ int main(int const argc, char **const argv)
         list<string> const bases{ Get_All_Bases(e.first) };
 
         if ( bases.empty() ) continue;
+
+        auto &LineOf = StringAlgorithms::LineOf;
 
         clogg << e.first << " - Line#" << LineOf(std::get<0u>(e.second).front()->First())+1u << " to Line#" << LineOf(std::get<0u>(e.second).front()->Last())+1u
               << " | Bases = ";

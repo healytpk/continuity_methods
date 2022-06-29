@@ -4,9 +4,9 @@ rm -rf precompiler transunit_* final_* bin_*
 
 if [ "$1" == "--extreme" ]; then
     #-DPRECOMPILER_USE_DEBUG_LIBSTDCXX
-    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -ggdb3 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsanitize=address,leak,undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all"
+    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand -ggdb3 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsanitize=address,leak,undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all"
 else
-    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -ggdb3"
+    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand -ggdb3"
 fi
 
 echo "= = = = = Building 'precompiler.cpp' . . . "

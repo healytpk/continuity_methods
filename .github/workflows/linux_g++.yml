@@ -37,3 +37,11 @@ jobs:
       run:  ./bin_lasers | ./comparetxt expected_output_lasers.txt
     - name: compare expected output for simple sample
       run:  ./bin_simple | ./comparetxt expected_output_simple.txt
+    - name: Install egypt and thomas_egypt for graphical graph of function calls
+      run: sudo ./3rdparty/egypt/setup_thomas_egypt.sh
+    - name: Run thomas_egypt to generate new_root.png
+      run: thomas_egypt main *expand*
+    - uses: actions/upload-artifact@v2
+      with:
+        name: new_root.png
+        path: new_root.png

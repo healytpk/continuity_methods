@@ -22,6 +22,7 @@ cat ./egypt_all_functions.egypt | xargs -n1 bash thomas_egypt_Keep_If_In_Scopes.
 cat ./egypt_all_functions.egypt | tr ' ' '\n' | \
   grep -E "StringAlgorithms|fifo_map|_top_level_|_Z2SvI|GradedOstream|IndentedOstream|9CurlyPair4Last|9CurlyPair5First|19CurlyBracketManager4Root"  | \
   tr '\n' ' ' >> ./egypt_excluded_functions.egypt
+cat ./egypt_all_functions.egypt | tr ' ' '\n' | grep -E "E[A-z]*Ul" | tr '\n' ' ' >> ./egypt_excluded_functions.egypt
 
 cat ./egypt_excluded_functions.egypt | xargs -n1 c++filt -p -n
 

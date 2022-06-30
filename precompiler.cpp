@@ -777,7 +777,8 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <exception>      // exception
 #include <chrono>         // duration_cast, milliseconds, steady_clock
 #include <sstream>        // ostringstream
-#include <atomic>         // atomic<>
+#include <atomic>         // atomic<>  - REVISIT - FIX - Not needed in single-threaded program
+#include <stack>          // stack (for iterative recursive function)
 
 using std::cin;
 using std::cout;
@@ -2414,39 +2415,87 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-string Get_All_Bases_Recursively(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
+void Get_All_Bases_Recursively(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
 {
     bool constexpr debugthisfunc = false;
+
+    struct StackFrame {
+                                      string        prefix      ;
+                                      string        classname   ;
+                                        bool        is_virtual  ;
+        decltype(g_scope_names)::mapped_type const *p           ;
+                                      string        full_name   ;
+                                        bool        is_new_entry;
+    list< array<string,3u> >::const_iterator        it          ;
+                    list< array<string,3u> > const *p_list_array;
+                                      string        base_name   ;
+    };
+
+    std::stack<StackFrame> my_stack;
+
+    my_stack.push((StackFrame){prefix,classname,is_virtual});
+
+    string last_recursive_return_value;
+
+    for (bool should_pop = false; false == my_stack.empty(); should_pop && (my_stack.pop(),true) )
+    {
+    bool outer_continue = false;
+
+                                      string        &prefix       = my_stack.top().prefix;
+                                      string        &classname    = my_stack.top().classname;
+                                        bool        &is_virtual   = my_stack.top().is_virtual;
+        decltype(g_scope_names)::mapped_type const *&p            = my_stack.top().p;
+                                      string        &full_name    = my_stack.top().full_name;
+                                        bool        &is_new_entry = my_stack.top().is_new_entry;
+    list< array<string,3u> >::const_iterator        &it           = my_stack.top().it;
+                    list< array<string,3u> > const *&p_list_array = my_stack.top().p_list_array;
+                                      string        &base_name    = my_stack.top().base_name;
+
+    size_t index_of_last_colon = -1;  // only here because must define before the 'goto'
+
+    if ( should_pop )
+    {
+        should_pop = false;
+        goto Label__Jump_To_Here_After_Popping;
+    }
 
     debugthisfunc && clogg << "231 : Recursive_Print_All_Bases_PROPER entered with arguments '" << prefix << "' + '" << classname << "'" << endl;
 
     if ( prefix.empty() ) std::abort();
 
-    decltype(g_scope_names)::mapped_type const *p = nullptr;
+    p = nullptr;
 
     Expose_Pseudonym(prefix, classname);
 
-    string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
+    full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
 
     debugthisfunc && clogg << "233 : full_name = '" << full_name << "' was gotten from '" << prefix << "' + '" << classname << "'" << endl;
 
-    if ( full_name.empty() )
+    if ( full_name.empty() )  // not a fatal error if we can't find a base class that's a template class
     {
         debugthisfunc && clogg << "234 : Recursive is returning false because full_name is empty" << endl;
-        return {};  // not a fatal error if we can't find a base class that's a template class
+
+        should_pop = true;
+        last_recursive_return_value = {};
+        continue;
     }
 
-    bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
+    is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
 
-    if ( (false == is_new_entry) && is_virtual )
+    if ( (false == is_new_entry) && is_virtual ) // REVISIT - FIX - all virtuals are common, all non-virtuals are unique
     {
         debugthisfunc && clogg << "235 : Recursive is returning false because it's NOT a new entry and it's virtual" << endl;
-        return {};  // if it's not a new entry and if it's virtual - REVISIT FIX all virtuals are common, and all non-virtuals are unique
+        //return {};  // if it's not a new entry and if it's virtual - REVISIT FIX all virtuals are common, and all non-virtuals are unique
+        should_pop = true;
+        last_recursive_return_value = {};
+        continue;
     }
 
-    for ( auto const &e : std::get<2u>( g_scope_names.at(full_name) ) )
+    p_list_array = &std::get<2u>( g_scope_names.at(full_name) );
+
+    for ( it = p_list_array->cbegin(); it != p_list_array->cend(); ++it )
     {
-        string const &base_name = std::get<2u>(e);  // Note that this is a simple name, i.e. "Laser" instead of "::MyNamespace::Laser"
+        base_name = std::get<2u>(*it);  // Note that this is a simple name, i.e. "Laser" instead of "::MyNamespace::Laser"
         debugthisfunc && clogg << "236 : full_name '" << full_name << "' has base: '" << base_name << "'" << endl;
 
         if constexpr ( verbose )
@@ -2454,10 +2503,10 @@ string Get_All_Bases_Recursively(string prefix, string classname, set<string> &a
             clogg << " [ALREADY_SEEN=";
             for ( auto const &e_already : already_recorded ) clogg << e_already << ", ";
             clogg << "] ";
-            clogg << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+            clogg << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(*it)) ? "true]]]" : "false]]] ") << endl;
         }
 
-        size_t const index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(classname);
+        index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(classname);
         if ( -1 != index_of_last_colon && (false == StringAlgorithms::starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
         {
             debugthisfunc && clogg << "237 : Changing '" << prefix << "' and '" << classname << "' to '";
@@ -2474,12 +2523,17 @@ string Get_All_Bases_Recursively(string prefix, string classname, set<string> &a
         }
 
         debugthisfunc && clogg << "============= 239 : Out to call recursively" << endl;
-        string str{ Get_All_Bases_Recursively(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) };
+        //Get_All_Bases_Recursively(prefix, base_name, already_recorded, "virtual" == std::get<0u>(*it), retval);
+        my_stack.push((StackFrame){prefix,base_name,"virtual" == std::get<0u>(*it)});
+        outer_continue = true;
+        break;
 
-        if ( false == str.empty() )
+Label__Jump_To_Here_After_Popping:
+
+        if ( false == last_recursive_return_value.empty() )
         {
-            debugthisfunc && clogg << "240 : Adding base class to list of base classes retval.push_back(\" " << str << "\")" << endl;
-            retval.push_back( std::move(str) );
+            debugthisfunc && clogg << "240 : Adding base class to list of base classes retval.push_back(\" " << last_recursive_return_value << "\")" << endl;
+            retval.push_back( last_recursive_return_value );
         }
         else
         {
@@ -2487,7 +2541,11 @@ string Get_All_Bases_Recursively(string prefix, string classname, set<string> &a
         }
     }
 
-    return full_name;
+    if ( outer_continue ) continue;
+
+    should_pop = true;
+    last_recursive_return_value = full_name;
+    }
 }
 
 list<string> Get_All_Bases(string_view arg)

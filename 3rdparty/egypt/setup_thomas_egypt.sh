@@ -17,8 +17,6 @@ fi
 
 set -x
 
-cd 3rdparty/egypt/
-
 rm -rf work/
 mkdir -p work/
 chmod 777 work/
@@ -36,5 +34,3 @@ chmod +x ../../egypt
 cd ../../
 
 chmod -R o+r,o+w egypt work/
-
-cd ../..

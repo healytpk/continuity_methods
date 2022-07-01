@@ -3,4 +3,4 @@ precompiler.exe
 transunit_*
 final_*
 bin_*
-
+*.expand

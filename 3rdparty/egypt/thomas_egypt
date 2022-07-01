@@ -19,7 +19,7 @@ cat ./egypt_all_functions.egypt | xargs -n1 c++filt -p -n
 echo -e "${RED}Making list of functions within the scopes ${EXCLUDED_SCOPES}. . .${NC}"
 sleep 3
 echo -n "dummy_DUMMY_dummy_DUMMY_dummy " > ./egypt_excluded_functions.egypt
-cat ./egypt_all_functions.egypt | xargs -n1 bash thomas_egypt_Keep_If_In_Scopes.bash ${EXCLUDED_SCOPES} | tr '\n' ' ' >> ./egypt_excluded_functions.egypt
+cat ./egypt_all_functions.egypt | xargs -n1 bash ./thomas_egypt_Keep_If_In_Scopes.bash ${EXCLUDED_SCOPES} | tr '\n' ' ' >> ./egypt_excluded_functions.egypt
 cat ./egypt_all_functions.egypt | tr ' ' '\n' | \
   grep -E "fifo_map|_top_level_|_Z2SvI|GradedOstream|IndentedOstream|9CurlyPair4Last|9CurlyPair5First|19CurlyBracketManager4Root|19CurlyBracketManager4clear"  | \
   tr '\n' ' ' >> ./egypt_excluded_functions.egypt
@@ -35,8 +35,8 @@ cat ./egypt_comma_separated.egypt
 
 echo -e "\n${RED}Running Egypt and creating a graph file. . .${NC}"
 sleep 3
-EGYPT_CMD1="egypt --omit `cat ./egypt_comma_separated.egypt` ${@:2} > ./graph.dot"
-EGYPT_CMD2="thomas_egypt_set_new_root 18 "\"""$1""\"" < ./graph.dot > ./main_as_root.dot"
+EGYPT_CMD1="./egypt --omit `cat ./egypt_comma_separated.egypt` ${@:2} > ./graph.dot"
+EGYPT_CMD2="./thomas_egypt_set_new_root 18 "\"""$1""\"" < ./graph.dot > ./main_as_root.dot"
 EGYPT_CMD3="dot -Granksep=2.0 -Tsvg ./main_as_root.dot > ./main_as_root.svg"
 EGYPT_CMD4="rsvg-convert -u -o ./main_as_root.png ./main_as_root.svg"
 EGYPT_CMD5="xdg-open ./main_as_root.png &"

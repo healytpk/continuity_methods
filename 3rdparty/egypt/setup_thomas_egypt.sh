@@ -24,6 +24,8 @@ cd work/
 
 g++ -o thomas_egypt_get_scope    -std=c++11 -O3 ../thomas_egypt_get_scope.cpp
 g++ -o thomas_egypt_set_new_root -std=c++11 -O3 ../thomas_egypt_set_new_root.cpp
+ln -sf ./work/thomas_egypt_get_scope    ../thomas_egypt_get_scope
+ln -sf ./work/thomas_egypt_set_new_root ../thomas_egypt_set_new_root
 
 tar -zxf ../egypt-1.10.tar.gz
 cd egypt-1.10/

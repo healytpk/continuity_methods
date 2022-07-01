@@ -2433,7 +2433,7 @@ void Get_All_Bases_Recursively(string prefix, string classname, set<string> &alr
 
     std::stack<StackFrame> my_stack;
 
-    my_stack.push((StackFrame){prefix,classname,is_virtual});
+    my_stack.push(StackFrame{prefix,classname,is_virtual});
 
     string last_recursive_return_value;
 
@@ -2524,7 +2524,7 @@ void Get_All_Bases_Recursively(string prefix, string classname, set<string> &alr
 
         debugthisfunc && clogg << "============= 239 : Out to call recursively" << endl;
         //Get_All_Bases_Recursively(prefix, base_name, already_recorded, "virtual" == std::get<0u>(*it), retval);
-        my_stack.push((StackFrame){prefix,base_name,"virtual" == std::get<0u>(*it)});
+        my_stack.push(StackFrame{prefix,base_name,"virtual" == std::get<0u>(*it)});
         outer_continue = true;
         break;
 

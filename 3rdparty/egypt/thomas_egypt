@@ -1,13 +1,13 @@
 #!/bin/bash
-EXCLUDED_SCOPES="std __gnu_cxx boost CryptoPP wx*"
+EXCLUDED_SCOPES="std __gnu_cxx __gnu_debug boost CryptoPP StringAlgorithms wx*"
 
 RED='\033[5;30;46m'
 NC='\033[0m' # No Color
 
 rm egypt_*.egypt
-rm graph.dot new_root.dot
-rm new_root.svg
-rm new_root.png
+rm graph.dot main_as_root.dot
+rm main_as_root.svg
+rm main_as_root.png
 
 echo -e "${RED}Getting entire list of functions. . .${NC}"
 sleep 3
@@ -19,6 +19,10 @@ echo -e "${RED}Making list of functions within the scopes ${EXCLUDED_SCOPES}. . 
 sleep 3
 echo -n "dummy_DUMMY_dummy_DUMMY_dummy " > ./egypt_excluded_functions.egypt
 cat ./egypt_all_functions.egypt | xargs -n1 bash thomas_egypt_Keep_If_In_Scopes.bash ${EXCLUDED_SCOPES} | tr '\n' ' ' >> ./egypt_excluded_functions.egypt
+cat ./egypt_all_functions.egypt | tr ' ' '\n' | \
+  grep -E "fifo_map|_top_level_|_Z2SvI|GradedOstream|IndentedOstream|9CurlyPair4Last|9CurlyPair5First|19CurlyBracketManager4Root|19CurlyBracketManager4clear"  | \
+  tr '\n' ' ' >> ./egypt_excluded_functions.egypt
+cat ./egypt_all_functions.egypt | tr ' ' '\n' | grep -E "E[A-z]*Ul" | tr '\n' ' ' >> ./egypt_excluded_functions.egypt
 
 cat ./egypt_excluded_functions.egypt | xargs -n1 c++filt -p -n
 
@@ -30,16 +34,26 @@ cat ./egypt_comma_separated.egypt
 
 echo -e "\n${RED}Running Egypt and creating a graph file. . .${NC}"
 sleep 3
-EGYPT_CMD1="egypt --omit `cat ./egypt_comma_separated.egypt` ${@:2} > ./graph.dot"
-EGYPT_CMD2="thomas_egypt_set_new_root 18 "\"""$1""\"" < ./graph.dot > ./new_root.dot"
-EGYPT_CMD3="dot -Tsvg ./new_root.dot > ./new_root.svg"
-EGYPT_CMD4="rsvg-convert -u -o ./new_root.png ./new_root.svg"
-EGYPT_CMD5="xdg-open ./new_root.png &"
+EGYPT_CMD1="./egypt --omit `cat ./egypt_comma_separated.egypt` ${@:2} > ./graph.dot"
+EGYPT_CMD2="thomas_egypt_set_new_root 18 "\"""$1""\"" < ./graph.dot > ./main_as_root.dot"
+EGYPT_CMD3="dot -Granksep=2.0 -Tsvg ./main_as_root.dot > ./main_as_root.svg"
+EGYPT_CMD4="rsvg-convert -u -o ./main_as_root.png ./main_as_root.svg"
+EGYPT_CMD5="xdg-open ./main_as_root.png &"
 
 echo "${EGYPT_CMD1}"
 eval "${EGYPT_CMD1}"
 echo "${EGYPT_CMD2}"
 eval "${EGYPT_CMD2}"
+
+echo Making a few names more readable. . .
+sed -i 's/CurlyBracketManager::CurlyPair/CurlyPair/g' ./main_as_root.dot
+
+for i in {1..5}
+do
+    sed -i 's/<[^<>]*>//g' ./main_as_root.dot
+    sed -i 's/([^()]*)//g' ./main_as_root.dot
+done
+
 echo "${EGYPT_CMD3}"
 eval "${EGYPT_CMD3}"
 echo "${EGYPT_CMD4}"

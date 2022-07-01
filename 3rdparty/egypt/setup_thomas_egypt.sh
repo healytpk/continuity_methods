@@ -1,29 +1,36 @@
 #!/bin/sh
 
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
-   exit 1
+if [ $EUID -ne 0 ]; then
+   echo "This script must be run as root in order to run 'apt install', so trying to use 'sudo'"
+   sudo apt install -y librsvg2-bin graphviz
+   if [ $? -ne 0 ]; then
+      echo "The 'sudo apt install' command failed. Bailing out."
+      exit 1
+   fi
+else
+   apt install -y librsvg2-bin graphviz
+   if [ $? -ne 0 ]; then
+      echo "The 'apt install' command failed. Bailing out."
+      exit 1
+   fi
 fi
 
 set -x
 
-mkdir -p /tmp/thomas_egypt/
+rm -rf work/
 
-g++ -o /tmp/thomas_egypt/thomas_egypt_get_scope -std=c++11 -O3 thomas_egypt_get_scope.cpp
-g++ -o /tmp/thomas_egypt/thomas_egypt_set_new_root -std=c++11 -O3 thomas_egypt_set_new_root.cpp
+mkdir -p work/
+chmod 777 work/
 
-install -m 775 -o root -g root ./thomas_egypt /usr/bin/
-install -m 775 -o root -g root ./thomas_egypt_Keep_If_In_Scopes.bash /usr/bin/
-install -m 775 -o root -g root /tmp/thomas_egypt/thomas_egypt_get_scope /usr/bin/
-install -m 775 -o root -g root /tmp/thomas_egypt/thomas_egypt_set_new_root /usr/bin/
+g++ -o work/thomas_egypt_get_scope    -std=c++11 -O3 thomas_egypt_get_scope.cpp
+g++ -o work/thomas_egypt_set_new_root -std=c++11 -O3 thomas_egypt_set_new_root.cpp
 
-tar -zxf egypt-1.10.tar.gz --directory /tmp/thomas_egypt/
-cd /tmp/thomas_egypt/egypt-1.10
+cd work/
+tar -zxf ../egypt-1.10.tar.gz
+cd egypt-1.10/
 perl Makefile.PL
 make
-make install
-cd -
+ln -sf ./work/egypt-1.10/egypt ../../egypt
+cd ../..
 
-rm -rf /tmp/thomas_egypt/
-
-apt install -y librsvg2-bin graphviz
+chmod -R o+r,o+w egypt work/

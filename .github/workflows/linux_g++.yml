@@ -40,7 +40,7 @@ jobs:
     - name: Install egypt and thomas_egypt for graphical graph of function calls
       run: sudo ./3rdparty/egypt/setup_thomas_egypt.sh
     - name: Run thomas_egypt to generate main_as_root.png
-      run: ./thomas_egypt main *expand*
+      run: ./3rdparty/egypt/thomas_egypt main *expand*
     - uses: actions/upload-artifact@v2
       with:
         name: main_as_root.png

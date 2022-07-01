@@ -32,6 +32,7 @@ cd egypt-1.10/
 perl Makefile.PL
 make
 ln -sf ./work/egypt-1.10/egypt ../../egypt
+chmod +x ../../egypt
 cd ../../
 
 chmod -R o+r,o+w egypt work/

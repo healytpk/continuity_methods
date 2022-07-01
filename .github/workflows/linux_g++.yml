@@ -16,7 +16,7 @@ jobs:
       run: sudo apt update; sudo apt install -y gcc-11 g++-11; sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11; uname -a; g++ --version | grep g++
     - uses: actions/checkout@v2
     - name: Compiler pre-compiler
-      run: g++ -o precompiler precompiler.cpp -std=c++20 > build_log.txt 2>&1
+      run: g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand > build_log.txt 2>&1
     - uses: actions/upload-artifact@v2
       with:
         name: build_log.txt
@@ -40,7 +40,7 @@ jobs:
     - name: Install egypt and thomas_egypt for graphical graph of function calls
       run: sudo ./3rdparty/egypt/setup_thomas_egypt.sh
     - name: Run thomas_egypt to generate main_as_root.png
-      run: ./thomas_egypt main *expand*
+      run: ./3rdparty/egypt/thomas_egypt main *expand*
     - uses: actions/upload-artifact@v2
       with:
         name: main_as_root.png

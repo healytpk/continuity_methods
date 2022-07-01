@@ -4,3 +4,4 @@ transunit_*
 final_*
 bin_*
 *.expand
+work

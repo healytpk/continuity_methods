@@ -17,20 +17,23 @@ fi
 
 set -x
 
-rm -rf work/
+cd 3rdparty/egypt/
 
+rm -rf work/
 mkdir -p work/
 chmod 777 work/
-
-g++ -o work/thomas_egypt_get_scope    -std=c++11 -O3 thomas_egypt_get_scope.cpp
-g++ -o work/thomas_egypt_set_new_root -std=c++11 -O3 thomas_egypt_set_new_root.cpp
-
 cd work/
+
+g++ -o thomas_egypt_get_scope    -std=c++11 -O3 ../thomas_egypt_get_scope.cpp
+g++ -o thomas_egypt_set_new_root -std=c++11 -O3 ../thomas_egypt_set_new_root.cpp
+
 tar -zxf ../egypt-1.10.tar.gz
 cd egypt-1.10/
 perl Makefile.PL
 make
 ln -sf ./work/egypt-1.10/egypt ../../egypt
-cd ../..
+cd ../../
 
 chmod -R o+r,o+w egypt work/
+
+cd ../..

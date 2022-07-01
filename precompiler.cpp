@@ -18,6 +18,8 @@
  * (Section 10) Parse all the class definitions in the input              : Line #1868 - #3267 : (Total = 1401 lines)
 */
 
+#define FORBID_RECURSIVE_FUNCTION_CALLS
+
 #if defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX) && defined(NDEBUG)
 #    error "Don't define NDEBUG and still want to use libstdc++ debugging"
 #endif
@@ -778,7 +780,10 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <chrono>         // duration_cast, milliseconds, steady_clock
 #include <sstream>        // ostringstream
 #include <atomic>         // atomic<>  - REVISIT - FIX - Not needed in single-threaded program
-#include <stack>          // stack (for iterative recursive function)
+
+#ifdef FORBID_RECURSIVE_FUNCTION_CALLS
+#    include <stack>          // stack (for iterative recursive function)
+#endif
 
 using std::cin;
 using std::cout;
@@ -2415,8 +2420,27 @@ string Find_Class_Relative_To_Scope(string &prefix, string classname)
     return full_name;
 }
 
-void Get_All_Bases_Recursively(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
+#ifdef FORBID_RECURSIVE_FUNCTION_CALLS
+
+list<string> Get_All_Bases(string_view const arg)
 {
+    size_t const beginning_index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(arg);
+
+    if ( -1 == beginning_index_of_last_colon ) throw runtime_error("There's no double-colon in the argument to Get_All_Bases");
+
+    string_view const prefix    = arg.substr(0u, beginning_index_of_last_colon + 2u);
+    string_view const classname = arg.substr(beginning_index_of_last_colon +  2u);
+
+    set<string> already_recorded;
+
+    list<string> retval;
+
+    //Get_All_Bases_Recursively(string(prefix), string(classname), already_recorded, false, retval);
+
+// =======================================================================================================
+// =======================================================================================================
+// =======================================================================================================
+// =======================================================================================================
     bool constexpr debugthisfunc = false;
 
     struct StackFrame {
@@ -2433,7 +2457,7 @@ void Get_All_Bases_Recursively(string prefix, string classname, set<string> &alr
 
     std::stack<StackFrame> my_stack;
 
-    my_stack.push(StackFrame{prefix,classname,is_virtual});
+    my_stack.push(StackFrame{string(prefix),string(classname),false /* is_virtual */ });
 
     string last_recursive_return_value;
 
@@ -2546,6 +2570,89 @@ Label__Jump_To_Here_After_Popping:
     should_pop = true;
     last_recursive_return_value = full_name;
     }
+// =======================================================================================================
+// =======================================================================================================
+// =======================================================================================================
+
+    return retval;
+}
+
+#else
+
+string Get_All_Bases_Recursively(string prefix, string classname, set<string> &already_recorded, bool is_virtual, list<string> &retval)
+{
+    bool constexpr debugthisfunc = false;
+
+    debugthisfunc && clogg << "231 : Recursive_Print_All_Bases_PROPER entered with arguments '" << prefix << "' + '" << classname << "'" << endl;
+
+    if ( prefix.empty() ) std::abort();
+
+    decltype(g_scope_names)::mapped_type const *p = nullptr;
+
+    Expose_Pseudonym(prefix, classname);
+
+    string const full_name = Find_Class_Relative_To_Scope(prefix, classname); // This will throw if class is unknown
+
+    debugthisfunc && clogg << "233 : full_name = '" << full_name << "' was gotten from '" << prefix << "' + '" << classname << "'" << endl;
+
+    if ( full_name.empty() )
+    {
+        debugthisfunc && clogg << "234 : Recursive is returning false because full_name is empty" << endl;
+        return {};  // not a fatal error if we can't find a base class that's a template class
+    }
+
+    bool const is_new_entry = already_recorded.insert(full_name).second;  // set::insert returns a pair, the second is a bool saying if it's a new entry
+
+    if ( (false == is_new_entry) && is_virtual )
+    {
+        debugthisfunc && clogg << "235 : Recursive is returning false because it's NOT a new entry and it's virtual" << endl;
+        return {};  // if it's not a new entry and if it's virtual - REVISIT FIX all virtuals are common, and all non-virtuals are unique
+    }
+
+    for ( auto const &e : std::get<2u>( g_scope_names.at(full_name) ) )
+    {
+        string const &base_name = std::get<2u>(e);  // Note that this is a simple name, i.e. "Laser" instead of "::MyNamespace::Laser"
+        debugthisfunc && clogg << "236 : full_name '" << full_name << "' has base: '" << base_name << "'" << endl;
+
+        if constexpr ( verbose )
+        {
+            clogg << " [ALREADY_SEEN=";
+            for ( auto const &e_already : already_recorded ) clogg << e_already << ", ";
+            clogg << "] ";
+            clogg << " [[[VIRTUAL=" << (("virtual" == std::get<0u>(e)) ? "true]]]" : "false]]] ") << endl;
+        }
+
+        size_t const index_of_last_colon = StringAlgorithms::Find_Last_Double_Colon(classname);
+        if ( -1 != index_of_last_colon && (false == StringAlgorithms::starts_with(classname, "::")) )  /* Maybe it's like this:   Class MyClass : public ::SomeClass {}; */
+        {
+            debugthisfunc && clogg << "237 : Changing '" << prefix << "' and '" << classname << "' to '";
+            // This deals with the case of a class inheriting from 'std::runtime_error', which inherits from 'exception' instead of 'std::exception'
+            prefix += classname.substr(0u, index_of_last_colon);
+            prefix += "::";
+
+            debugthisfunc && clogg << prefix << "' and '" << classname << endl;
+        }
+        else if ( StringAlgorithms::starts_with(classname, "::") )
+        {
+            debugthisfunc && clogg << "238 : Wiping out the prefix because classname is '" << classname << "'" << endl;
+            prefix.clear();  // In case the base class begins with two colons: "class MyClass : public ::SomeClass {};"
+        }
+
+        debugthisfunc && clogg << "============= 239 : Out to call recursively" << endl;
+        string str{ Get_All_Bases_Recursively(prefix, base_name, already_recorded, "virtual" == std::get<0u>(e), retval) };
+
+        if ( false == str.empty() )
+        {
+            debugthisfunc && clogg << "240 : Adding base class to list of base classes retval.push_back(\" " << str << "\")" << endl;
+            retval.push_back( std::move(str) );
+        }
+        else
+        {
+            debugthisfunc && clogg << "241 : The return value from the recursive call was an empty string" << endl;
+        }
+    }
+
+    return full_name;
 }
 
 list<string> Get_All_Bases(string_view arg)
@@ -2565,6 +2672,8 @@ list<string> Get_All_Bases(string_view arg)
 
     return retval;
 }
+
+#endif
 
 list< pair<size_t,size_t> > GetOpenSpacesBetweenInnerCurlyBrackets(CurlyBracketManager::CurlyPair const &cp)
 {

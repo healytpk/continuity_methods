@@ -2,11 +2,12 @@
 
 rm -rf precompiler transunit_* final_* bin_*
 
-if [ "$1" == "--extreme" ]; then
-    #-DPRECOMPILER_USE_DEBUG_LIBSTDCXX
-    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand -ggdb3 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsanitize=address,leak,undefined -fsanitize=pointer-compare -fsanitize=pointer-subtract -fstack-protector-all"
+COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand "
+
+if [ "$1" == "--release" ]; then
+    COMMAND_BUILD_PRECOMPILER+=" -DNDEBUG -O3 -s "
 else
-    COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-rtl-expand -ggdb3"
+    COMMAND_BUILD_PRECOMPILER+=" -ggdb3 -fsanitize=address,leak,undefined,pointer-compare,pointer-subtract -fstack-protector-all "
 fi
 
 echo "= = = = = Building 'precompiler.cpp' . . . "

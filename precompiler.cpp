@@ -6,26 +6,66 @@
  * 'Continuity Methods'.
  *
  * This C++ source file is separated into 10 sections:
- * (Section  1) Override global 'new' and 'delete' for max speed          : Line #  25 - #  87 : (Total =   63 lines)
- * (Section  2) GradedOstream for selective control over output from clog : Line #  88 - # 228 : (Total =  141 lines)
- * (Section  3) Implementations of functions from Boost                   : Line # 229 - # 569 : (Total =  341 lines)
- * (Section  4) Implementation of container type : FIFO map               : Line # 570 - # 662 : (Total =   93 lines)
- * (Section  5) Include standard header files, and define global objects  : Line # 663 - # 738 : (Total =   76 lines)
- * (Section  6) regex_top_level_token_iterator                            : Line # 739 - #1002 : (Total =  264 lines)
- * (Section  7) Process keywords and identifiers                          : Line #1003 - #1112 : (Total =  110 lines)
- * (Section  8) Parse function signatures                                 : Line #1113 - #1731 : (Total =  619 lines)
- * (Section  9) Generate the auxillary code needed for Continuity Methods : Line #1732 - #1867 : (Total =  136 lines)
- * (Section 10) Parse all the class definitions in the input              : Line #1868 - #3267 : (Total = 1401 lines)
+ * (Section  1) Build Modes - Debug, Release                              : Line #  22 - #  66 : (Total =   45 lines)
+ * (Section  2) Override global 'new' and 'delete' for max speed          : Line #  67 - # 129 : (Total =   63 lines)
+ * (Section  3) GradedOstream for selective control over output from clog : Line # 130 - # 270 : (Total =  141 lines)
+ * (Section  4) Implementations of functions from Boost                   : Line # 271 - # 679 : (Total =  409 lines)
+ * (Section  5) Implementation of container type : FIFO map               : Line # 680 - # 765 : (Total =   86 lines)
+ * (Section  6) Include standard header files, and define global objects  : Line # 766 - # 837 : (Total =   72 lines)
+ * (Section  7) regex_top_level_token_iterator                            : Line # 838 - #1101 : (Total =  264 lines)
+ * (Section  8) Process keywords and identifiers                          : Line #1102 - #1211 : (Total =  110 lines)
+ * (Section  9) Parse function signatures                                 : Line #1212 - #1789 : (Total =  578 lines)
+ * (Section 10) Generate the auxillary code needed for Continuity Methods : Line #1790 - #1925 : (Total =  136 lines)
+ * (Section 11) Parse all the class definitions in the input              : Line #1926 - #3454 : (Total = 1530 lines)
 */
+
+// =====================================================================
+// Section 1 of 11 : Build Modes - Debug, Release
+// =====================================================================
 
 #define FORBID_RECURSIVE_FUNCTION_CALLS
 
-#if defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX) && defined(NDEBUG)
-#    error "Don't define NDEBUG and still want to use libstdc++ debugging"
+// The next macro is to detect the GNU C++ compiler (g++) on Linux
+#if     defined(__GNUG__) &&  defined(__linux__)                       \
+    && !defined(__llvm__) && !defined(__clang__)                       \
+    && !defined(__INTEL_COMPILER) && !defined(__INTEL_LLVM_COMPILER)   \
+    && !defined(_WIN32) && !defined(_WIN64)                            \
+    && !defined(__APPLE__)
+#    define REAL_GNU_COMPILER
+#endif
+
+#if defined(_GLIBC_DEBUG) || defined(_GLIBC_DEBUG_PEDANTIC) || defined(_GLIBCXX_DEBUG) || defined(_GLIBCXX_DEBUG_PEDANTIC)
+#    error "Please only set or unset NDEBUG. Don't manually set any of the following: _GLIBC_DEBUG _GLIBC_DEBUG_PEDANTIC _GLIBCXX_DEBUG _GLIBCXX_DEBUG_PEDANTIC"
+#    include "Please_only_set_or_unset_NDEBUG____No_Such_Header_File"
+#endif
+
+#ifdef NDEBUG
+     /* Release Mode */
+#    ifdef REAL_GNU_COMPILER
+#        include <list>         //         std::list
+#        include <debug/list>   // __gnu_debug::list
+#        include <type_traits>  // is_same_v
+         static_assert( false == std::is_same_v< std::list<int>, __gnu_debug::list<int> >, "libstdc++ is using containers from __gnu_debug even though we're in Release Mode");
+#        warning "libstdc++ is using containers from std"
+#    endif
+#else
+     /* Debug Mode */
+#    define _GLIBC_DEBUG
+#    define _GLIBC_DEBUG_PEDANTIC
+#    define _GLIBCXX_DEBUG
+#    define _GLIBCXX_DEBUG_PEDANTIC
+#    define _GLIBCXX_EXTERN_TEMPLATE 0
+#    ifdef REAL_GNU_COMPILER
+#        include <list>         //         std::list
+#        include <debug/list>   // __gnu_debug::list
+#        include <type_traits>  // is_same_v
+         static_assert( std::is_same_v< std::list<int>, __gnu_debug::list<int> >, "libstdc++ is not using containers from __gnu_debug even though we're in Debug Mode");
+#        warning "libstdc++ is using containers from __gnu_debug"
+#    endif
 #endif
 
 // =================================================================
-// Section 1 of 10 : Override global 'new' and 'delete' for max speed
+// Section 2 of 11 : Override global 'new' and 'delete' for max speed
 // =================================================================
 
 decltype(sizeof(1)) g_total_allocation = 0u;
@@ -88,7 +128,7 @@ void operator delete[](void *const p) noexcept { /* Do Nothing */ }
 #endif // if override global 'new' and 'delete' for max speed is enabled
 
 // ===========================================================================
-// Section 2 of 10 : GradedOstream for selective control over output from clog
+// Section 3 of 11 : GradedOstream for selective control over output from clog
 // ===========================================================================
 
 #include <ostream>   // ostream
@@ -229,20 +269,14 @@ public:
 };
 
 // ==========================================================================
-// Section 3 of 10 : Implementations of functions from Boost
+// Section 4 of 11 : Implementations of functions from Boost
 // ==========================================================================
 
 #include <cassert>     // assert
 #include <cstddef>     // size_t
 #include <cstring>     // strcmp, strlen
 #include <cctype>      // isalnum, isdigit
-#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
-#    include <debug/string>
-     namespace std_or_gnu_debug { using __gnu_debug::string; }
-#else
-#    include <string>     // string, to_string
-     namespace std_or_gnu_debug { using std::string; }
-#endif
+#include <string>      // string, to_string
 #include <string_view> // string_view
 #include <algorithm>   // all_of
 #include <type_traits> // remove_reference_t, remove_cv_t, decay (all for C++17)
@@ -258,7 +292,7 @@ std::string g_intact;
 class StringAlgorithms {
 
     typedef std::size_t size_t;
-    typedef std_or_gnu_debug::string string;
+    typedef std::string string;
     typedef std::string_view string_view;
 
 private:
@@ -644,17 +678,10 @@ static std::string_view Sv(A a, B b)  // Pass iterators by value
 }
 
 // ==========================================================================
-// Section 4 of 10 : Implementation of container type : FIFO map
+// Section 5 of 11 : Implementation of container type : FIFO map
 // ==========================================================================
 
-#include <cstddef>  // Just to get __GLIBCXX__ defined
-#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
-#    include <debug/list>
-     using __gnu_debug::list;
-#else
-#    include <list>
-     using std::list;
-#endif
+#include <list>       // list
 #include <utility>    // pair
 #include <algorithm>  // find
 #include <stdexcept>  // out_of_range
@@ -689,7 +716,7 @@ protected:
 
     typedef PairType value_type;
 
-    list<PairType> data;
+    std::list<PairType> data;
 
 public:
 
@@ -737,7 +764,7 @@ public:
 };
 
 // =========================================================================
-// Section 5 of 10 : Include standard header files, and define global objects
+// Section 6 of 11 : Include standard header files, and define global objects
 // =========================================================================
 
 bool constexpr verbose = false;
@@ -756,21 +783,9 @@ bool only_print_numbers; /* This gets set in main -- don't set it here */
 #include <iomanip>        // noskipws
 #include <stdexcept>      // out_of_range, runtime_error
 #include <utility>        // pair<>
-#if (defined(__GLIBCXX__) || defined(__GLIBCPP__)) && defined(PRECOMPILER_USE_DEBUG_LIBSTDCXX)
-#    include <debug/string>
-#    include <debug/list>
-#    include <debug/set>
-     using __gnu_debug::string;
-     using __gnu_debug::list;
-     using __gnu_debug::set;
-#else
-#    include <string>     // string, to_string
-#    include <list>       // list
-#    include <set>        // set
-     using std::string;
-     using std::list;
-     using std::set;
-#endif
+#include <string>         // string, to_string
+#include <list>           // list
+#include <set>            // set
 #include <array>          // array
 #include <tuple>          // tuple
 #include <utility>        // pair, std::move()
@@ -793,6 +808,10 @@ using std::string_view;
 using std::array;
 using std::tuple;
 using std::pair;
+
+using std::string;
+using std::list;
+using std::set;
 
 using std::regex;
 using std::regex_replace;
@@ -817,7 +836,7 @@ std::uintmax_t GetTickCount(void)
 std::uintmax_t g_timestamp_program_start = 0u;
 
 // ==========================================================================
-// Section 6 of 10 : regex_top_level_token_iterator
+// Section 7 of 11 : regex_top_level_token_iterator
 // ==========================================================================
 
 template<
@@ -1081,7 +1100,7 @@ using r_sregex_top_level_iterator        = regex_top_level_iterator      <     s
 using r_svregex_top_level_iterator       = regex_top_level_iterator      <string_view::const_reverse_iterator>;
 
 // ==========================================================================
-// Section 7 of 10 : Process keywords and identifiers
+// Section 8 of 11 : Process keywords and identifiers
 // ==========================================================================
 
 struct ShortStr {
@@ -1191,7 +1210,7 @@ void Find_And_Erase_All_Keywords(string &s)
 }
 
 // ==========================================================================
-// Section 8 of 10 : Parse function signatures
+// Section 9 of 11 : Parse function signatures
 // ==========================================================================
 
 class Function_Signature {
@@ -1769,7 +1788,7 @@ string_view Indentation_For_CurlyPair(CurlyBracketManager::CurlyPair const &cp)
 }
 
 // ==========================================================================
-// Section 9 of 10 : Generate the auxillary code needed for Continuity Methods
+// Section 10 of 11 : Generate the auxillary code needed for Continuity Methods
 // ==========================================================================
 
 void Print_Helper_Classes_For_Class(string classname)
@@ -1905,7 +1924,7 @@ void Print_Helper_Classes_For_Class(string classname)
 }
 
 // =============================================================
-// Section 10 of 10 : Parse all the class definitions in the input
+// Section 11 of 11 : Parse all the class definitions in the input
 // =============================================================
 
 void Replace_All_String_Literals_With_Spaces(bool undo = false)

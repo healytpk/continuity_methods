@@ -7,7 +7,11 @@ COMMAND_BUILD_PRECOMPILER="g++ -o precompiler precompiler.cpp -std=c++20 -fdump-
 if [ "$1" == "--release" ]; then
     COMMAND_BUILD_PRECOMPILER+=" -DNDEBUG -O3 -s "
 else
-    COMMAND_BUILD_PRECOMPILER+=" -ggdb3 -fsanitize=address,leak,undefined,pointer-compare,pointer-subtract -fstack-protector-all "
+    export ASAN_OPTIONS="detect_invalid_pointer_pairs=2"
+    COMMAND_BUILD_PRECOMPILER+=" -ggdb3 -fsanitize=address,leak,undefined,pointer-compare,pointer-subtract,float-divide-by-zero,float-cast-overflow \
+                                 -fsanitize-address-use-after-scope -fsanitize-coverage=trace-cmp \
+                                 -fcf-protection=full -fstack-protector-all -fstack-clash-protection \
+                                 -fvtv-debug -fvtv-counts -finstrument-functions "
 fi
 
 echo "= = = = = Building 'precompiler.cpp' . . . "

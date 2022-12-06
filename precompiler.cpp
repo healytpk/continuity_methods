@@ -1803,19 +1803,6 @@ void Print_Helper_Classes_For_Class(string classname)
 
     cout << "namespace Continuity_Methods { namespace Helpers { namespace " << classname << " {\n\n";
 
-    cout << "namespace Testers {\n\n";
-    for ( auto const &e : g_func_alterations )
-    {
-        string_view const tmp1 = e.second.fsig.Name();
-
-        cout << "    template<class U, class = decltype(&U::" << tmp1 << "____WITHOUT_CONTINUITY)>\n"
-             << "    struct " << tmp1 << "____WITHOUT_CONTINUITY {};\n\n";
-
-        cout << "    template<class U, class = decltype(&U::" << tmp1 << ")>\n"
-             << "    struct " << tmp1 << " {};\n\n";
-    }
-    cout << "}\n\n";
-
     cout <<
     "class IMethodInvoker {\n"
     "protected:\n"
@@ -1859,7 +1846,11 @@ void Print_Helper_Classes_For_Class(string classname)
                 "        {\n"
                 "            Base *const p_base_x7c1 = static_cast<Base*>(static_cast<Derived*>(arg_this));\n"
                 "\n"
-                "            if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << "____WITHOUT_CONTINUITY>::value )\n"
+                "            if constexpr ( requires { p_base_x7c1->Base::";
+
+        e.second.fsig.Invocation____WITHOUT_CONTINUITY(cout);
+
+        cout << "; } )\n"
                 "            {\n"
                 "                return p_base_x7c1->Base::";
 
@@ -1867,7 +1858,11 @@ void Print_Helper_Classes_For_Class(string classname)
 
         cout << ";\n"
                 "            }\n"
-                "            else if constexpr ( ::Continuity_Methods::exists<Base,::Continuity_Methods::Helpers::" << classname << "::Testers::" << name << ">::value )\n"
+                "            else if constexpr ( requires { p_base_x7c1->Base::";
+
+        e.second.fsig.Invocation(cout);
+
+        cout << "; } )\n"
                 "            {\n"
                 "                return p_base_x7c1->Base::";
 
@@ -3226,21 +3221,6 @@ void Print_Header(void)
             "\n"
             "    typedef decltype(sizeof(char)) size_t;\n"
             "    typedef decltype((char*)nullptr - (char*)nullptr) ptrdiff_t;\n"
-            "\n"
-            "    struct  true_type { static constexpr bool value = true ; };\n"
-            "    struct false_type { static constexpr bool value = false; };\n"
-            "\n"
-            "    template <class T, template <class...> class Test>\n"
-            "    struct exists {\n"
-            "\n"
-            "        template<class U>\n"
-            "        static true_type check(Test<U>*);\n"
-            "\n"
-            "        template<class U>\n"
-            "        static false_type check(...);\n"
-            "\n"
-            "        static constexpr bool value = decltype(check<T>(0))::value;\n"
-            "    };\n"
             "\n"
             "}\n\n";
 }
